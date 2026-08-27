@@ -98,5 +98,5 @@
     </type>
 
     <preference for="Magento\Checkout\Model\Cart\ImageProvider" type="FalcoSense\Search\Model\Cart\ImageProvider"/>
-    <preference for="Magento\Checkout\CustomerData\DefaultItem" type="Ahy\ThemeCustomization\CustomerData\DefaultItem"/>
+    <!-- <preference for="Magento\Checkout\CustomerData\DefaultItem" type="Ahy\ThemeCustomization\CustomerData\DefaultItem"/> -->
 </config>

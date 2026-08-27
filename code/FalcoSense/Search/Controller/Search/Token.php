@@ -35,15 +35,22 @@ class Token extends Action implements HttpGetActionInterface
 
         try {
             $storeId = (int) $this->storeManager->getStore()->getId();
-            $platformStoreId = (int) $this->helper->getPlatformStoreId($storeId);
-            $token = $this->tokenService->getToken($platformStoreId);
+            $tokenData = $this->tokenService->getTokenData($storeId);
 
-            if ($token === '') {
+            if ($tokenData['token'] === '') {
                 return $result->setHttpResponseCode(503)
                     ->setData(['success' => false, 'error' => 'Token service unavailable.']);
             }
 
-            return $result->setData(['success' => true, 'token' => $token]);
+            $ttlSeconds = $tokenData['expires_at']
+                ? max(0, strtotime($tokenData['expires_at']) - time())
+                : null;
+
+            return $result->setData([
+                'success'     => true,
+                'token'       => $tokenData['token'],
+                'ttl_seconds' => $ttlSeconds,
+            ]);
         } catch (\Throwable $e) {
             return $result->setHttpResponseCode(500)
                 ->setData(['success' => false, 'error' => 'Internal error.']);

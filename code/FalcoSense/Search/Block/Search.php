@@ -43,9 +43,9 @@ class Search extends Template
         return $this->helper->getApiKey();
     }
 
-    public function getSearchToken(int $magentoStoreId = 0): string
+    public function getSearchToken(): string
     {
-        return $this->tokenService->getToken($magentoStoreId);
+        return $this->tokenService->getToken((int) $this->_storeManager->getStore()->getId());
     }
 
     public function getProductsApiUrl(): string

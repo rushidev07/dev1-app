@@ -27,6 +27,18 @@ class SearchTokenService
      */
     public function getToken(int $magentoStoreId = 0): string
     {
+        return $this->getTokenData($magentoStoreId)['token'];
+    }
+
+    /**
+     * Same as getToken() but also returns the expiry, so callers that hand the
+     * token to the browser can let it proactively refresh before the token
+     * actually goes bad instead of only reacting to a 401 from the platform.
+     *
+     * @return array{token: string, expires_at: ?string}
+     */
+    public function getTokenData(int $magentoStoreId = 0): array
+    {
         $cacheFile = self::CACHE_FILE_PREFIX . $magentoStoreId . '.json';
 
         // Check file cache
@@ -35,7 +47,7 @@ class SearchTokenService
             if (!empty($cached['token']) && !empty($cached['expires_at'])) {
                 $expiresAt = strtotime($cached['expires_at']);
                 if ($expiresAt > time() + self::REFRESH_BEFORE) {
-                    return $cached['token'];
+                    return $cached;
                 }
             }
         }
@@ -44,11 +56,11 @@ class SearchTokenService
         $token = $this->fetchFromPlatform($magentoStoreId);
         if ($token !== null) {
             file_put_contents($cacheFile, json_encode($token), LOCK_EX);
-            return $token['token'];
+            return $token;
         }
 
-        // Fallback: return empty string — caller should handle gracefully
-        return '';
+        // Fallback: caller should handle an empty token gracefully
+        return ['token' => '', 'expires_at' => null];
     }
 
     private function fetchFromPlatform(int $magentoStoreId): ?array
