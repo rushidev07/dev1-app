@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Customer:etc/sections.xsd">
+    <!-- Refresh the cumulative-savings badge after an order is placed (savings are
+         recorded at checkout_submit_all_after, so the total changes here). Login /
+         logout already reload every section, covering the member's first page load. -->
+    <action name="checkout/onepage/success">
+        <section name="caliber-nation-savings"/>
+    </action>
+</config>

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!-- SmartSearch renders its own category listing; remove the redundant layered nav sidebar
+             (theme-level override so it reliably wins over the Hyva/core declaration regardless of merge order) -->
+        <referenceBlock name="catalog.leftnav" remove="true"/>
+        <referenceContainer name="sidebar.main" remove="true"/>
+    </body>
+</page>

@@ -1,0 +1,30 @@
+<?php
+declare(strict_types=1);
+
+namespace FalcoSense\Search\Block;
+
+use Magento\Framework\View\Element\Template;
+
+/**
+ * Assigned to the "header-search" block via view/frontend/layout/default.xml.
+ *
+ * Magento's layout merge always lets theme-level layout files win over module
+ * layout files for the "template" attribute — confirmed directly via Magento's
+ * own template hints and temporary debug logging in
+ * Magento\Framework\View\Layout\Generator\Block::generateBlock() on 2026-08-20:
+ * Hyva's default theme's own Magento_Theme/layout/default.xml resets
+ * "header-search"'s template to its own stock file no matter what this
+ * module's layout XML sets, regardless of module load order.
+ *
+ * That merge only ever touches the "template" attribute though — never
+ * "class". So this class assignment survives untouched, and getTemplate()
+ * below simply never looks at whatever "template" value layout XML ended up
+ * with, sidestepping the problem entirely instead of trying to win it.
+ */
+class HeaderSearchForm extends Template
+{
+    public function getTemplate()
+    {
+        return "FalcoSense_Search::html/header/search-form.phtml";
+    }
+}

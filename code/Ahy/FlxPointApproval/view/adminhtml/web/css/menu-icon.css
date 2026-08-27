@@ -1,0 +1,11 @@
+/* FlxPoint Approval top-level menu icon */
+#menu-ahy-flxpointapproval-top-level > a:before {
+    background: url('../images/flxpoint-approval-icon.svg') no-repeat center !important;
+    content: '';
+    background-size: contain !important;
+}
+
+#menu-ahy-flxpointapproval-top-level > a:hover:before,
+#menu-ahy-flxpointapproval-top-level.active > a:before {
+    background-image: url('../images/flxpoint-approval-icon-active.svg') !important;
+}

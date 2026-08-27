@@ -1,0 +1,129 @@
+<!--@subject Welcome to Caliber Nation! Your Membership is Active @-->
+<!--@vars {
+    "var first_name":"First Name",
+    "var tier_label":"Membership Tier Label",
+    "var renewal_date":"Renewal Date",
+    "var store_name":"Store Name",
+    "var store_url":"Store URL",
+    "var account_url":"My Account URL",
+    "var is_new_user":"Is New User (boolean)",
+    "var savings_message":"Savings messaging"
+} @-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f1eb;font-family:Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f1eb;padding:40px 0;">
+    <tr>
+        <td align="center">
+            <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:4px;overflow:hidden;">
+
+                <!-- Header -->
+                <tr>
+                    <td style="background-color:#1b2a47;padding:32px 40px;text-align:center;">
+                        <img src="{{media url='wysiwyg/caliber-nation/caliber-nation-logo.png'}}"
+                             alt="Caliber Nation"
+                             width="160"
+                             style="display:block;margin:0 auto;"/>
+                    </td>
+                </tr>
+
+                <!-- Hero banner -->
+                <tr>
+                    <td style="background-color:#c0392b;padding:24px 40px;text-align:center;">
+                        <p style="margin:0;font-size:22px;font-weight:bold;color:#ffffff;letter-spacing:1px;text-transform:uppercase;">
+                            You're In. Welcome to Caliber Nation.
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                    <td style="padding:40px;color:#1b2a47;">
+                        <p style="margin:0 0 16px 0;font-size:16px;">Hi {{var first_name}},</p>
+                        <p style="margin:0 0 24px 0;font-size:15px;line-height:1.7;color:#444;">
+                            Your <strong>{{var tier_label}}</strong> membership is now active.
+                            You now have access to exclusive discounts, early-bird sales, member-only spotlight deals, and much more.
+                        </p>
+                        {{depend savings_message}}
+                        <p style="margin:0 0 24px 0;font-size:15px;line-height:1.7;color:#1b7a3d;font-weight:bold;">
+                            {{var savings_message}}
+                        </p>
+                        {{/depend}}
+
+                        <!-- Membership details card -->
+                        <table width="100%" cellpadding="0" cellspacing="0"
+                               style="background:#f4f1eb;border-radius:4px;margin-bottom:32px;">
+                            <tr>
+                                <td style="padding:24px 28px;">
+                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td style="font-size:13px;color:#888;padding-bottom:4px;">MEMBERSHIP PLAN</td>
+                                            <td style="font-size:13px;color:#888;padding-bottom:4px;text-align:right;">RENEWS ON</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size:16px;font-weight:bold;color:#1b2a47;">{{var tier_label}}</td>
+                                            <td style="font-size:16px;font-weight:bold;color:#1b2a47;text-align:right;">{{var renewal_date}}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- CTA -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                            <tr>
+                                <td align="center">
+                                    <a href="{{var store_url}}"
+                                       style="display:inline-block;background-color:#c0392b;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;padding:16px 40px;border-radius:50px;">
+                                        Start Shopping
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- New user note -->
+                        {{depend is_new_user}}
+                        <table width="100%" cellpadding="0" cellspacing="0"
+                               style="background:#fff8e1;border-left:4px solid #f0c040;margin-bottom:24px;">
+                            <tr>
+                                <td style="padding:16px 20px;font-size:14px;color:#555;line-height:1.6;">
+                                    <strong>Set your password</strong><br/>
+                                    We've sent you a separate email with a link to set your account password.
+                                    Once set, you can manage your membership from
+                                    <a href="{{var account_url}}" style="color:#1b2a47;">My Account</a>.
+                                </td>
+                            </tr>
+                        </table>
+                        {{/depend}}
+
+                        <p style="margin:0;font-size:14px;color:#666;line-height:1.6;">
+                            You can manage your membership, toggle auto-renew, or cancel anytime from
+                            <a href="{{var account_url}}" style="color:#1b2a47;">My Account</a>.
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="background-color:#f4f1eb;padding:24px 40px;text-align:center;border-top:1px solid #e0dbd0;">
+                        <p style="margin:0 0 8px 0;font-size:12px;color:#999;">
+                            You received this email because you joined Caliber Nation at {{var store_name}}.
+                        </p>
+                        <p style="margin:0;font-size:12px;color:#999;">
+                            &copy; {{var store_name}}. All rights reserved.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

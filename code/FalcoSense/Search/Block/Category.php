@@ -1,0 +1,101 @@
+<?php
+declare(strict_types=1);
+
+namespace FalcoSense\Search\Block;
+
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Catalog\Model\Layer\Resolver as LayerResolver;
+use FalcoSense\Search\Helper\Data as SmartSearchHelper;
+use FalcoSense\Search\Service\SearchTokenService;
+
+class Category extends Template
+{
+    private SmartSearchHelper  $helper;
+    private LayerResolver      $layerResolver;
+    private SearchTokenService $tokenService;
+
+    public function __construct(
+        Context            $context,
+        SmartSearchHelper  $helper,
+        LayerResolver      $layerResolver,
+        SearchTokenService $tokenService,
+        array              $data = []
+    ) {
+        parent::__construct($context, $data);
+        $this->helper        = $helper;
+        $this->layerResolver = $layerResolver;
+        $this->tokenService  = $tokenService;
+    }
+
+    public function getSearchApiUrl(): string
+    {
+        $url = $this->helper->getSearchUrl();
+        return $url ?: 'http://localhost:8001/api/search.php';
+    }
+
+    public function getApiKey(): string
+    {
+        return $this->helper->getApiKey();
+    }
+
+    public function getSearchToken(int $magentoStoreId = 0): string
+    {
+        return $this->tokenService->getToken($magentoStoreId);
+    }
+
+    public function getProductsApiUrl(): string
+    {
+        $endpoint = $this->helper->getEndpointUrl();
+        if (!$endpoint) {
+            return 'http://localhost:8080/api/v1/products';
+        }
+        $parts = parse_url($endpoint);
+        $base  = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
+        if (!empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+        return $base . '/api/v1/products';
+    }
+
+    public function getPlatformStoreId(): int
+    {
+        return $this->helper->getPlatformStoreId();
+    }
+
+    public function getSearchAnalyticsUrl(): string
+    {
+        $endpoint = $this->helper->getEndpointUrl();
+        if (!$endpoint) {
+            return 'http://localhost:8080/api/v1/analytics/search';
+        }
+        $parts = parse_url($endpoint);
+        $base  = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
+        if (!empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+        return $base . '/api/v1/analytics/search';
+    }
+
+    public function getCategoryName(): string
+    {
+        try {
+            $layer    = $this->layerResolver->get();
+            $category = $layer->getCurrentCategory();
+            return (string) ($category ? $category->getName() : '');
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    public function getCategoryId(): int
+    {
+        try {
+            $layer    = $this->layerResolver->get();
+            $category = $layer->getCurrentCategory();
+            return (int) ($category ? $category->getId() : 0);
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+}

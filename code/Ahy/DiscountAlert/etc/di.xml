@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <preference for="Ahy\DiscountAlert\Api\ConfigInterface"
+                type="Ahy\DiscountAlert\Model\Config"/>
+    <preference for="Ahy\DiscountAlert\Api\ProductCollectorInterface"
+                type="Ahy\DiscountAlert\Service\DiscountProductCollector"/>
+    <preference for="Ahy\DiscountAlert\Api\RunRepositoryInterface"
+                type="Ahy\DiscountAlert\Model\RunRepository"/>
+    <preference for="Ahy\DiscountAlert\Api\Data\RunInterface"
+                type="Ahy\DiscountAlert\Model\Run"/>
+    <preference for="Ahy\DiscountAlert\Api\Data\RunItemInterface"
+                type="Ahy\DiscountAlert\Model\RunItem"/>
+
+    <!-- Dedicated log file, so an alert failure is not lost among unrelated system noise. -->
+    <virtualType name="Ahy\DiscountAlert\Logger\Handler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/ahy_discount_alert.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="Ahy\DiscountAlert\Logger\Logger" type="Magento\Framework\Logger\Monolog">
+        <arguments>
+            <argument name="name" xsi:type="string">ahyDiscountAlert</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">Ahy\DiscountAlert\Logger\Handler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Ahy\DiscountAlert\Cron\SendDiscountAlert">
+        <arguments>
+            <argument name="logger" xsi:type="object">Ahy\DiscountAlert\Logger\Logger</argument>
+        </arguments>
+    </type>
+    <type name="Ahy\DiscountAlert\Service\AlertDispatcher">
+        <arguments>
+            <argument name="logger" xsi:type="object">Ahy\DiscountAlert\Logger\Logger</argument>
+        </arguments>
+    </type>
+    <type name="Ahy\DiscountAlert\Controller\Adminhtml\Run\Disable">
+        <arguments>
+            <argument name="logger" xsi:type="object">Ahy\DiscountAlert\Logger\Logger</argument>
+        </arguments>
+    </type>
+    <type name="Ahy\DiscountAlert\Controller\Adminhtml\Run\RevertToMsrp">
+        <arguments>
+            <argument name="logger" xsi:type="object">Ahy\DiscountAlert\Logger\Logger</argument>
+        </arguments>
+    </type>
+    <type name="Ahy\DiscountAlert\Controller\Adminhtml\Run\RestoreSpecialPrice">
+        <arguments>
+            <argument name="logger" xsi:type="object">Ahy\DiscountAlert\Logger\Logger</argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="ahyDiscountAlertSend" xsi:type="object">
+                    Ahy\DiscountAlert\Console\Command\SendAlertCommand
+                </item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!--
+        Every registered command is constructed when the CLI builds its command list, before
+        any area is set. Injecting the dispatcher through a proxy keeps its dependency graph
+        (mail templates, blocks, layout) from being built until the command actually runs,
+        which would otherwise fail with "Area code is not set".
+    -->
+    <type name="Ahy\DiscountAlert\Console\Command\SendAlertCommand">
+        <arguments>
+            <argument name="dispatcher" xsi:type="object">Ahy\DiscountAlert\Service\AlertDispatcher\Proxy</argument>
+        </arguments>
+    </type>
+
+</config>

@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd"
+      layout="1column">
+    <head>
+        <css src="Ahy_PlpRevamp::css/catnav-styles.css"/>
+    </head>
+    <body>
+        <attribute name="class" value="ahy-brands-body"/>
+        <referenceBlock name="breadcrumbs">
+            <action method="addCrumb">
+                <argument name="crumbName" xsi:type="string">home</argument>
+                <argument name="crumbInfo" xsi:type="array">
+                    <item name="label" xsi:type="string">Home</item>
+                    <item name="title" xsi:type="string">Home</item>
+                    <item name="link" xsi:type="string">/</item>
+                </argument>
+            </action>
+            <action method="addCrumb">
+                <argument name="crumbName" xsi:type="string">all_brands</argument>
+                <argument name="crumbInfo" xsi:type="array">
+                    <item name="label" xsi:type="string">All Brands</item>
+                    <item name="title" xsi:type="string">All Brands</item>
+                </argument>
+            </action>
+        </referenceBlock>
+        <referenceContainer name="main">
+            <block class="Ahy\PlpRevamp\Block\Brands\AllBrands"
+                   name="ahy.brands.all"
+                   template="Ahy_PlpRevamp::brands/all_brands.phtml"/>
+        </referenceContainer>
+    </body>
+</page>

@@ -1,0 +1,154 @@
+<?php
+/**
+ * Recorded discount alert runs, newest first.
+ *
+ * @var \Ahy\DiscountAlert\Block\Adminhtml\Run\Listing $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+use Ahy\DiscountAlert\Block\Adminhtml\Run\Listing;
+
+$runs        = $block->getRuns();
+$totalRuns   = $block->getTotalRuns();
+$totalPages  = $block->getTotalPages();
+$currentPage = $block->getCurrentPage();
+$pagerFormId = 'ahy-da-runs-pager-form';
+?>
+<div class="admin__data-grid-outer-wrap ahy-da-grid">
+
+    <div class="ahy-da-summary">
+        <?= $escaper->escapeHtml(__('Every recorded alert run. Open one to review the products it flagged and disable any that should not be on sale.')) ?>
+    </div>
+
+    <?php if (!$runs): ?>
+        <div class="message message-notice">
+            <?= $escaper->escapeHtml(__('No alert runs have been recorded yet. One is created each time the alert is sent.')) ?>
+        </div>
+    <?php else: ?>
+        <form id="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+              action="<?= $escaper->escapeUrl($block->getListUrl()) ?>"
+              method="get"></form>
+
+        <div class="ahy-da-toolbar">
+            <div class="ahy-da-toolbar-left">
+                <span class="ahy-da-records">
+                    <?= $escaper->escapeHtml(__('%1 records found', $totalRuns)) ?>
+                </span>
+            </div>
+
+            <div class="ahy-da-pager">
+                <select class="admin__control-select ahy-da-pager-limit"
+                        form="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+                        name="<?= $escaper->escapeHtmlAttr(Listing::PARAM_LIMIT) ?>"
+                        data-role="page-size">
+                    <?php foreach ($block->getPageSizes() as $size): ?>
+                        <option value="<?= (int) $size ?>" <?= $block->getPageSize() === $size ? 'selected="selected"' : '' ?>>
+                            <?= (int) $size ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <span class="ahy-da-pager-label"><?= $escaper->escapeHtml(__('per page')) ?></span>
+
+                <?php if ($currentPage > 1): ?>
+                    <a class="ahy-da-pager-arrow" href="<?= $escaper->escapeUrl($block->getPageUrl($currentPage - 1)) ?>"
+                       title="<?= $escaper->escapeHtmlAttr(__('Previous page')) ?>">&#8249;</a>
+                <?php else: ?>
+                    <span class="ahy-da-pager-arrow _disabled">&#8249;</span>
+                <?php endif; ?>
+
+                <input type="text" class="admin__control-text ahy-da-pager-page"
+                       form="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+                       name="<?= $escaper->escapeHtmlAttr(Listing::PARAM_PAGE) ?>"
+                       value="<?= (int) $currentPage ?>"/>
+                <span class="ahy-da-pager-label"><?= $escaper->escapeHtml(__('of %1', $totalPages)) ?></span>
+
+                <?php if ($currentPage < $totalPages): ?>
+                    <a class="ahy-da-pager-arrow" href="<?= $escaper->escapeUrl($block->getPageUrl($currentPage + 1)) ?>"
+                       title="<?= $escaper->escapeHtmlAttr(__('Next page')) ?>">&#8250;</a>
+                <?php else: ?>
+                    <span class="ahy-da-pager-arrow _disabled">&#8250;</span>
+                <?php endif; ?>
+
+                <button type="submit" class="action-default ahy-da-pager-go"
+                        form="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+                        data-role="pager-go">
+                    <span><?= $escaper->escapeHtml(__('Go')) ?></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="admin__data-grid-wrap">
+            <table class="data-grid">
+                <thead>
+                    <tr>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Run')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Recorded')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Threshold')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Products Flagged')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('New This Run')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('No Longer Flagged')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Email Sent')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Products Recorded')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Disabled Since')) ?></span></th>
+                        <th class="data-grid-th"><span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Action')) ?></span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($runs as $run): ?>
+                    <tr class="data-row">
+                        <td><?= $escaper->escapeHtml('#' . (int) $run->getRunId()) ?></td>
+                        <td><?= $escaper->escapeHtml((string) $run->getCreatedAt()) ?></td>
+                        <td><?= $escaper->escapeHtml($block->formatThreshold($run) . '%') ?></td>
+                        <td><?= $escaper->escapeHtml((string) $run->getProductCount()) ?></td>
+                        <td>
+                            <?php if ($block->getNewCount($run) > 0): ?>
+                                <span class="grid-severity-major">
+                                    <span><?= $escaper->escapeHtml((string) $block->getNewCount($run)) ?></span>
+                                </span>
+                            <?php else: ?>
+                                <span class="ahy-da-muted">0</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($block->getRemovedCount($run) > 0): ?>
+                                <?= $escaper->escapeHtml((string) $block->getRemovedCount($run)) ?>
+                            <?php else: ?>
+                                <span class="ahy-da-muted">0</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($block->isEmailSent($run)): ?>
+                                <span class="grid-severity-notice">
+                                    <span><?= $escaper->escapeHtml(__('Sent')) ?></span>
+                                </span>
+                            <?php else: ?>
+                                <span class="ahy-da-muted"><?= $escaper->escapeHtml(__('No change')) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?= $escaper->escapeHtml((string) $run->getItemCount()) ?>
+                            <?php if ($run->isTruncated()): ?>
+                                <span class="ahy-da-muted">(<?= $escaper->escapeHtml(__('capped')) ?>)</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= $escaper->escapeHtml((string) $block->getDisabledCount($run)) ?></td>
+                        <td class="ahy-da-action-cell">
+                            <a class="ahy-da-row-action" href="<?= $escaper->escapeUrl($block->getReviewUrl($run)) ?>">
+                                <?= $escaper->escapeHtml(__('Review')) ?>
+                            </a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <script type="text/x-magento-init">
+            {
+                "#<?= /* @noEscape */ $pagerFormId ?>": {
+                    "Ahy_DiscountAlert/js/run-items": {}
+                }
+            }
+        </script>
+    <?php endif; ?>
+</div>

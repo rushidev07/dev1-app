@@ -1,0 +1,87 @@
+<?php
+/**
+ * Hyvä Themes - https://hyva.io
+ * Copyright © Hyvä Themes 2020-present. All rights reserved.
+ * This product is licensed per Magento install
+ * See https://hyva.io/license
+ */
+
+declare(strict_types=1);
+
+use Magento\Theme\Block\Html\Breadcrumbs;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var Breadcrumbs $block */
+/** @var array[] $crumbs */
+
+?>
+<?php if ($crumbs && is_array($crumbs)): ?>
+<style>
+@media (max-width: 767px) {
+    .breadcrumbs ol.items {
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+    .breadcrumbs ol.items > li {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    .breadcrumbs ol.items > li:last-child {
+        flex-shrink: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .breadcrumbs ol.items > li:last-child a {
+        display: block;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+}
+@media (min-width: 480px) and (max-width: 767px) {
+    /* slightly more space — no change needed, ellipsis handles it */
+}
+@media (min-width: 768px) {
+    .breadcrumbs ol.items {
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+    .breadcrumbs ol.items > li,
+    .breadcrumbs ol.items > li:last-child {
+        flex-shrink: 1;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+}
+</style>
+<nav class="breadcrumbs bg-ahy-bg shadow-sm" aria-label="Breadcrumb">
+    <div class="container">
+        <ol class="items list-reset py-4 rounded flex flex-wrap text-ahy-blue text-sm">
+            <?php foreach ($crumbs as $crumbName => $crumbInfo): ?>
+                <li class="item flex <?= $escaper->escapeHtmlAttr($crumbName) ?>">
+                <?php if (!$crumbInfo['first']): ?>
+                    <span aria-hidden="true" class="separator px-2">/</span>
+                <?php endif; ?>
+                <?php if ($crumbInfo['link']): ?>
+                    <a href="<?= $escaper->escapeUrl($crumbInfo['link']) ?>"
+                       class="underline underline-offset-6 "
+                       title="<?= $escaper->escapeHtmlAttr($crumbInfo['title']) ?>"
+                    ><?= $escaper->escapeHtml($crumbInfo['label']) ?></a>
+                <?php elseif ($crumbInfo['last']): ?>
+                    <a href="<?= $escaper->escapeUrl($crumbInfo['link']) ?>"
+                       class="underline underline-offset-6 "
+                       aria-current="page"
+                    ><?= $escaper->escapeHtml($crumbInfo['label']) ?></a>
+                <?php else: ?>
+                    <?= $escaper->escapeHtml($crumbInfo['label']) ?>
+                <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ol>
+    </div>
+</nav>
+<?php endif; ?>

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Communication/etc/communication.xsd">
+
+    <topic name="falcosense.search.product.sync"
+           request="string"/>
+
+    <!-- Full-sync topic: payload is a JSON string containing a batch of product IDs.
+         Uses the db connection — no RabbitMQ required. -->
+    <topic name="falcosense.search.full_sync"
+           request="string"/>
+
+</config>

@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+
+    <event name="customer_login">
+        <observer name="ahy_smartsearch_customer_login"
+                  instance="FalcoSense\Search\Observer\CustomerLoginObserver"/>
+    </event>
+
+    <event name="customer_register_success">
+        <observer name="ahy_smartsearch_customer_register"
+                  instance="FalcoSense\Search\Observer\CustomerRegisterObserver"/>
+    </event>
+
+    <event name="catalog_controller_product_view">
+        <observer name="ahy_smartsearch_product_view"
+                  instance="FalcoSense\Search\Observer\ProductViewObserver"/>
+    </event>
+
+    <event name="checkout_cart_product_add_after">
+        <observer name="ahy_smartsearch_add_to_cart"
+                  instance="FalcoSense\Search\Observer\AddToCartObserver"/>
+    </event>
+
+    <event name="sales_quote_remove_item">
+        <observer name="ahy_smartsearch_remove_from_cart"
+                  instance="FalcoSense\Search\Observer\RemoveFromCartObserver"/>
+    </event>
+
+    <event name="wishlist_add_product">
+        <observer name="ahy_smartsearch_wishlist_add"
+                  instance="FalcoSense\Search\Observer\WishlistAddObserver"/>
+    </event>
+
+    <event name="customer_logout">
+        <observer name="ahy_smartsearch_customer_logout"
+                  instance="FalcoSense\Search\Observer\CustomerLogoutObserver"/>
+    </event>
+
+</config>

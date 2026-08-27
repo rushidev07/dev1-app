@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <!--
+            Sits under the existing Ahy tab, which Ahy_Ffl declares as Ahy::top_level.
+            No module sequence is added for it on purpose: Magento merges menu.xml from every
+            enabled module regardless of load order, and if Ahy_Ffl were ever disabled this
+            item would simply not render rather than breaking the menu.
+        -->
+        <add id="Ahy_DiscountAlert::runs"
+             title="Discount Alerts"
+             translate="title"
+             module="Ahy_DiscountAlert"
+             sortOrder="20"
+             parent="Ahy::top_level"
+             action="ahy_discount_alert/run/index"
+             resource="Ahy_DiscountAlert::manage"/>
+    </menu>
+</config>

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/consumer.xsd">
+
+    <consumer name="smartSearchProductSync"
+              queue="falcosense.search.product.sync"
+              connection="db"
+              consumerInstance="Magento\Framework\MessageQueue\Consumer"
+              handler="FalcoSense\Search\Model\WebhookConsumer::process"
+              maxMessages="100"/>
+
+    <!-- Full-sync consumer: processes batches of 500 product IDs queued by the admin button.
+         Uses db connection — no RabbitMQ required.
+         Run with: bin/magento queue:consumers:start smartSearchFullSync -->
+    <consumer name="smartSearchFullSync"
+              queue="falcosense.search.full_sync"
+              connection="db"
+              consumerInstance="Magento\Framework\MessageQueue\Consumer"
+              handler="FalcoSense\Search\Model\FullSyncConsumer::process"
+              maxMessages="1000"/>
+
+</config>

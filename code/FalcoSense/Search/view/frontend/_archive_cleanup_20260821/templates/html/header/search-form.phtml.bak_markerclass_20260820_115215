@@ -1,0 +1,1196 @@
+<?php
+/**
+ * Hyvä Themes - https://hyva.io
+ * Copyright © Hyvä Themes 2020-present. All rights reserved.
+ * This product is licensed per Magento install
+ * See https://hyva.io/license
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use Magento\Search\Helper\Data as SearchHelper;
+use FalcoSense\Search\Helper\Data as SmartSearchHelper;
+use FalcoSense\Search\Service\SearchTokenService;
+
+// phpcs:disable Magento2.Templates.ThisInTemplate.FoundHelper
+
+/** @var Escaper $escaper */
+/** @var Template $block */
+/** @var SearchHelper $helper */
+
+$helper            = $this->helper(SearchHelper::class);
+$smartSearchHelper = $this->helper(SmartSearchHelper::class);
+
+$tokenService    = \Magento\Framework\App\ObjectManager::getInstance()->get(SearchTokenService::class);
+$platformStoreId = (int) $smartSearchHelper->getPlatformStoreId();
+$searchToken     = $tokenService->getToken($platformStoreId);
+
+$endpoint = $smartSearchHelper->getEndpointUrl() ?: 'http://localhost:8080';
+$parsed   = parse_url($endpoint);
+$apiBase  = ($parsed['scheme'] ?? 'http') . '://' . ($parsed['host'] ?? 'localhost');
+if (!empty($parsed['port'])) { $apiBase .= ':' . $parsed['port']; }
+$productsApiUrl  = $apiBase . '/api/v1/products';
+$productDetailUrl = $apiBase . '/api/v1/product';
+$addToCartUrl    = $block->getUrl('checkout/cart/add');
+$tokenRefreshUrl = $block->escapeUrl($block->getUrl('smartsearch/search/token'));
+$fsSearchUrl     = $block->escapeUrl($block->getUrl('fs/search'));
+?>
+<style>
+/* ── Modal shell ─────────────────────────────────────────── */
+#ahyModal { display:none; width:100%; min-height:90vh; background:#efeadd; }
+#ahyModal.is-open { display:block; }
+body.ahy-search-open .page-main,
+body.ahy-search-open main,
+body.ahy-search-open #maincontent { display:none !important; }
+body.ahy-search-open .top-container { display:none !important; }
+body.ahy-search-open { background:#efeadd !important; }
+.ahy-filter-modal { z-index: 999999; }
+/* Mobile card: edge-to-edge below 640px, padded above */
+.ahy-mobile-card { margin-left:50%; width:100vw; transform:translateX(-50%); }
+@media (min-width:640px) {
+    .ahy-mobile-card { margin-left:auto; width:100%; transform:none; max-width:640px; }
+}
+/* ── Popular products carousel ────────────────────────────── */
+.pop-wrap{position:relative;}
+.pop-cards-row{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:none;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px;cursor:grab;user-select:none;}
+.pop-cards-row.is-dragging{cursor:grabbing;}
+.pop-cards-row::-webkit-scrollbar{display:none;}
+.pop-card{flex-shrink:0;width:calc(78% - 6px);scroll-snap-align:start;}
+.pop-nav-btn{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;border-radius:50%;background:rgba(100,100,100,0.75);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;}
+.pop-nav-btn-prev{left:12px;}
+.pop-nav-btn-next{right:12px;}
+.popular-searches-row{display:flex;flex-wrap:wrap;gap:10px;}
+@media(max-width:767px){.pop-cards-row{scroll-snap-type:x mandatory;}}
+@media(min-width:640px){.pop-card{width:calc(48% - 6px);}}
+@media(min-width:1024px){.pop-card{width:calc(25% - 9px);}}
+    /* Everest GIF page loader */
+    .ahy-page-loader {
+        background: url(/media/icons/everest-loading-icon.gif) no-repeat center;
+        height: 100px;
+        width: 100px;
+        margin: 80px auto;
+        position: relative;
+    }
+    /* Modal loader — white blurred backdrop, pinned over the results area while loading/paginating */
+    .ahy-modal-loader-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #efeadd;
+    }
+</style>
+
+<!-- ── Search form ───────────────────────────────────────── -->
+<script>
+'use strict';
+// Captured once, before any live-search typing changes the address bar, so the
+// URL can be restored when the search modal closes.
+window._ahyOriginalUrl = window._ahyOriginalUrl || window.location.href;
+
+// Every debounced search (see the 1000ms debounce on the input below) gets
+// its own real history entry via pushState, never replaceState — so pressing
+// Back steps through each previous search one at a time, landing back on
+// each in turn, all the way out to the page the visitor actually arrived on
+// (replaceState would instead overwrite that arrival entry in place, leaving
+// nothing for Back to land on but whatever was before this site entirely).
+// We track how many we've pushed so closeModal() can pop all of them at once
+// with a single history.go() instead of one at a time.
+window._ahySearchPushCount = window._ahySearchPushCount || 0;
+
+function ahySetSearchUrl(url) {
+    window._ahySearchPushCount++;
+    history.pushState(history.state, '', url);
+}
+
+// history.replaceState()/pushState() (used above/below to keep the URL in
+// sync while typing) don't leave behind a DOM snapshot matching the pre-search
+// page. So when the user hits Back/Forward, the browser's bfcache can try to
+// restore the DOM as it last looked (mid-search, with the modal's own
+// styling/state applied) instead of re-rendering fresh, producing a broken
+// layout. Forcing a real reload on back/forward guarantees a clean, correctly
+// styled page every time. This is suppressed for the one history.back() call
+// closeModal() makes on its own (see below) since that's just collapsing the
+// overlay, not a real user Back-button press, and reloading there would be a
+// jarring, unnecessary flash for something that should feel instant.
+if (!window._ahyPopstateReloadBound) {
+    window._ahyPopstateReloadBound = true;
+    window.addEventListener('popstate', () => {
+        if (window._ahySuppressPopstateReload) { window._ahySuppressPopstateReload = false; return; }
+        window.location.reload();
+    });
+}
+
+function initMiniSearch() {
+    return {
+        minSearchLength: <?= (int) $helper->getMinQueryLength() ?>,
+        _searchResultBaseUrl: <?= json_encode($fsSearchUrl) ?>,
+        _queryParamName: <?= json_encode($helper->getQueryParamName()) ?>,
+        suggest() {
+            const term = this.$refs.searchInput.value.trim();
+            if (term.length < this.minSearchLength) {
+                window.dispatchEvent(new CustomEvent('ahy-modal-close'));
+                return;
+            }
+            this.$refs.searchInput.setCustomValidity('');
+            window.dispatchEvent(new CustomEvent('ahy-modal-search', { detail: { query: term } }));
+
+            // Reflect the live query in the address bar (no page reload, no new
+            // history entry per keystroke) so the URL always matches what the
+            // AJAX search modal is currently showing.
+            const url = new URL(this._searchResultBaseUrl, window.location.origin);
+            url.searchParams.set(this._queryParamName, term);
+            ahySetSearchUrl(url.toString());
+        },
+        async onFocus() {
+            if (this.$refs.searchInput.value.trim().length >= this.minSearchLength) {
+                window.dispatchEvent(new CustomEvent('ahy-modal-open'));
+            }
+        },
+        search(term) {
+            const input = this.$refs.searchInput;
+            term = term || input.value;
+            if (term.length < this.minSearchLength) {
+                input.setCustomValidity('<?= $escaper->escapeJs(__('Minimum Search query length is %1', $helper->getMinQueryLength())) ?>');
+                input.reportValidity();
+                return;
+            }
+            input.setCustomValidity('');
+            input.value = term;
+            this.$refs.form.submit();
+        },
+    }
+}
+</script>
+
+<div class="container px-0 py-2 mx-auto text-black" x-data="initMiniSearch()">
+    <form class="form minisearch relative" id="search_mini_form" x-ref="form" @submit.prevent="search()"
+          action="<?= $fsSearchUrl ?>" method="get">
+
+        <label class="hidden" for="search" data-role="minisearch-label">
+            <span><?= $escaper->escapeHtml(__('Search')) ?></span>
+        </label>
+
+        <div class="relative flex items-center" data-ahy-file="2-FalcoSense_Search-html-header-search-form">
+            <input id="search"
+                x-ref="searchInput"
+                type="text"
+                autocomplete="off"
+                name="<?= $escaper->escapeHtmlAttr($helper->getQueryParamName()) ?>"
+                value="<?= /** @noEscape */ $helper->getEscapedQueryText() ?>"
+                placeholder="<?= $escaper->escapeHtmlAttr(__('Search for products')) ?>"
+                maxlength="<?= $escaper->escapeHtmlAttr($helper->getMaxQueryLength()) ?>"
+                class="w-full p-2 py-3 leading-normal placeholder-black transition appearance-none text-grey-800
+                       focus:outline-none focus:border-transparent focus:ring-transparent pl-6 rounded-full border-transparent"
+                @focus="onFocus()"
+                @input.debounce.300="suggest()"
+                @keydown.escape="window.dispatchEvent(new CustomEvent('ahy-modal-close'))"
+                @keydown.enter.prevent
+            />
+        </div>
+
+        <button type="submit" title="<?= $escaper->escapeHtml(__('Search')) ?>" class="action search sr-only" aria-label="Search">
+            <?= $escaper->escapeHtml(__('Search')) ?>
+        </button>
+    </form>
+</div>
+
+<!-- ── Search modal — same logic & HTML as results.phtml ─── -->
+<script>
+/**
+ * Shared page-wide search-token source. The token baked into this (and other)
+ * server-rendered templates can go stale once the page HTML is served from
+ * Varnish's full-page cache, since the cache freezes whatever token was live
+ * at render time. This helper always fetches a live token from an endpoint
+ * that is explicitly marked no-store/no-cache, bypassing Varnish, so every
+ * page view (cached or not) ends up using a currently-valid token.
+ */
+window.ahyTokenRefresh = window.ahyTokenRefresh || (function () {
+    const tokenUrl = <?= json_encode($tokenRefreshUrl) ?>;
+    let cached = null;
+    let inflight = null;
+
+    async function fetchLive() {
+        try {
+            const resp = await fetch(tokenUrl, { credentials: 'include', cache: 'no-store' });
+            const data = await resp.json();
+            return data && data.success ? data.token : null;
+        } catch (e) {
+            console.error('[ahyTokenRefresh] fetch error', e);
+            return null;
+        }
+    }
+
+    return {
+        // Returns a token, fetching one live only if we don't already have one cached in memory.
+        async get() {
+            if (cached) return cached;
+            if (!inflight) {
+                inflight = fetchLive().then(t => { cached = t; inflight = null; return t; });
+            }
+            return inflight;
+        },
+        // Forces a brand-new live token (used after a 401) and notifies listeners.
+        async refresh() {
+            cached = null;
+            const t = await this.get();
+            if (t) window.dispatchEvent(new CustomEvent('ahy-token-refreshed', { detail: t }));
+            return t;
+        },
+    };
+})();
+
+function ahyModalSearch(productsApiUrl, searchToken, addToCartUrl) {
+    return {
+        productsApiUrl,
+        searchToken,
+        addToCartUrl,
+        results: [],
+        popularProducts: [],
+        popularSearches: [],
+        isMobile: window.innerWidth < 768,
+        popularScrollPos: 0,
+        popularScrollMax: 0,
+        _popDragging: false,
+        _popDragStartX: 0,
+        _popDragScrollLeft: 0,
+        _popDragMoved: false,
+        filters: [],
+        apiFacets: [],
+        activeFilters: [],
+        priceRange: { min: null, max: null },
+        activePriceMin: '',
+        activePriceMax: '',
+        activePriceRange: null,
+        priceCollapsed: false,
+        total: 0,
+        page: 1,
+        pageSize: 12,
+        totalPages: 1,
+        sort: 'relevance',
+        loading: false,
+        cartLoading: {},
+        wishLoading: {},
+        mobileFiltersOpen: false,
+        mobileSortOpen: false,
+        wasCorrection: false,
+        correctedQuery: '',
+        originalQuery: '',
+        suggestedQuery: '',
+        searchQuery: '',
+        _pageContent: [],
+
+        init() {
+            if (window._ahyModalInited) return;
+            window._ahyModalInited = true;
+            this.$watch('mobileFiltersOpen', val => { document.body.style.overflow = val ? 'hidden' : ''; });
+            window.ahyTokenRefresh.get().then(t => { if (t) this.searchToken = t; });
+            window.addEventListener('ahy-token-refreshed', e => { this.searchToken = e.detail; });
+
+            this._pageContent = [
+                document.querySelector('main'),
+                document.querySelector('.page-main'),
+                document.querySelector('#maincontent'),
+            ].filter((el, i, arr) => el && arr.indexOf(el) === i);
+
+            const wrapper = this.$el.closest('.columns') || this.$el;
+            const header  = document.querySelector('header') || document.querySelector('.page-header');
+            if (header && header.parentNode) {
+                header.parentNode.insertBefore(wrapper, header.nextSibling);
+            }
+
+            window.addEventListener('ahy-modal-search', (e) => {
+                const q = e.detail.query;
+                if (q !== this.searchQuery) { this.page = 1; this.sort = 'relevance'; this.activeFilters = []; this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.wasCorrection = false; this.correctedQuery = ''; }
+                this.searchQuery = q;
+                this.openModal();
+                this.fetch();
+            });
+            window.addEventListener('ahy-modal-open', () => { if (this.searchQuery) this.openModal(); });
+            window.addEventListener('ahy-modal-close', () => this.closeModal());
+            window.addEventListener('resize', () => { this.isMobile = window.innerWidth < 768; });
+            window.addEventListener('mousemove', (e) => this._popDragMove(e));
+            window.addEventListener('mouseup', () => this._popDragEnd());
+        },
+
+        openModal() {
+            this.$el.classList.add('is-open');
+            document.body.classList.add('ahy-search-open');
+            window.scrollTo(0, 0);
+        },
+
+        closeModal() {
+            this.$el.classList.remove('is-open');
+            document.body.classList.remove('ahy-search-open');
+            // Pop every entry pushed during this search session at once (one
+            // per debounced query, see ahySetSearchUrl above) with a single
+            // history.go(), rather than replaceState — that correctly
+            // restores the original arrival page as a real, intact history
+            // entry instead of just visually resetting the URL on top of
+            // whichever pushed entry happens to be current. The popstate
+            // this triggers is our own, not a user Back press, so it's
+            // flagged to skip the forced-reload handler.
+            if (window._ahySearchPushCount > 0) {
+                const n = window._ahySearchPushCount;
+                window._ahySearchPushCount = 0;
+                window._ahySuppressPopstateReload = true;
+                history.go(-n);
+            } else {
+                history.replaceState(history.state, '', window._ahyOriginalUrl);
+            }
+        },
+
+        async fetch() {
+            this.loading = true;
+            try {
+                const url = new URL(this.productsApiUrl);
+                url.searchParams.set('search_token', this.searchToken);
+                url.searchParams.set('q', this.wasCorrection && this.correctedQuery ? this.correctedQuery : this.searchQuery);
+                url.searchParams.set('page', this.page);
+                url.searchParams.set('per_page', this.pageSize);
+                url.searchParams.set('include_variants', '1');
+                this.activeFilters.forEach(f => url.searchParams.set(f.key, f.value));
+                if (this.activePriceMin !== '') url.searchParams.set('price_min', this.activePriceMin);
+                if (this.activePriceMax !== '') url.searchParams.set('price_max', this.activePriceMax);
+                if (this.sort !== 'relevance') url.searchParams.set('sort', this.sort);
+
+                let resp = await window.fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
+                if (resp.status === 401) {
+                    await window.ahyTokenRefresh.refresh();
+                    url.searchParams.set('search_token', this.searchToken);
+                    resp = await window.fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
+                }
+                const data = await resp.json();
+
+                if (data.success) {
+                    this.results       = data.data || [];
+                    if (this.results.length) console.log('[AhyModal] product.image samples:', this.results.slice(0,3).map(p => ({sku: p.sku, image: p.image})));
+                    this.total         = (data.pagination && data.pagination.total) || data.total || 0;
+                    this.pageSize      = (data.pagination && data.pagination.per_page) || this.pageSize;
+                    this.totalPages    = Math.max(1, Math.ceil(this.total / this.pageSize));
+                    this.apiFacets     = data.facets || [];
+                    this.wasCorrection = !!data.was_corrected;
+                    this.correctedQuery = data.corrected_query || this.searchQuery;
+                    this.originalQuery  = data.original_query  || this.searchQuery;
+                    this.suggestedQuery = data.suggested_query || '';
+                    this.buildFilters();
+                    if (this.results.length === 0) { this.fetchPopularProducts(); this.fetchPopularSearches(); }
+                }
+            } catch(e) { console.error('[AhyModal] fetch error', e); }
+            this.loading = false;
+        },
+
+        async fetchPopularProducts() {
+            if (this.popularProducts.length) return;
+            try {
+                const url = new URL(this.productsApiUrl);
+                url.searchParams.set('search_token', this.searchToken);
+                url.searchParams.set('q', 'outdoor');
+                url.searchParams.set('per_page', '8');
+                url.searchParams.set('include_variants', '1');
+                const resp = await window.fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
+                const data = await resp.json();
+                if (data.success && data.data) {
+                    this.popularProducts = data.data;
+                } else if (data.products) {
+                    this.popularProducts = data.products;
+                }
+                console.log('[Popular]', this.popularProducts.length, 'products loaded');
+                this.$nextTick(() => {
+                    const el = this.$refs.popScroll;
+                    if (el) this.popularScrollMax = el.scrollWidth - el.clientWidth;
+                });
+            } catch(e) { console.error('[Popular] fetch error', e); }
+        },
+
+        async fetchPopularSearches() {
+            if (this.popularSearches.length) return;
+            try {
+                const suggestUrl = this.productsApiUrl.replace('/api/v1/products', '/api/v1/suggest');
+                const url = new URL(suggestUrl);
+                url.searchParams.set('search_token', this.searchToken);
+                const resp = await window.fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
+                const data = await resp.json();
+                this.popularSearches = (data.suggestions || data.terms || data.results || []).slice(0, 8);
+            } catch(e) { console.error('[PopularSearches] fetch error', e); }
+        },
+
+        buildFilters() {
+            if (!this.apiFacets.length) return;
+            const priceFacet = this.apiFacets.find(f => f.key === 'price');
+            if (priceFacet) this.priceRange = { min: priceFacet.min ?? null, max: priceFacet.max ?? null };
+            this.filters = this.apiFacets
+                .filter(f => f.key !== 'price' && f.key !== 'category')
+                .map(f => ({
+                    key:       f.key,
+                    label:     f.key === 'brand' ? 'Shop By Brand' : f.label,
+                    collapsed: false,
+                    showAll:   false,
+                    options:   (f.options || []).map(o => ({ value: o.value, count: o.count })),
+                }));
+        },
+
+        sortedResults() { return this.results; },
+
+        searchExact(q) {
+            window.location.href = '/catalogsearch/result/?q=' + encodeURIComponent(q);
+        },
+
+        _scrollToResults() {
+          const el = document.querySelector('.column.main');
+            if (!el) return;
+            const y = Math.max(0, el.getBoundingClientRect().top + window.pageYOffset);
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        },
+
+        toggleFilter(key, label, value) {
+            const idx = this.activeFilters.findIndex(f => f.key === key && f.value === value);
+            if (idx >= 0) this.activeFilters.splice(idx, 1);
+            else this.activeFilters.push({ key, label, value });
+            this.page = 1;
+            this._scrollToResults();
+            this.fetch();
+        },
+
+        removeFilter(key, value) {
+            this.activeFilters = this.activeFilters.filter(f => !(f.key === key && f.value === value));
+            this.page = 1; this._scrollToResults(); this.fetch();
+        },
+
+        applyPriceFilter() { this.page = 1; this._scrollToResults(); this.fetch(); },
+        clearPriceFilter() { this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._scrollToResults(); this.fetch(); },
+        clearAllFilters() { this.activeFilters = []; this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._scrollToResults(); this.fetch(); },
+
+        priceRangeBuckets() {
+            if (this.priceRange.min === null) return [];
+            return [
+                { label: 'Under $50',     min: '',   max: 50   },
+                { label: '$50 – $100',    min: 50,   max: 100  },
+                { label: '$100 – $250',   min: 100,  max: 250  },
+                { label: '$250 – $500',   min: 250,  max: 500  },
+                { label: '$500 – $1,000', min: 500,  max: 1000 },
+                { label: 'Over $1,000',   min: 1000, max: ''   },
+            ].filter(b => {
+                const lo = b.min === '' ? 0 : b.min;
+                const hi = b.max === '' ? Infinity : b.max;
+                return lo < this.priceRange.max && hi > this.priceRange.min;
+            });
+        },
+
+        togglePriceRange(bucket) {
+            if (this.activePriceRange && this.activePriceRange.label === bucket.label) {
+                this.activePriceRange = null; this.activePriceMin = ''; this.activePriceMax = '';
+            } else {
+                this.activePriceRange = bucket;
+                this.activePriceMin = bucket.min === '' ? '' : String(bucket.min);
+                this.activePriceMax = bucket.max === '' ? '' : String(bucket.max);
+            }
+            this.applyPriceFilter();
+        },
+
+        isFilterActive(key, value) { return this.activeFilters.some(f => f.key === key && f.value === value); },
+
+       goToPage(p) { this.page = p; this.paginationLoading = true; this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollToResults()); }); },
+        setSort(val) { this.sort = val; this.page = 1; this.fetch(); },
+        sortLabel() {
+            return { relevance: 'Relevance', price_asc: 'Price: Low to high', price_desc: 'Price: High to low' }[this.sort] || 'Relevance';
+        },
+
+        FALLBACK_IMG: '/media/.thumbswysiwyg/everest-logo_2_.png',
+        isFallbackImg(image) {
+            return this.imgUrl(image) === this.FALLBACK_IMG;
+        },
+        imgUrl(image) {
+            if (!image || image.includes('no_selection')) return this.FALLBACK_IMG;
+            if (image.includes('falcosense/800x800')) return image;
+            const isHttp = image.startsWith('http');
+            const path = isHttp ? image.replace(/^https?:\/\/[^/]+/, '') : image;
+            const m = path.match(/\/catalog\/product\/(.+)$/);
+            if (!m && isHttp) return this.FALLBACK_IMG;
+            const rel = m ? m[1] : path.replace(/^\/+/, '');
+            if (!rel) return this.FALLBACK_IMG;
+            const filename = rel.split('/').pop();
+            if (!filename) return this.FALLBACK_IMG;
+            const c1 = filename[0], c2 = filename[1] || c1;
+            return '/media/falcosense/800x800/' + c1 + '/' + c2 + '/' + filename;
+        },
+        handleImgError(event) {
+            const el = event.target;
+            if (el.dataset.imgFailed) return;
+            el.dataset.imgFailed = '1';
+            el.src = this.FALLBACK_IMG;
+            el.style.opacity = '0.45';
+        },
+
+        async addSimpleToCart(product) {
+            const pid = product.product_id;
+            console.log('[AhyModal] addSimpleToCart pid:', pid, 'url:', '<?= $escaper->escapeJs($addToCartUrl) ?>');
+            this.cartLoading = { ...this.cartLoading, [pid]: true };
+            try {
+                const params = new URLSearchParams({ product: pid, qty: 1, form_key: hyva.getFormKey() });
+                const resp = await fetch('<?= $escaper->escapeJs($addToCartUrl) ?>', {
+                    method: 'POST',
+                    body: params,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                console.log('[AhyModal] addToCart resp:', resp.status, 'ok:', resp.ok, 'redirected:', resp.redirected, 'url:', resp.url);
+                if (resp.ok || resp.redirected) {
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                    window.dispatchEvent(new CustomEvent('toggle-cart'));
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{ type: 'success', text: 'Product added to cart.' }], 3000);
+                }
+            } catch(e) { console.error('[AhyModal] addToCart error', e); }
+            finally { this.cartLoading = { ...this.cartLoading, [pid]: false }; }
+        },
+
+        async addToWishlistModal(productId) {
+            const pid = productId;
+            this.wishLoading = { ...this.wishLoading, [pid]: true };
+            try {
+                const resp = await window.fetch(BASE_URL + 'wishlist/index/add/', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body: 'form_key=' + hyva.getFormKey() + '&product=' + pid + '&uenc=' + hyva.getUenc(),
+                    credentials: 'include',
+                });
+                if (resp.redirected) { window.location.href = resp.url; return; }
+                if (resp.ok) {
+                    const data = await resp.json().catch(() => null);
+                    const msg = data && data.success ? 'Product added to Wish List.' : (data && data.error_message) || 'Could not add to wishlist.';
+                    const type = data && data.success ? 'success' : 'error';
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{ type, text: msg }], 5000);
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                }
+            } catch(e) { console.error('[AhyModal] wishlist error', e); }
+            this.wishLoading = { ...this.wishLoading, [pid]: false };
+        },
+
+        _popScrollUpdate(el) {
+            this.popularScrollPos = el.scrollLeft;
+            this.popularScrollMax = el.scrollWidth - el.clientWidth;
+        },
+        _popDragStart(e, el) {
+            this._popDragging = true;
+            this._popDragStartX = e.pageX - el.getBoundingClientRect().left;
+            this._popDragScrollLeft = el.scrollLeft;
+            this._popDragMoved = false;
+            el.classList.add('is-dragging');
+        },
+        _popDragMove(e) {
+            if (!this._popDragging) return;
+            const el = this.$refs.popScroll;
+            if (!el) return;
+            const x = e.pageX - el.getBoundingClientRect().left;
+            const walk = x - this._popDragStartX;
+            el.scrollLeft = this._popDragScrollLeft - walk;
+            if (Math.abs(walk) > 5) this._popDragMoved = true;
+        },
+        _popDragEnd() {
+            if (!this._popDragging) return;
+            this._popDragging = false;
+            const el = this.$refs.popScroll;
+            if (el) el.classList.remove('is-dragging');
+        },
+        _popCardWidth() {
+            const el = this.$refs.popScroll;
+            if (!el) return 0;
+            const card = el.querySelector('.pop-card');
+            return card ? card.offsetWidth + 12 : el.clientWidth;
+        },
+        _popScrollPrev() {
+            const el = this.$refs.popScroll;
+            if (el) el.scrollBy({ left: -this._popCardWidth(), behavior: 'smooth' });
+        },
+        _popScrollNext() {
+            const el = this.$refs.popScroll;
+            if (el) el.scrollBy({ left: this._popCardWidth(), behavior: 'smooth' });
+        },
+    };
+}
+</script>
+
+<div class="columns">
+<div id="ahyModal"
+     x-data="ahyModalSearch('<?= $escaper->escapeJs($productsApiUrl) ?>', '<?= $escaper->escapeJs($searchToken) ?>', '<?= $escaper->escapeJs($addToCartUrl) ?>')"
+     x-init="init()"
+     x-cloak>
+
+    <!-- ── Title ──────────────────────────────────────── -->
+    <div class="pt-8 pb-0 max-w-screen-xl mx-auto">
+        <h1 class="text-ahy-blue page-title !font-extrabold title-font uppercase text-3xl md:text-6xl"
+            x-text="'SEARCH RESULTS FOR: \'' + searchQuery.toUpperCase() + '\''"></h1>
+    </div>
+
+    <!-- ── Layout ─────────────────────────────────────── -->
+    <div id="ahy-results-layout" class="flex gap-0 max-w-screen-xl mx-auto lg:px-6 pb-16">
+
+        <!-- ── Sidebar ─────────────────────────────────── -->
+        <aside class="hidden md:block w-64 shrink-0 pt-6 pr-6" x-show="loading || results.length > 0">
+
+            <!-- Item count -->
+            <div x-show="!loading" class="border-b-2 border-ahy-blue pb-3 mb-0">
+                <span class="text-sm font-semibold text-ahy-blue">(<span x-text="total"></span> Items)</span>
+            </div>
+
+            <!-- Active filter tags -->
+            <div x-show="activeFilters.length > 0 || activePriceMin !== '' || activePriceMax !== ''" class="mt-4 mb-2 flex flex-wrap gap-2">
+                <template x-for="f in activeFilters" :key="f.key + f.value">
+                    <span class="inline-flex items-center gap-1 bg-ahy-blue text-white text-xs px-3 py-1 rounded-full cursor-pointer"
+                          @click="removeFilter(f.key, f.value)">
+                        <span x-text="f.label + ': ' + f.value"></span>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </span>
+                </template>
+                <template x-if="activePriceMin !== '' || activePriceMax !== ''">
+                    <span class="inline-flex items-center gap-1 bg-ahy-blue text-white text-xs px-3 py-1 rounded-full cursor-pointer" @click="clearPriceFilter()">
+                        <span x-text="'Price: $' + activePriceMin + (activePriceMax ? ' – $' + activePriceMax : '+')"></span>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </span>
+                </template>
+                <button class="text-xs text-ahy-blue underline" @click="clearAllFilters()">Reset all</button>
+            </div>
+
+            <!-- Filter groups -->
+            <div class="space-y-0" x-show="filters.length > 0 || priceRange.min !== null">
+
+                <!-- Price -->
+                <template x-if="priceRange.min !== null">
+                    <div class="border-t border-gray-200 py-4">
+                        <button class="flex items-center justify-between w-full mb-3" @click="priceCollapsed = !priceCollapsed">
+                            <span class="font-bold text-ahy-blue text-sm">Price</span>
+                            <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="priceCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <ul x-show="!priceCollapsed" class="space-y-2.5">
+                            <template x-for="bucket in priceRangeBuckets()" :key="bucket.label">
+                                <li>
+                                    <label class="flex items-center gap-2.5 cursor-pointer group" @click.prevent="togglePriceRange(bucket)">
+                                        <span class="w-4 h-4 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center transition-colors"
+                                              :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-ahy-blue border-ahy-blue' : 'bg-white group-hover:border-ahy-blue'">
+                                            <svg x-show="activePriceRange && activePriceRange.label === bucket.label" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                        </span>
+                                        <span class="text-sm text-gray-700 flex-1 leading-tight" x-text="bucket.label"></span>
+                                    </label>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+
+                <!-- Categorical filters -->
+                <template x-for="filter in filters" :key="filter.key">
+                    <div class="border-t border-gray-200 py-4">
+                        <button class="flex items-center justify-between w-full mb-3" @click="filter.collapsed = !filter.collapsed">
+                            <span class="font-bold text-ahy-blue text-sm" x-text="filter.label"></span>
+                            <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="filter.collapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <ul x-show="!filter.collapsed" class="space-y-2.5">
+                            <template x-for="option in (filter.showAll ? filter.options : filter.options.slice(0,5))" :key="option.value">
+                                <li>
+                                    <label class="flex items-center gap-2.5 cursor-pointer group" @click.prevent="toggleFilter(filter.key, filter.label, option.value)">
+                                        <span class="w-4 h-4 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center transition-colors"
+                                              :class="isFilterActive(filter.key, option.value) ? 'bg-ahy-blue border-ahy-blue' : 'bg-white group-hover:border-ahy-blue'">
+                                            <svg x-show="isFilterActive(filter.key, option.value)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                            </svg>
+                                        </span>
+                                        <span class="text-sm text-gray-700 flex-1 leading-tight" x-text="option.value"></span>
+                                        <span class="text-sm text-gray-400 shrink-0" x-text="'(' + option.count + ')'"></span>
+                                    </label>
+                                </li>
+                            </template>
+                            <li x-show="filter.options.length > 5">
+                                <button class="text-sm font-bold text-ahy-blue hover:underline" @click="filter.showAll = !filter.showAll">
+                                    <span x-show="!filter.showAll">See More +</span>
+                                    <span x-show="filter.showAll">See Less –</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </aside>
+
+        <!-- ── Main content ────────────────────────────── -->
+        <div class="flex-1 min-w-0 pt-6">
+
+            <!-- ── Mobile filter/sort toolbar ──────────────── -->
+            <div class="md:hidden" x-show="!loading && results.length > 0">
+                <div class="flex items-center gap-4 py-4">
+                    <!-- FILTER BY pill -->
+                    <button @click="mobileFiltersOpen = !mobileFiltersOpen; mobileSortOpen = false"
+                            class="flex-shrink-0 border-2 border-ahy-blue text-ahy-blue rounded-full px-6 py-2.5 text-sm font-bold uppercase tracking-wide bg-[#efeadd]"
+                            :class="activeFilters.length > 0 || activePriceMin !== '' ? 'bg-ahy-blue !text-white' : ''">
+                        FILTER BY
+                        <span x-show="activeFilters.length > 0 || activePriceMin !== ''"
+                              x-text="' (' + (activeFilters.length + (activePriceMin !== '' ? 1 : 0)) + ')'"></span>
+                    </button>
+                    <!-- Sort by inline -->
+                    <div x-data="{ open: false }" class="relative flex flex-wrap items-center gap-1 text-sm text-ahy-blue">
+                        <span class="text-gray-600">Sort by:</span>
+                        <button @click="open = !open" class="font-bold flex items-center gap-1 ml-0.5">
+                            <span x-text="sortLabel()"></span>
+                            <svg class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" @click.outside="open = false"
+                             class="absolute left-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-50 w-52 py-1">
+                            <button @click="setSort('relevance'); open = false" class="w-full text-left px-4 py-3 text-sm" :class="sort === 'relevance' ? 'font-bold text-ahy-blue' : ''">Relevance</button>
+                            <button @click="setSort('price_asc'); open = false" class="w-full text-left px-4 py-3 text-sm" :class="sort === 'price_asc' ? 'font-bold text-ahy-blue' : ''">Price: Low to High</button>
+                            <button @click="setSort('price_desc'); open = false" class="w-full text-left px-4 py-3 text-sm" :class="sort === 'price_desc' ? 'font-bold text-ahy-blue' : ''">Price: High to Low</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile sort panel (removed — now inline dropdown above) -->
+                <div x-show="false" class="hidden">
+                    <button @click="setSort('relevance'); mobileSortOpen = false"
+                            class="w-full text-left px-4 py-3 text-sm" :class="sort === 'relevance' ? 'font-bold text-ahy-blue' : ''">Relevance</button>
+                    <button @click="setSort('price_asc'); mobileSortOpen = false"
+                            class="w-full text-left px-4 py-3 text-sm" :class="sort === 'price_asc' ? 'font-bold text-ahy-blue' : ''">Price: Low to High</button>
+                    <button @click="setSort('price_desc'); mobileSortOpen = false"
+                            class="w-full text-left px-4 py-3 text-sm" :class="sort === 'price_desc' ? 'font-bold text-ahy-blue' : ''">Price: High to Low</button>
+                </div>
+
+            </div>
+
+            <!-- ── Mobile filter full-screen modal ─────────── -->
+            <div x-show="mobileFiltersOpen"
+                 class="md:hidden fixed inset-0 bg-white overflow-y-auto flex flex-col ahy-filter-modal">
+
+                <!-- Top bar -->
+                <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
+                    <button @click="clearAllFilters()" class="text-sm font-semibold text-ahy-blue">Reset</button>
+                    <button @click="mobileFiltersOpen = false"
+                            class="w-8 h-8 flex items-center justify-center text-gray-500 text-xl leading-none">&#x2715;</button>
+                    <button @click="mobileFiltersOpen = false" class="text-sm font-semibold text-ahy-blue">Apply</button>
+                </div>
+
+                <!-- Item count -->
+                <div class="px-4 pt-4 pb-3 border-b-2 border-ahy-blue">
+                    <span class="font-semibold text-ahy-blue" x-text="'(' + total + ' Items)'"></span>
+                </div>
+
+                <!-- Filter groups -->
+                <div class="flex-1 px-4 pb-8">
+
+                    <!-- Price -->
+                    <template x-if="priceRange.min !== null">
+                        <div class="border-b border-gray-200 py-4">
+                            <button class="flex items-center justify-between w-full mb-3" @click="priceCollapsed = !priceCollapsed">
+                                <span class="font-bold text-ahy-blue text-sm">Price</span>
+                                <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="priceCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <ul x-show="!priceCollapsed" class="space-y-3">
+                                <template x-for="bucket in priceRangeBuckets()" :key="bucket.label">
+                                    <li>
+                                        <label class="flex items-center gap-2.5 cursor-pointer" @click.prevent="togglePriceRange(bucket)">
+                                            <span class="w-5 h-5 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center"
+                                                  :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-ahy-blue border-ahy-blue' : 'bg-white'">
+                                                <svg x-show="activePriceRange && activePriceRange.label === bucket.label" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                            </span>
+                                            <span class="text-sm text-gray-700" x-text="bucket.label"></span>
+                                        </label>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+                    </template>
+
+                    <!-- Categorical filters -->
+                    <template x-for="filter in filters" :key="'mf-' + filter.key">
+                        <div class="border-b border-gray-200 py-4">
+                            <button class="flex items-center justify-between w-full mb-3" @click="filter.collapsed = !filter.collapsed">
+                                <span class="font-bold text-ahy-blue text-sm" x-text="filter.label"></span>
+                                <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="filter.collapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <ul x-show="!filter.collapsed" class="space-y-3">
+                                <template x-for="option in (filter.showAll ? filter.options : filter.options.slice(0,5))" :key="option.value">
+                                    <li>
+                                        <label class="flex items-center gap-2.5 cursor-pointer" @click.prevent="toggleFilter(filter.key, filter.label, option.value)">
+                                            <span class="w-5 h-5 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center"
+                                                  :class="isFilterActive(filter.key, option.value) ? 'bg-ahy-blue border-ahy-blue' : 'bg-white'">
+                                                <svg x-show="isFilterActive(filter.key, option.value)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                            </span>
+                                            <span class="text-sm text-gray-700 flex-1" x-text="option.value"></span>
+                                            <span class="text-sm text-gray-400" x-text="'(' + option.count + ')'"></span>
+                                        </label>
+                                    </li>
+                                </template>
+                                <li x-show="filter.options.length > 5">
+                                    <button class="text-sm font-bold text-ahy-blue mt-1" @click="filter.showAll = !filter.showAll">
+                                        <span x-show="!filter.showAll">See More +</span>
+                                        <span x-show="filter.showAll">See Less –</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Sort row (desktop) -->
+            <div class="hidden md:flex items-center justify-end mb-5" x-show="!loading && results.length > 0">
+                <div x-data="{ open: false }" class="relative flex items-center gap-1 text-sm text-ahy-blue">
+                    <span>Sort by:</span>
+                    <button @click="open = !open" class="font-bold flex items-center gap-1 ml-1">
+                        <span x-text="sortLabel()"></span>
+                        <svg class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" @click.outside="open = false"
+                         class="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-50 w-52 py-1">
+                        <button @click="setSort('relevance'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'relevance' ? 'font-bold text-ahy-blue' : ''">Relevance</button>
+                        <button @click="setSort('price_asc'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'price_asc' ? 'font-bold text-ahy-blue' : ''">Price: Low to High</button>
+                        <button @click="setSort('price_desc'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'price_desc' ? 'font-bold text-ahy-blue' : ''">Price: High to Low</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spell correction -->
+            <div x-show="!loading && wasCorrection" class="mb-4 px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm text-gray-600">
+                Showing results for <strong class="text-ahy-blue" x-text="correctedQuery"></strong> instead of <em x-text="originalQuery"></em>.
+                <a class="ml-1 text-ahy-blue font-semibold hover:underline cursor-pointer" @click.prevent="searchExact(originalQuery)" x-text="'Search for &quot;' + originalQuery + '&quot; anyway'"></a>
+            </div>
+            <div x-show="!loading && !wasCorrection && suggestedQuery" class="mb-4 px-4 py-3 bg-white rounded-xl border border-gray-200 text-sm text-gray-600">
+                Did you mean <a class="text-ahy-blue font-semibold hover:underline cursor-pointer" @click.prevent="searchExact(suggestedQuery)" x-text="'&quot;' + suggestedQuery + '&quot;'"></a>?
+            </div>
+
+            <!-- Modal loader — white blurred backdrop, shown for both the initial load and every pagination fetch -->
+            <div x-show="loading || paginationLoading" x-cloak class="ahy-modal-loader-overlay">
+                <div class="ahy-page-loader" style="margin:0;"></div>
+            </div>
+
+            <!-- No results + popular products -->
+            <div x-show="!loading && results.length === 0 && searchQuery" style="width:100%; padding:20px 0; box-sizing:border-box;">
+                <p class="text-xl sm:text-2xl lg:text-3xl font-bold leading-snug mb-6 sm:mb-8" style="color:#1d1d1f;">
+                    Sorry, no matches were found.<br>Try a new search or use our suggestions.
+                </p>
+                <div x-show="popularProducts.length > 0">
+                    <h2 style="font-size:17px; font-weight:700; color:#1d1d1f; margin-bottom:16px;">Discover products that people are loving right now</h2>
+                    <!-- Carousel wrapper: positions prev/next buttons absolutely -->
+                    <div class="pop-wrap">
+                        <!-- Prev button — desktop/tablet only, shown after scrolling right -->
+                        <button type="button"
+                                class="pop-nav-btn pop-nav-btn-prev"
+                                x-show="!isMobile && popularScrollPos > 10"
+                                @click="_popScrollPrev()"
+                                aria-label="Scroll left">
+                            <svg width="22" height="22" fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <!-- Next button — desktop/tablet only, hidden when at end -->
+                        <button type="button"
+                                class="pop-nav-btn pop-nav-btn-next"
+                                x-show="!isMobile && popularScrollPos < popularScrollMax - 10"
+                                @click="_popScrollNext()"
+                                aria-label="Scroll right">
+                            <svg width="22" height="22" fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <!-- Scroll container -->
+                        <div class="pop-cards-row"
+                             x-ref="popScroll"
+                             @scroll="_popScrollUpdate($el)"
+                             @mousedown="_popDragStart($event, $el)"
+                             @dragstart.prevent
+                             @click.capture="if(_popDragMoved){ $event.preventDefault(); $event.stopPropagation(); _popDragMoved=false; }">
+                            <template x-for="product in popularProducts" :key="'pop-' + (product.sku || product.product_id)">
+                                <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                                   class="pop-card no-underline hover:shadow-md transition-shadow duration-200"
+                                   draggable="false"
+                                   style="background:#fff; border-radius:12px; border:1px solid #d2d2d7; display:flex; flex-direction:column; overflow:hidden;">
+                                    <!-- Image -->
+                                    <div style="flex:1; display:flex; align-items:center; justify-content:center; padding:24px; min-height:160px;">
+                                        <img :src="imgUrl(product.image)"
+                                             :alt="product.name"
+                                             class="object-contain"
+                                             :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                             draggable="false"
+                                             loading="eager"
+                                             fetchpriority="high"
+                                             @error="handleImgError($event)"
+                                             :data-original-src="product.image"
+                                             style="max-width:130px; max-height:130px; width:100%; height:auto; pointer-events:none;"/>
+                                    </div>
+                                    <!-- Name + Price -->
+                                    <div style="padding:8px 12px 14px; display:flex; flex-direction:column; gap:4px;">
+                                        <p class="line-clamp-2" style="font-size:12px; color:#1d1d1f; line-height:1.4; margin:0;" x-text="product.name"></p>
+                                        <template x-if="product.special_price && product.special_price < product.price">
+                                            <div class="flex items-baseline gap-2" style="margin-top:4px;">
+                                                <span class="text-xs text-gray-400 line-through" x-text="'$' + parseFloat(product.price).toFixed(2)"></span>
+                                                <span class="text-sm font-bold text-gray-900" x-text="'$ ' + parseFloat(product.special_price).toFixed(2)"></span>
+                                            </div>
+                                        </template>
+                                        <template x-if="!product.special_price || product.special_price >= product.price">
+                                            <div>
+                                                <template x-if="product.type === 'configurable'">
+                                                    <p class="text-sm text-gray-800">
+                                                        <span class="font-normal text-xs">Starting at </span>
+                                                        <span class="font-bold" x-text="'$ ' + parseFloat(product.price || 0).toFixed(2)"></span>
+                                                    </p>
+                                                </template>
+                                                <template x-if="product.type !== 'configurable' && product.price">
+                                                    <span class="text-sm font-bold text-gray-900" x-text="'$ ' + parseFloat(product.price).toFixed(2)"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </a>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <!-- Popular Searches -->
+                <div x-show="popularSearches.length > 0" style="margin-top:32px;">
+                    <h2 style="font-size:17px; font-weight:700; color:#1d1d1f; margin-bottom:16px;">Popular Searches</h2>
+                    <div class="popular-searches-row">
+                        <template x-for="term in popularSearches" :key="term">
+                            <button type="button"
+                                    @click="searchExact(term)"
+                                    style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border:1px solid #d2d2d7; border-radius:999px; background:#fff; color:#1d1d1f; font-size:13px; white-space:nowrap; transition:box-shadow 0.2s; cursor:pointer;"
+                                    onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'"
+                                    onmouseout="this.style.boxShadow='none'">
+                                <span x-text="term"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Desktop product grid -->
+            <div x-show="!loading && results.length > 0" class="hidden md:grid grid-cols-2 xl:grid-cols-3 gap-0.5">
+                <template x-for="(product, index) in sortedResults()" :key="product.sku || product.product_id">
+                    <div class="bg-white relative flex flex-col group">
+
+                        <!-- Stock badge -->
+                        <div class="absolute left-3 top-3 z-10"
+                             x-show="product.variants && product.variants.length <= 10 && product.variants.length > 0">
+                            <span class="rounded border-2 border-ahy-stock-green bg-white px-2 py-1 text-xs font-semibold text-ahy-stock-green"
+                                  x-text="(product.variants || []).length + ' Left'"></span>
+                        </div>
+
+                        <!-- Bookmark -->
+                        <button @click.prevent="addToWishlistModal(product.product_id)"
+                                :disabled="wishLoading[product.product_id]"
+                                aria-label="Add to Wish List" type="button"
+                                class="absolute top-2.5 right-2.5 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center text-ahy-blue hover:text-red-500 shadow-sm transition">
+                            <template x-if="wishLoading[product.product_id]">
+                                <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                            </template>
+                            <template x-if="!wishLoading[product.product_id]">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20" fill="currentColor">
+                                    <path d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                </svg>
+                            </template>
+                        </button>
+
+                        <!-- Image -->
+                        <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'" class="block overflow-hidden" style="height:244px">
+                            <img :src="imgUrl(product.image)"
+                                 :alt="product.name"
+                                 width="244" height="244"
+                                 class="object-contain object-center p-3"
+                                 :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                 style="width:244px;height:244px;margin:0 auto;display:block"
+                                 loading="eager"
+                                 fetchpriority="high"
+                                 @error="handleImgError($event)"
+                                 :data-original-src="product.image"/>
+                        </a>
+
+                        <!-- Info -->
+                        <div class="flex flex-col flex-1 px-4 pb-4">
+
+                            <!-- Name -->
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                               class="line-clamp-2 !text-lg !font-extrabold text-ahy-blue leading-normal mt-1 h-[3.4rem]"
+                               :title="product.name" x-html="product.name"></a>
+
+                            <!-- Seller -->
+                            <p class="text-xs text-gray-500 mt-1"
+                               x-text="'Sold By ' + (product.brand || 'The Everest Marketplace')"></p>
+
+                            <!-- Price -->
+                            <div class="AhyPrice min-h-[5.5rem] flex flex-col !overflow-visible mt-1">
+                                <template x-if="product.price && product.special_price && product.special_price < product.price">
+                                    <div>
+                                        <div class="text-ahy-red text-xs font-bold uppercase">Deal</div>
+                                        <div class="flex items-baseline gap-2">
+                                            <span class="text-2xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(product.special_price)"></span>
+                                            <span class="text-sm text-gray-400 line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="product.price && (!product.special_price || product.special_price >= product.price)">
+                                    <div class="flex flex-col items-baseline">
+                                        <span class="capitalize text-ahy-red !font-bold !text-sm">From</span>
+                                        <span class="text-2xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(product.price)"></span>
+                                    </div>
+                                </template>
+                                <template x-if="!product.price">
+                                    <span class="capitalize !flex justify-center items-center w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 font-bold !border-2 !border-ahy-blue">See Options</span>
+                                </template>
+                            </div>
+
+                            <div class="flex items-center justify-between">
+                                <p class="capitalize !text-gray-900 !font-semibold !text-sm text-nowrap">FREE Shipping</p>
+                                <div class="w-full mt-auto pt-3 max-w-[160px]">
+                                    <template x-if="product.type !== 'configurable'">
+                                        <button @click.prevent="addSimpleToCart(product)"
+                                                :class="cartLoading[product.product_id] === true ? 'opacity-60 pointer-events-none' : ''"
+                                                class="capitalize kuBtnDark !flex justify-center items-center gap-2 w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 font-bold !border-2 !border-ahy-blue AhyLandingAddToCartBtn">
+                                            <svg x-show="cartLoading[product.product_id] === true" class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                            <svg x-show="cartLoading[product.product_id] !== true" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                            <span x-text="cartLoading[product.product_id] === true ? 'Adding…' : 'Add'"></span>
+                                        </button>
+                                    </template>
+                                    <template x-if="product.type === 'configurable'">
+                                        <button @click.prevent="window.dispatchEvent(new CustomEvent('ahy-open-config-modal', {detail: product, bubbles: true}))"
+                                                class="capitalize kuBtnDark !flex justify-center items-center w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 font-bold !border-2 !border-ahy-blue AhyLandingAddToCartBtn">
+                                            Options
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Mobile product list (< 640px horizontal, 640–768px padded) -->
+            <div x-show="!loading && results.length > 0" class="md:hidden flex flex-col gap-0.5">
+                <template x-for="(product, index) in sortedResults()" :key="'m-' + (product.sku || product.product_id)">
+                    <!-- edge-to-edge below 640px, padded + max-w-[640px] above -->
+                    <div class="relative flex bg-white ahy-mobile-card">
+
+                        <!-- Image column -->
+                        <div class="relative shrink-0" style="width:45%">
+                            <div class="absolute top-3 left-3 z-10"
+                                 x-show="product.variants && product.variants.length <= 10 && product.variants.length > 0">
+                                <span class="rounded border-2 border-ahy-stock-green bg-white px-2 py-0.5 text-xs font-semibold text-ahy-stock-green"
+                                      x-text="(product.variants || []).length + ' Left'"></span>
+                            </div>
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'" class="block h-full">
+                                <img :src="imgUrl(product.image)"
+                                     :alt="product.name"
+                                     class="w-full h-full object-contain p-3"
+                                     :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                     style="min-height:160px;max-height:200px"
+                                     loading="eager"
+                                     fetchpriority="high"
+                                     @error="handleImgError($event)" :data-original-src="product.image"/>
+                            </a>
+                        </div>
+
+                        <!-- Info column -->
+                        <div class="flex-1 min-w-0 flex flex-col px-3 py-4">
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                               class="font-bold text-ahy-blue leading-snug line-clamp-3" style="font-size:15px"
+                               x-html="product.name"></a>
+                            <p class="text-xs text-gray-500 mt-1"
+                               x-text="'Sold By ' + (product.brand || 'The Everest Marketplace')"></p>
+                            <div class="mt-2">
+                                <template x-if="product.price && product.special_price && product.special_price < product.price">
+                                    <div>
+                                        <div class="text-ahy-red text-sm font-bold">Deal</div>
+                                        <div class="flex items-baseline gap-2">
+                                            <span class="text-xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(product.special_price)"></span>
+                                            <span class="text-sm text-gray-400 line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="product.price && (!product.special_price || product.special_price >= product.price)">
+                                    <div>
+                                        <span class="text-ahy-red text-sm font-bold">From</span>
+                                        <div class="text-xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(product.price)"></div>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="text-sm text-gray-900 font-semibold mt-2">FREE Shipping</p>
+                            <div class="flex items-center gap-2 mt-3">
+                                <template x-if="product.type !== 'configurable'">
+                                    <button @click.prevent="addSimpleToCart(product)"
+                                            :class="cartLoading[product.product_id] === true ? 'opacity-60 pointer-events-none' : ''"
+                                            class="flex items-center gap-2 border-2 border-ahy-blue text-ahy-blue rounded-full px-5 py-2 text-sm font-bold">
+                                        <svg x-show="cartLoading[product.product_id] === true" class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                        <svg x-show="cartLoading[product.product_id] !== true" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                        <span x-text="cartLoading[product.product_id] === true ? 'Adding…' : 'Add'"></span>
+                                    </button>
+                                </template>
+                                <template x-if="product.type === 'configurable'">
+                                    <button @click.prevent="window.dispatchEvent(new CustomEvent('ahy-open-config-modal', {detail: product, bubbles: true}))"
+                                            class="flex items-center gap-2 border-2 border-ahy-blue text-ahy-blue rounded-full px-5 py-2 text-sm font-bold">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                                        Options
+                                    </button>
+                                </template>
+                                <button @click.prevent="addToWishlistModal(product.product_id)"
+                                        :disabled="wishLoading[product.product_id]"
+                                        class="w-9 h-9 shrink-0 rounded-full border border-gray-300 bg-white flex items-center justify-center text-ahy-blue hover:text-red-500">
+                                    <template x-if="wishLoading[product.product_id]">
+                                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                    </template>
+                                    <template x-if="!wishLoading[product.product_id]">
+                                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20" fill="currentColor">
+                                            <path d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                        </svg>
+                                    </template>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Pagination -->
+            <div x-show="!loading && totalPages > 1" class="flex justify-center items-center gap-8 pt-10 pb-4">
+                <button aria-label="Previous" :disabled="page <= 1"
+                        @click="page > 1 && goToPage(page - 1)"
+                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200"
+                        :class="page <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:border-ahy-blue'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" class="font-bold text-ahy-blue flex items-center gap-1">
+                        Page <span x-text="page"></span> of <span x-text="totalPages"></span>
+                        <svg class="w-4 h-4 ml-1 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <nav x-show="open" @click.outside="open = false"
+                         class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 max-h-52 overflow-auto py-1">
+                        <template x-for="p in totalPages" :key="p">
+                            <button class="w-full text-center px-4 py-2.5 text-sm hover:bg-gray-50"
+                                    :class="p === page ? 'font-bold text-ahy-blue' : ''"
+                                    @click="goToPage(p); open = false"
+                                    x-text="'Page ' + p"></button>
+                        </template>
+                    </nav>
+                </div>
+                <button aria-label="Next" :disabled="page >= totalPages"
+                        @click="page < totalPages && goToPage(page + 1)"
+                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200"
+                        :class="page >= totalPages ? 'opacity-30 cursor-not-allowed' : 'hover:border-ahy-blue'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+
+        </div><!-- /.flex-1 -->
+    </div><!-- /.flex -->
+
+
+</div><!-- #ahyModal -->
+</div><!-- .columns -->

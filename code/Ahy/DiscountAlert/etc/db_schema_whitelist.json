@@ -1,0 +1,48 @@
+{
+    "ahy_discount_alert_run": {
+        "column": {
+            "run_id": true,
+            "token": true,
+            "threshold": true,
+            "product_count": true,
+            "item_count": true,
+            "new_count": true,
+            "removed_count": true,
+            "email_sent": true,
+            "created_at": true
+        },
+        "index": {
+            "AHY_DISCOUNT_ALERT_RUN_TOKEN": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_discount_alert_run_item": {
+        "column": {
+            "item_id": true,
+            "run_id": true,
+            "product_id": true,
+            "sku": true,
+            "name": true,
+            "price": true,
+            "special_price": true,
+            "discount_pct": true,
+            "status_at_send": true,
+            "is_new": true,
+            "disabled_at": true,
+            "disabled_by": true,
+            "reverted_at": true,
+            "reverted_by": true
+        },
+        "index": {
+            "AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID": true,
+            "AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID_IS_NEW": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID_AHY_DISCOUNT_ALERT_RUN_RUN_ID": true,
+            "AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID_PRODUCT_ID": true
+        }
+    }
+}

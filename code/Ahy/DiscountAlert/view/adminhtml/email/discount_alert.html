@@ -1,0 +1,207 @@
+<!--@subject Discount Alert: {{var total_count}} products exceed {{var threshold}}% discount @-->
+<!--@vars
+{
+    "var total_count":    "Products matching the threshold",
+    "var new_count":      "Products flagged for the first time since the previous run",
+    "var shown_count":    "Products listed in the table below",
+    "var stored_count":   "Products recorded and written to the CSV",
+    "var truncated":      "Set when the collection cap dropped products",
+    "var threshold":      "Discount threshold (%)",
+    "var bracket_rows":   "Distribution cells, rendered by Ahy\\DiscountAlert\\Block\\Email\\BracketSummary",
+    "var new_products_table":      "Newly flagged product rows",
+    "var existing_products_table": "Previously flagged product rows",
+    "var new_total_count":         "Newly flagged products collected",
+    "var new_shown_count":         "Newly flagged products listed below",
+    "var existing_total_count":    "Previously flagged products collected",
+    "var existing_shown_count":    "Previously flagged products listed below",
+    "var csv_filename":   "Attached CSV file name",
+    "var run_date":       "Run date in the store's timezone",
+    "var review_url":     "Admin link to review and disable this run's products",
+    "var logo_url":       "Transactional email logo from Design configuration",
+    "var store_name":     "Store name from Store Information"
+}
+@-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light only">
+    <title>Discount Alert</title>
+    <style>
+        :root { color-scheme: light only; }
+    </style>
+</head>
+<body style="margin:0;padding:0;font-family:'Poppins','Helvetica Neue',Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td align="center" style="padding:32px 0;">
+
+<table width="90%" cellpadding="0" cellspacing="0" border="0" style="width:90%;">
+
+    <!-- Brand header -->
+    <tr>
+        <td style="padding:0 4px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                    <td valign="middle">
+                        {{if logo_url}}
+                        <img src="{{var logo_url}}" alt="{{var store_name}}" style="display:block;border:0;outline:none;text-decoration:none;max-height:32px;">
+                        {{else}}
+                        <span style="font-size:16px;font-weight:800;color:#0D2E47;letter-spacing:0.5px;">{{var store_name}}</span>
+                        {{/if}}
+                    </td>
+                    <td align="right" valign="middle">
+                        <span style="font-size:11px;color:#DFB897;font-weight:600;white-space:nowrap;">{{var run_date}}</span>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- Hero card -->
+    <tr>
+        <td style="background:#0D2E47;padding:36px 40px 34px;border-radius:6px 6px 0 0;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#DFB897;margin-bottom:18px;">Discount Alert Report</div>
+            <div style="font-size:13px;font-weight:500;color:#DFB897;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Products above {{var threshold}}% discount</div>
+            <div style="font-size:58px;font-weight:800;color:#FFFFFF;line-height:1;letter-spacing:-2px;">{{var new_count}}</div>
+            <div style="font-size:13px;font-weight:600;color:#FFFFFF;letter-spacing:0.5px;margin-top:8px;">newly flagged products since the previous alert</div>
+            <div style="border-top:1px solid rgba(223,184,151,0.35);margin-top:22px;padding-top:16px;font-size:14px;font-weight:600;color:#DFB897;">
+                {{var total_count}} products in total are currently above the {{var threshold}}% threshold
+            </div>
+        </td>
+    </tr>
+
+    <!-- Distribution -->
+    <tr>
+        <td style="background:#FFFFFF;padding:28px 40px 30px;border-left:1px solid #EFEADD;border-right:1px solid #EFEADD;">
+            <div style="font-size:11px;font-weight:700;color:#0D2E47;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:18px;">Distribution by Discount Range</div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #EFEADD;border-collapse:collapse;border-radius:4px;overflow:hidden;background:#EFEADD;">
+                <tr>
+                    {{var bracket_rows|raw}}
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <!-- Newly flagged since the previous alert -->
+    <tr>
+        <td style="background:#FFFFFF;padding:8px 40px 30px;border-left:1px solid #EFEADD;border-right:1px solid #EFEADD;">
+            <div style="border-left:4px solid #9b1c1c;padding-left:12px;margin-bottom:16px;">
+                <div style="font-size:11px;font-weight:700;color:#9b1c1c;text-transform:uppercase;letter-spacing:1.5px;">Newly flagged since the previous alert</div>
+                <div style="font-size:11px;color:#0D2E47;font-weight:500;margin-top:4px;">These crossed the {{var threshold}}% threshold for the first time</div>
+            </div>
+            {{if new_total_count}}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">SKU</th>
+                        <th style="text-align:left;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Product Name</th>
+                        <th style="text-align:right;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Regular</th>
+                        <th style="text-align:right;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Sale</th>
+                        <th style="text-align:right;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Disc.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{var new_products_table|raw}}
+                </tbody>
+            </table>
+            <p style="margin:16px 0 0;font-size:11px;color:#DFB897;font-weight:500;">
+                Ranked by discount percentage, deepest first. Showing {{var new_shown_count}} of {{var new_total_count}} newly flagged products.
+            </p>
+            {{else}}
+            <p style="margin:0;font-size:12px;color:#0D2E47;font-weight:500;">
+                No products crossed the threshold for the first time in this run.
+            </p>
+            {{/if}}
+        </td>
+    </tr>
+
+    <!-- Previously flagged, still above the threshold -->
+    {{depend existing_total_count}}
+    <tr>
+        <td style="background:#FFFFFF;padding:8px 40px 32px;border-left:1px solid #EFEADD;border-right:1px solid #EFEADD;">
+            <div style="border-left:4px solid #DFB897;padding-left:12px;margin-bottom:16px;">
+                <div style="font-size:11px;font-weight:700;color:#0D2E47;text-transform:uppercase;letter-spacing:1.5px;">Previously flagged, still above the threshold</div>
+                <div style="font-size:11px;color:#0D2E47;font-weight:500;margin-top:4px;">Already reported in the previous alert</div>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;white-space:nowrap;">SKU</th>
+                        <th style="text-align:left;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Product Name</th>
+                        <th style="text-align:right;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Regular</th>
+                        <th style="text-align:right;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Sale</th>
+                        <th style="text-align:right;padding:0 14px 10px;border-bottom:2px solid #0D2E47;font-size:10px;color:#DFB897;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">Disc.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{var existing_products_table|raw}}
+                </tbody>
+            </table>
+            <p style="margin:16px 0 0;font-size:11px;color:#DFB897;font-weight:500;">
+                Ranked by discount percentage, deepest first. Showing {{var existing_shown_count}} of {{var existing_total_count}} products. Full list in the attached CSV.
+            </p>
+        </td>
+    </tr>
+    {{/depend}}
+
+    <!-- Review & disable CTA -->
+    {{depend review_url}}
+    <tr>
+        <td style="background:#FFFFFF;padding:0 40px 32px;border-left:1px solid #EFEADD;border-right:1px solid #EFEADD;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #EFEADD;">
+                <tr>
+                    <td align="center" style="padding:26px 0 0;">
+                        <table cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="center" bgcolor="#0D2E47" style="border-radius:4px;">
+                                    <a href="{{var review_url}}"
+                                       style="display:inline-block;padding:14px 34px;font-family:'Poppins',Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#FFFFFF;text-decoration:none;border-radius:4px;">
+                                        Review &amp; Disable Products
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                        <p style="margin:14px 0 0;font-size:11px;color:#DFB897;font-weight:500;line-height:1.6;">
+                            Opens the Magento admin. You will be asked to sign in, then you can pick which products to disable.<br>
+                            Nothing is changed until you confirm.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    {{/depend}}
+
+    <!-- CSV note -->
+    <tr>
+        <td style="background:#EFEADD;padding:18px 40px;border-left:1px solid #EFEADD;border-right:1px solid #EFEADD;">
+            <p style="margin:0;font-size:12px;color:#0D2E47;line-height:1.6;">
+                <strong style="color:#0D2E47;">{{var csv_filename}}</strong> is attached to this email.
+                <span style="color:#0D2E47;">Open in Excel or Google Sheets. {{var stored_count}} products, sortable and filterable.</span>
+                {{depend truncated}}
+                <br><span style="color:#9b1c1c;font-weight:600;">Only the first {{var stored_count}} of {{var total_count}} products are included. Raise the maximum per run in Stores &rsaquo; Configuration &rsaquo; Ahy &rsaquo; Discount Alert.</span>
+                {{/depend}}
+            </p>
+        </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+        <td style="background:#0D2E47;padding:32px 40px;border-radius:0 0 6px 6px;text-align:center;">
+            <div style="font-size:20px;font-weight:800;font-style:italic;color:#DFB897;letter-spacing:0.5px;margin-bottom:14px;">WHAT'S YOUR EVEREST?</div>
+            <div style="font-size:11px;color:#DFB897;font-weight:400;line-height:1.7;">
+                {{var store_name}} Automated Inventory Alert
+            </div>
+        </td>
+    </tr>
+
+</table>
+
+</td></tr>
+</table>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+<?php
+/**
+ * Layered Navigation filter items — styled to match Klevu .kuMulticheck design
+ * Checkbox square, label, count. "See More +" after 5 items.
+ */
+declare(strict_types=1);
+
+use Magento\Catalog\Helper\Data;
+use Magento\Framework\Escaper;
+use Magento\LayeredNavigation\Block\Navigation\FilterRenderer;
+
+/** @var FilterRenderer $block */
+/** @var Escaper $escaper */
+
+$catalogHelper = $this->helper(Data::class);
+
+/** @var array $filterItems */
+
+$validItems = array_filter($filterItems, fn($item) => $item->getCount() > 0);
+$totalItems = count($validItems);
+?>
+<div x-data="{ showAll: false }">
+<?php $i = 0; foreach ($filterItems as $filterItem): ?>
+    <?php if ($filterItem->getCount() <= 0) continue; ?>
+    <?php $i++; ?>
+    <div <?= $i > 5 ? 'x-show="showAll"' : '' ?>>
+        <a href="<?= $escaper->escapeUrl($filterItem->getUrl()) ?>"
+           class="flex items-center gap-2 py-[9px] px-3 rounded-full hover:bg-white cursor-pointer"
+           style="color: #0d2f47; text-decoration: none;">
+            <!-- Square checkbox matching Klevu kuMulticheck style -->
+            <span class="flex-shrink-0"
+                  style="display:inline-block; width:18px; height:18px; border:1px solid #cccccc; border-radius:3px; background:#fff; box-sizing:border-box;">
+            </span>
+            <!-- Label -->
+            <span class="flex-1 truncate leading-none" style="font-size:13px;">
+                <?= /* @noEscape */ $filterItem->getLabel() ?>
+            </span>
+            <!-- Count -->
+            <?php if ($catalogHelper->shouldDisplayProductCountOnLayer()): ?>
+            <span class="flex-shrink-0" style="font-size:13px; color:#0d2f47;">
+                (<?= (int)$filterItem->getCount() ?>)
+            </span>
+            <?php endif; ?>
+        </a>
+    </div>
+<?php endforeach; ?>
+
+<?php if ($totalItems > 5): ?>
+<div class="mt-2 px-3">
+    <button x-show="!showAll"
+            @click.prevent="showAll = true"
+            type="button"
+            class="text-sm font-bold bg-transparent border-0 p-0 cursor-pointer capitalize"
+            style="color: #4589c6;">
+        see more +
+    </button>
+    <button x-show="showAll"
+            @click.prevent="showAll = false"
+            type="button"
+            class="text-sm font-bold bg-transparent border-0 p-0 cursor-pointer capitalize"
+            style="color: #4589c6;">
+        see less -
+    </button>
+</div>
+<?php endif; ?>
+</div>

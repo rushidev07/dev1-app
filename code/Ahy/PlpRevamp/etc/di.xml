@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <type name="Ahy\PlpRevamp\Service\Yotpo\BottomlineFetcher">
+        <arguments>
+            <argument name="httpClient" xsi:type="object">GuzzleHttp\Client</argument>
+        </arguments>
+    </type>
+
+    <!--
+        Own ImageUploader virtualType so featured-brand images move from tmp in every area.
+        (Core's Magento\Catalog\CategoryImageUpload is declared adminhtml-only and cannot be
+        referenced from a global backend model constructed on the frontend.)
+        Reuses the catalog/category media paths so images sit alongside category card images.
+    -->
+    <virtualType name="Ahy\PlpRevamp\Model\FeaturedBrandsImageUpload" type="Magento\Catalog\Model\ImageUploader">
+        <arguments>
+            <argument name="baseTmpPath" xsi:type="string">catalog/tmp/category</argument>
+            <argument name="basePath" xsi:type="string">catalog/category</argument>
+            <argument name="allowedExtensions" xsi:type="array">
+                <item name="jpg" xsi:type="string">jpg</item>
+                <item name="jpeg" xsi:type="string">jpeg</item>
+                <item name="gif" xsi:type="string">gif</item>
+                <item name="png" xsi:type="string">png</item>
+                <item name="webp" xsi:type="string">webp</item>
+                <item name="svg" xsi:type="string">svg</item>
+            </argument>
+            <argument name="allowedMimeTypes" xsi:type="array">
+                <item name="jpg" xsi:type="string">image/jpg</item>
+                <item name="jpeg" xsi:type="string">image/jpeg</item>
+                <item name="gif" xsi:type="string">image/gif</item>
+                <item name="png" xsi:type="string">image/png</item>
+                <item name="webp" xsi:type="string">image/webp</item>
+                <item name="svg" xsi:type="string">image/svg+xml</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Ahy\PlpRevamp\Model\Category\Attribute\Backend\FeaturedBrands">
+        <arguments>
+            <argument name="imageUploader" xsi:type="object">Ahy\PlpRevamp\Model\FeaturedBrandsImageUpload</argument>
+        </arguments>
+    </type>
+
+    <type name="Ahy\PlpRevamp\Controller\Adminhtml\FeaturedBrand\Upload">
+        <arguments>
+            <argument name="imageUploader" xsi:type="object">Ahy\PlpRevamp\Model\FeaturedBrandsImageUpload</argument>
+        </arguments>
+    </type>
+
+</config>

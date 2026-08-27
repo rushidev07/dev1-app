@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework-message-queue:etc/publisher.xsd">
+
+    <publisher topic="falcosense.search.product.sync">
+        <connection name="db" exchange="magento" disabled="false"/>
+    </publisher>
+
+    <!-- Full-sync uses MySQL db queue — no RabbitMQ dependency. -->
+    <publisher topic="falcosense.search.full_sync">
+        <connection name="db" exchange="magento" disabled="false"/>
+    </publisher>
+
+</config>

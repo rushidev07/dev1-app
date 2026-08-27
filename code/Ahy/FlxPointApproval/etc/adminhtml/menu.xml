@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <!-- New top-level tab — separate from Ahy::top_level -->
+        <add id="Ahy_FlxPointApproval::top_level"
+             title="FlxPoint Approval"
+             module="Ahy_FlxPointApproval"
+             sortOrder="52"
+             resource="Ahy_FlxPointApproval::product_approval"/>
+
+        <add id="Ahy_FlxPointApproval::product_approval_index"
+             title="Pending Products"
+             module="Ahy_FlxPointApproval"
+             sortOrder="10"
+             parent="Ahy_FlxPointApproval::top_level"
+             action="ahy_flxpoint_approval/product/index"
+             resource="Ahy_FlxPointApproval::product_approval"/>
+    </menu>
+</config>

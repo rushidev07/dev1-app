@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Email:etc/email_templates.xsd">
+
+    <template id="ahy_estateapi_order_invoiced_template"
+              label="Order Invoiced Notification Mail to Seller (Ahy Estate/EFFL)"
+              file="order_invoiced.html"
+              type="html"
+              module="Ahy_EstateApiIntegration"
+              area="frontend"/>
+
+</config>

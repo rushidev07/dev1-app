@@ -1,0 +1,39 @@
+<?php
+/** @var \Magento\Backend\Block\Template $block */
+$entityId = (int) $block->getRequest()->getParam('entity_id');
+$postUrl  = $block->getUrl('ahy_flxpoint_approval/product/reject');
+?>
+<div class="admin__data-grid-wrap">
+    <div style="max-width:600px; padding:30px;">
+        <h2><?= $block->escapeHtml(__('Reject Product')) ?></h2>
+        <p><?= $block->escapeHtml(__('Provide an optional reason for rejecting this product. The reason will be stored for reference.')) ?></p>
+
+        <form action="<?= $block->escapeUrl($postUrl) ?>" method="post" id="reject-product-form">
+            <?= $block->getBlockHtml('formkey') ?>
+            <input type="hidden" name="entity_id" value="<?= (int) $entityId ?>"/>
+
+            <div class="admin__field" style="margin-bottom:20px;">
+                <label class="admin__field-label" for="rejection_reason">
+                    <?= $block->escapeHtml(__('Rejection Reason (optional)')) ?>
+                </label>
+                <div class="admin__field-control">
+                    <textarea id="rejection_reason"
+                              name="rejection_reason"
+                              rows="5"
+                              style="width:100%; max-width:560px;"
+                              placeholder="<?= $block->escapeHtmlAttr(__('Enter reason for rejection...')) ?>"></textarea>
+                </div>
+            </div>
+
+            <div class="admin__actions-switch" style="margin-top:20px;">
+                <button type="submit" class="action-primary">
+                    <?= $block->escapeHtml(__('Confirm Rejection')) ?>
+                </button>
+                <a href="<?= $block->escapeUrl($block->getUrl('ahy_flxpoint_approval/product/index')) ?>"
+                   class="action-secondary" style="margin-left:10px;">
+                    <?= $block->escapeHtml(__('Cancel')) ?>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

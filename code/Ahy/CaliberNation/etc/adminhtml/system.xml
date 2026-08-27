@@ -1,0 +1,248 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <!-- Nested under the shared "Ahy" tab (declared by other Ahy_* modules). -->
+        <section id="caliber_nation" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+            <tab>ahy</tab>
+            <label>Caliber Nation Settings</label>
+            <resource>Ahy_CaliberNation::config</resource>
+
+            <!-- ── General (master switch) ────────────────────────────────────── -->
+            <group id="general" translate="label" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General</label>
+                <field id="enabled" translate="label comment" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Caliber Nation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Master switch for the whole program. When set to No, every Caliber Nation feature is turned off: no membership activation, no member pricing or savings, no payment restrictions, no lifecycle emails/crons, and all storefront banners, signup forms, and account panels are hidden. Existing member records are left untouched and resume when re-enabled.</comment>
+                </field>
+            </group>
+
+            <!-- ── Membership ─────────────────────────────────────────────────── -->
+            <group id="membership" translate="label" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Membership Settings</label>
+
+                <field id="price" translate="label comment" type="text"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Annual Membership Price</label>
+                    <comment>Price charged per year (e.g. 99.99). Shown on the signup form and used for renewal.</comment>
+                    <validate>required-entry validate-number validate-greater-than-zero</validate>
+                </field>
+
+                <field id="trial_enabled" translate="label comment" type="select"
+                       sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Bonus Month(s) at Signup</label>
+                    <comment>When enabled, new members receive extra months of access beyond the standard 12-month cycle.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+
+                <field id="trial_months" translate="label comment" type="text"
+                       sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Bonus Months</label>
+                    <comment>Number of extra months granted at signup (e.g. 1 = 13-month cycle). Only applies when bonus months is enabled above.</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                    <depends>
+                        <field id="trial_enabled">1</field>
+                    </depends>
+                </field>
+
+                <field id="max_renewal_attempts" translate="label comment" type="text"
+                       sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Max Auto-Renewal Attempts</label>
+                    <comment>How many failed auto-renewal charges before a membership is marked Expired. The renewal cron retries once per day, so 3 means it expires on the third failed day. Until then the membership sits in "Renewal Pending" (no member benefits) and keeps retrying.</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                </field>
+
+            </group>
+
+            <!-- ── Email ─────────────────────────────────────────────────────── -->
+            <group id="email" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Email Settings</label>
+
+                <field id="sender" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Sender</label>
+                    <comment>From identity used for OTP and welcome emails sent by the Caliber Nation membership flow.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Identity</source_model>
+                </field>
+            </group>
+
+            <!-- ── Member Pricing (Phase 3) ──────────────────────────────────── -->
+            <group id="pricing" translate="label" sortOrder="15" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Member Pricing</label>
+
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Member Pricing</label>
+                    <comment>Master switch for the additive member-pricing engine (membership + seller + category + product discounts).</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+
+                <field id="base_discount_type" translate="label" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Membership Base Discount Type</label>
+                    <source_model>Ahy\CaliberNation\Model\Config\Source\DiscountType</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+
+                <field id="base_discount_value" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Membership Base Discount Value</label>
+                    <comment>The base discount every active member gets on all products (0 = none). Percent → % off; Fixed → amount off. Seller/category/product discounts stack on top.</comment>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+
+                <field id="cap_type" translate="label" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Global Discount Cap Type</label>
+                    <source_model>Ahy\CaliberNation\Model\Config\Source\DiscountType</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+
+                <field id="cap_value" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Global Discount Cap Value</label>
+                    <comment>Maximum TOTAL member discount after stacking (0 = no cap). Percent → never more than this % off the original; Fixed → never more than this amount off. Does not limit coupons.</comment>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
+
+            <!-- ── Win-back (lapsed-member re-engagement) ─────────────────────── -->
+            <group id="winback" translate="label" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Win-back Discount</label>
+
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Win-back Discount</label>
+                    <comment>Offer lapsed members a discounted renewal price once they have been expired beyond the threshold below.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+
+                <field id="days_threshold" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Days Expired Before Discount</label>
+                    <comment>Number of days a membership must be expired before the win-back price applies (e.g. 30 → from day 31).</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+
+                <field id="discount_type" translate="label" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Discount Type</label>
+                    <source_model>Ahy\CaliberNation\Model\Config\Source\WinbackDiscountType</source_model>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+
+                <field id="discount_value" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Discount Value</label>
+                    <comment>Percent → % off the standard price (e.g. 20). Fixed → the discounted price itself (e.g. 79.99).</comment>
+                    <validate>required-entry validate-number validate-zero-or-greater</validate>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
+
+            <!-- ── Messaging (renewal prompt / savings / early-bird copy) — Phase 4 ── -->
+            <group id="messaging" translate="label" sortOrder="25" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Messaging</label>
+
+                <field id="renewal_prompt_heading" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Renewal Prompt Heading</label>
+                    <comment>Shown to lapsed members prompting them to renew (e.g. "Your membership has expired").</comment>
+                </field>
+                <field id="renewal_prompt_body" translate="label" type="textarea" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Renewal Prompt Body</label>
+                </field>
+                <field id="savings_message" translate="label comment" type="textarea" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Savings Messaging</label>
+                    <comment>General member-savings copy for storefront blocks.</comment>
+                </field>
+                <field id="average_savings_intro" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Average Savings Intro</label>
+                    <comment>Prefix for the average figure, e.g. "Members save an average of".</comment>
+                </field>
+                <field id="average_savings_static" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Average Savings Fallback (amount)</label>
+                    <comment>Used when there isn't enough order data to compute a real average (e.g. 25.00). 0 = hide the block until real data exists.</comment>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                </field>
+                <field id="earlybird_message" translate="label comment" type="textarea" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Early-bird Messaging</label>
+                    <comment>Copy for early-access / early-bird promotions (feature lands in a later phase).</comment>
+                </field>
+            </group>
+
+            <!-- ── Landing-page stats band (the "by the numbers" row) ──────────── -->
+            <group id="landing" translate="label comment" sortOrder="27" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Landing Page Stats</label>
+                <comment>The three headline figures on the Caliber Nation landing page. Enter numbers only currency, commas and the % sign are added for you.</comment>
+
+                <field id="stat_avg_savings" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Average Savings Per Year</label>
+                    <comment>Numbers only, e.g. 3500 → displays as "$3,500+/yr".</comment>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                </field>
+                <field id="stat_monthly_cost" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Monthly Equivalent</label>
+                    <comment>Numbers only, e.g. 8.33 → displays as "$8.33/mth". Leave EMPTY to calculate it automatically from the annual membership price.</comment>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                </field>
+                <field id="stat_max_discount" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Maximum Discount (%)</label>
+                    <comment>Numbers only, e.g. 90 → displays as "90%". Keep this in line with the discount cap under Member Pricing.</comment>
+                    <validate>validate-number validate-zero-or-greater</validate>
+                </field>
+            </group>
+
+            <!-- ── Early Cancellation / Refund Requests ─────────────────────────── -->
+            <group id="early_cancellation" translate="label" sortOrder="28" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Early Cancellation</label>
+
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Early Cancellation Tracking</label>
+                    <comment>When enabled, members who cancel within the refund window below will appear in the Early Cancellations grid for admin review.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+
+                <field id="refund_window_days" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Refund Window (Days)</label>
+                    <comment>Number of days from the membership start date within which a cancellation is flagged for refund review (e.g. 30 = within the first 30 days).</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
+
+            <!-- ── Cancellation handling — Phase 4 ─────────────────────────────── -->
+            <group id="cancellation" translate="label" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Cancellation Handling</label>
+
+                <field id="send_email" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Send Cancellation Email</label>
+                    <comment>Email the member a confirmation when they cancel. Cancellation always keeps benefits until the paid-through date (renewal date).</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="confirmation_message" translate="label comment" type="textarea" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>On-screen Cancellation Confirmation</label>
+                    <comment>Message shown after a self-service cancellation. Leave blank for the default.</comment>
+                </field>
+            </group>
+
+            <group id="emails" translate="label" sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Lifecycle Emails</label>
+                <field id="expiry_enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Send Expiry Email</label>
+                    <comment>Email the member when their membership expires (failed renewals or end of a cancelled paid-through term).</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="renewal_reminder_enabled" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Send Advance Renewal Reminder</label>
+                    <comment>Email active auto-renewing members before their renewal date (US advance-notice).</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="renewal_reminder_days" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Reminder Days Before Renewal</label>
+                    <comment>How many days before the renewal date to send the reminder (e.g. 7).</comment>
+                    <depends><field id="renewal_reminder_enabled">1</field></depends>
+                </field>
+                <field id="winback_enabled" translate="label comment" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Send Win-back Email</label>
+                    <comment>Email lapsed members a rejoin offer once they become win-back eligible (requires Win-back enabled).</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

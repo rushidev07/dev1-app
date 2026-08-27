@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+
+    <!-- Cron jobs removed: falcosense_search_delta_sync and falcosense_search_image_compress
+         are no longer scheduled. Product sync now runs only via the manual CLI command:
+         bin/magento smartsearch:sync:full -->
+    <group id="default">
+    </group>
+
+</config>

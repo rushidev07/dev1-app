@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation.cart.renewal_prompt"
+                   template="Ahy_CaliberNation::cta/renewal-prompt.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Ahy\CaliberNation\ViewModel\RenewalPrompt</argument>
+                </arguments>
+            </block>
+            <!-- Renewal popup for expired members: once per session, alongside the banner. -->
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation.cart.renewal_popup"
+                   template="Ahy_CaliberNation::cta/renewal-popup.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Ahy\CaliberNation\ViewModel\RenewalPrompt</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation.cart.join_cta"
+                   template="Ahy_CaliberNation::cta/join-banner.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Ahy\CaliberNation\ViewModel\JoinCta</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

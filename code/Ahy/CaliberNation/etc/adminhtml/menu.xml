@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Ahy_CaliberNation::caliber_nation"
+             title="Caliber Nation"
+             translate="title"
+             module="Ahy_CaliberNation"
+             sortOrder="10"
+             resource="Ahy_CaliberNation::caliber_nation"/>
+        <add id="Ahy_CaliberNation::membership"
+             title="Memberships"
+             translate="title"
+             module="Ahy_CaliberNation"
+             sortOrder="10"
+             parent="Ahy_CaliberNation::caliber_nation"
+             action="calibernation/membership/index"
+             resource="Ahy_CaliberNation::membership"/>
+        <add id="Ahy_CaliberNation::seller_pricing"
+             title="Seller Participation"
+             translate="title"
+             module="Ahy_CaliberNation"
+             sortOrder="20"
+             parent="Ahy_CaliberNation::caliber_nation"
+             action="calibernation/sellerpricing/index"
+             resource="Ahy_CaliberNation::seller_pricing"/>
+        <add id="Ahy_CaliberNation::price_rules"
+             title="Member Price Rules"
+             translate="title"
+             module="Ahy_CaliberNation"
+             sortOrder="30"
+             parent="Ahy_CaliberNation::caliber_nation"
+             action="calibernation/pricerule/index"
+             resource="Ahy_CaliberNation::price_rules"/>
+        <add id="Ahy_CaliberNation::refund_requests"
+             title="Early Cancellations"
+             translate="title"
+             module="Ahy_CaliberNation"
+             sortOrder="40"
+             parent="Ahy_CaliberNation::caliber_nation"
+             action="calibernation/refundrequest/index"
+             resource="Ahy_CaliberNation::refund_requests"/>
+    </menu>
+</config>

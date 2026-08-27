@@ -1,0 +1,458 @@
+<?php
+/**
+ * Caliber Nation — My Account: Membership Overview (Premium UI — Responsive)
+ *
+ * States:
+ *   A — Active member        → two-column desktop / dark strip header mobile
+ *   B — Expired              → two-column desktop / dark strip header mobile
+ *   C — Cancelled            → two-column desktop / dark strip header mobile
+ *   D — No membership        → two-column desktop / dark strip header mobile
+ *
+ * @var \Magento\Framework\View\Element\Template                          $block
+ * @var \Magento\Framework\Escaper                                        $escaper
+ * @var \Hyva\Theme\Model\ViewModelRegistry                               $viewModels
+ * @var \Ahy\CaliberNation\ViewModel\Account\MembershipOverview           $viewModel
+ */
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons  = $viewModels->require(HeroiconsOutline::class);
+
+/** @var \Ahy\CaliberNation\ViewModel\Account\MembershipOverview $viewModel */
+$viewModel  = $block->getData('view_model');
+?>
+
+<?php if (!$viewModel->hasMembership()): ?>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     STATE D — No membership
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="overflow-hidden rounded-xl shadow-xl flex flex-col lg:flex-row">
+
+    <!-- MOBILE: dark header strip (replaces left panel on small screens) ── -->
+    <div class="lg:hidden relative overflow-hidden px-5 py-4 flex items-center gap-3"
+         style="background-color:#0d2f47;
+                background-image:repeating-linear-gradient(135deg,transparent,transparent 20px,rgba(255,255,255,.022) 20px,rgba(255,255,255,.022) 21px);">
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:3px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div>
+        <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+             alt="Caliber Nation" class="relative h-7 shrink-0"/>
+        <div class="relative">
+            <p class="text-white text-sm font-bold"><?= $escaper->escapeHtml(__('Caliber Nation')) ?></p>
+            <p class="text-white text-xs" style="opacity:.5;"><?= $escaper->escapeHtml(__('Membership')) ?></p>
+        </div>
+    </div>
+
+    <!-- LEFT: Dark brand panel (desktop only) ─────────────────────────── -->
+    <div class="hidden lg:flex flex-col items-center justify-center relative overflow-hidden lg:w-2/5 px-10 py-16"
+         style="background-color:#0d2f47;
+                background-image:repeating-linear-gradient(135deg,transparent,transparent 20px,rgba(255,255,255,.022) 20px,rgba(255,255,255,.022) 21px);">
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 88% 88%,rgba(216,58,58,.1) 0%,transparent 45%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:4px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div>
+
+        <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+             alt="Caliber Nation" class="relative w-36 mb-8"/>
+        <h3 class="relative font-league-gothic text-white text-5xl text-center leading-none mb-4">
+            JOIN NOW<br/>AND SAVE
+        </h3>
+        <p class="relative text-white text-sm text-center leading-relaxed mb-8"
+           style="opacity:.7;max-width:200px;">
+            <?= $escaper->escapeHtml(__('Exclusive discounts, early-bird deals, and more — all in one membership.')) ?>
+        </p>
+        <div class="relative w-10 h-0.5 bg-ahy-red mb-8"></div>
+        <ul class="relative text-white text-sm space-y-3.5 w-full" style="max-width:210px;">
+            <li class="flex items-start gap-2.5">
+                <span class="text-ahy-red shrink-0 mt-0.5 font-bold text-base leading-none">&#10003;</span>
+                <?= $escaper->escapeHtml(__('10%–90% off member products')) ?>
+            </li>
+            <li class="flex items-start gap-2.5">
+                <span class="text-ahy-red shrink-0 mt-0.5 font-bold text-base leading-none">&#10003;</span>
+                <?= $escaper->escapeHtml(__('Early-bird access to sales & new sellers')) ?>
+            </li>
+            <li class="flex items-start gap-2.5">
+                <span class="text-ahy-red shrink-0 mt-0.5 font-bold text-base leading-none">&#10003;</span>
+                <?= $escaper->escapeHtml(__('Track your total member savings')) ?>
+            </li>
+            <li class="flex items-start gap-2.5">
+                <span class="text-ahy-red shrink-0 mt-0.5 font-bold text-base leading-none">&#10003;</span>
+                <?= $escaper->escapeHtml(__('Cancel anytime — no lock-in')) ?>
+            </li>
+        </ul>
+    </div>
+
+    <!-- RIGHT: Join CTA ────────────────────────────────────────────────── -->
+    <div class="bg-white flex-1 flex flex-col justify-center px-5 py-8 sm:px-8 sm:py-12 lg:px-12 lg:py-16">
+
+        <h2 class="font-league-gothic text-3xl sm:text-4xl text-ahy-blue uppercase leading-tight mb-3">
+            <?= $escaper->escapeHtml(__("You're Not a Member Yet")) ?>
+        </h2>
+        <p class="text-gray-500 text-sm leading-relaxed mb-8 max-w-md">
+            <?= $escaper->escapeHtml(__('Join Caliber Nation to unlock exclusive member pricing, early-bird access to new sellers and products, and track your total savings.')) ?>
+        </p>
+
+        <a href="<?= $escaper->escapeUrl($block->getUrl('caliber-nation')) ?>"
+           class="inline-flex items-center justify-center
+                  w-full sm:w-auto sm:self-start
+                  bg-ahy-red hover:bg-ahy-red-light
+                  text-white font-bold rounded-full px-10 h-14 transition-colors">
+            <?= $escaper->escapeHtml(__('Join Caliber Nation')) ?>
+            <?= $heroicons->arrowRightHtml('ml-2 shrink-0', 18, 18) ?>
+        </a>
+
+        <!-- Trust row -->
+        <div class="flex flex-wrap items-center gap-4 mt-8 pt-6 border-t border-gray-100">
+            <?php foreach ([__('Cancel anytime'), __('No hidden fees'), __('Annual billing')] as $trust): ?>
+            <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <?= $escaper->escapeHtml($trust) ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+
+<?php elseif ($viewModel->isActive()): ?>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     STATE A — Active member
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="overflow-hidden rounded-xl shadow-xl flex flex-col lg:flex-row">
+
+    <!-- MOBILE: dark header strip (replaces left panel on small screens) ── -->
+    <div class="lg:hidden relative overflow-hidden px-5 py-4 flex items-center justify-between gap-3"
+         style="background-color:#0d2f47;
+                background-image:repeating-linear-gradient(135deg,transparent,transparent 20px,rgba(255,255,255,.022) 20px,rgba(255,255,255,.022) 21px);">
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:3px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div>
+        <div class="relative flex items-center gap-3 min-w-0">
+            <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+                 alt="Caliber Nation" class="h-7 shrink-0 hidden md:block"/>
+            <div class="min-w-0">
+                <p class="text-white text-sm font-bold truncate">
+                    <?= $escaper->escapeHtml($viewModel->getTierLabel()) ?> <?= $escaper->escapeHtml(__('Plan')) ?>
+                </p>
+                <p class="text-white text-xs truncate" style="opacity:.5;">
+                    <?= $escaper->escapeHtml(__('Since')) ?> <?= $escaper->escapeHtml($viewModel->getFormattedStartDate()) ?>
+                </p>
+            </div>
+        </div>
+        <div class="relative flex items-center gap-1.5 shrink-0">
+            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0"></span>
+            <span class="text-white text-xs font-bold uppercase tracking-wide">
+                <?= $escaper->escapeHtml($viewModel->getStatusLabel()) ?>
+            </span>
+        </div>
+    </div>
+
+    <!-- LEFT: Dark member panel (desktop only) ─────────────────────────── -->
+    <div class="hidden lg:flex flex-col items-center justify-between relative overflow-hidden lg:w-2/5 px-8 py-12"
+         style="background-color:#0d2f47;">
+
+        <!-- Logo -->
+        <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+             alt="Caliber Nation" class="relative w-32 mb-6"/>
+
+        <!-- Mini membership card -->
+        <?php
+            $stateACard = $block->getLayout()
+                ->createBlock(\Magento\Framework\View\Element\Template::class)
+                ->setTemplate('Ahy_CaliberNation::partials/membership-card.phtml')
+                ->setData('member_name', $viewModel->getCustomerName())
+                ->setData('tier', strtoupper($viewModel->getTierLabel()));
+        ?>
+        <div class="relative w-full mb-6" style="max-width:280px;">
+            <?= $stateACard->toHtml() ?>
+        </div>
+
+        <!-- Tier + since -->
+        <div class="relative text-center">
+            <p class="text-white font-league-gothic text-2xl uppercase tracking-wider">
+                <?= $escaper->escapeHtml($viewModel->getTierLabel()) ?> Plan
+            </p>
+            <p class="text-white text-xs tracking-wide mt-1" style="opacity:.5;">
+                <?= $escaper->escapeHtml(__('Member since')) ?>
+                <?= $escaper->escapeHtml($viewModel->getFormattedStartDate()) ?>
+            </p>
+        </div>
+    </div>
+
+    <!-- RIGHT: Details + controls ──────────────────────────────────────── -->
+    <div class="bg-white flex-1 px-5 py-7 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+
+        <!-- Heading row -->
+        <div class="flex items-center justify-between mb-6 sm:mb-8">
+            <h2 class="text-base sm:text-lg font-extrabold text-ahy-blue uppercase tracking-wide">
+                <?= $escaper->escapeHtml(__('Membership Details')) ?>
+            </h2>
+            <span class="hidden lg:inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide
+                         text-green-700 bg-green-100 px-3 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <?= $escaper->escapeHtml($viewModel->getStatusLabel()) ?>
+            </span>
+        </div>
+
+        <!-- Details grid -->
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5 mb-7 sm:mb-8 text-sm">
+
+            <div class="border-l-2 border-ahy-red pl-4">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    <?= $escaper->escapeHtml(__('Plan')) ?>
+                </dt>
+                <dd class="font-bold text-ahy-blue">
+                    <?= $escaper->escapeHtml($viewModel->getTierLabel()) ?>
+                </dd>
+            </div>
+
+            <div class="border-l-2 border-ahy-red pl-4">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    <?= $escaper->escapeHtml(__('Member Since')) ?>
+                </dt>
+                <dd class="font-bold text-ahy-blue">
+                    <?= $escaper->escapeHtml($viewModel->getFormattedStartDate()) ?>
+                </dd>
+            </div>
+
+            <div class="border-l-2 border-ahy-red pl-4">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    <?= $escaper->escapeHtml($viewModel->isAutoRenewEnabled() ? __('Renews On') : __('Expires On')) ?>
+                </dt>
+                <dd class="font-bold text-ahy-blue">
+                    <?= $escaper->escapeHtml($viewModel->getFormattedRenewalDate()) ?>
+                </dd>
+            </div>
+
+            <div class="border-l-2 border-ahy-red pl-4">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    <?= $escaper->escapeHtml(__('Payment Method')) ?>
+                </dt>
+                <dd class="font-bold text-ahy-blue leading-snug">
+                    <?= $escaper->escapeHtml($viewModel->getPaymentMethodSummary()) ?>
+                    <?php $expiry = $viewModel->getPaymentMethodExpiry(); ?>
+                    <?php if ($expiry): ?>
+                        <span class="block text-xs font-normal text-gray-500 mt-0.5">
+                            <?= $escaper->escapeHtml(__('Exp.') . ' ' . $expiry) ?>
+                        </span>
+                    <?php endif; ?>
+                </dd>
+            </div>
+
+            <div class="sm:col-span-2 border-l-2 border-ahy-red pl-4">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    <?= $escaper->escapeHtml(__('Total Savings')) ?>
+                </dt>
+                <dd class="font-extrabold text-ahy-blue text-xl sm:text-2xl">
+                    <?= $escaper->escapeHtml($viewModel->getTotalSavings()) ?>
+                </dd>
+            </div>
+
+        </dl>
+
+        <div class="border-t border-gray-100 mb-6 sm:mb-8"></div>
+
+        <?= $block->getChildHtml('membership_manager') ?>
+
+    </div>
+</div>
+
+<?php elseif ($viewModel->isExpired() && !$viewModel->isRefundReviewed()): ?>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     STATE B — Expired / Renewal Pending
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="overflow-hidden rounded-xl shadow-xl flex flex-col lg:flex-row">
+
+    <!-- MOBILE: dark header strip ─────────────────────────────────────── -->
+    <div class="lg:hidden relative overflow-hidden px-5 py-4 flex items-center justify-between gap-3"
+         style="background-color:#0d2f47;
+                background-image:repeating-linear-gradient(135deg,transparent,transparent 20px,rgba(255,255,255,.022) 20px,rgba(255,255,255,.022) 21px);">
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:3px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div>
+        <div class="relative flex items-center gap-3">
+            <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png" alt="Caliber Nation" class="h-7 shrink-0"/>
+            <p class="text-white text-sm font-bold"><?= $escaper->escapeHtml(__('Caliber Nation')) ?></p>
+        </div>
+        <div class="relative flex items-center gap-1.5 shrink-0">
+            <span class="w-2 h-2 rounded-full bg-yellow-400 shrink-0"></span>
+            <span class="text-yellow-400 text-xs font-bold uppercase tracking-wide">
+                <?= $escaper->escapeHtml($viewModel->getStatusLabel()) ?>
+            </span>
+        </div>
+    </div>
+
+    <!-- LEFT: Dark panel (desktop only) ────────────────────────────────── -->
+    <div class="hidden lg:flex flex-col items-center justify-center relative overflow-hidden lg:w-2/5 px-10 py-16"
+         style="background-color:#0d2f47;
+                background-image:repeating-linear-gradient(135deg,transparent,transparent 20px,rgba(255,255,255,.022) 20px,rgba(255,255,255,.022) 21px);">
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:4px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div>
+        <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+             alt="Caliber Nation" class="relative w-32 mb-8"/>
+        <div class="relative flex items-center gap-2 mb-5">
+            <span class="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0"></span>
+            <span class="text-yellow-400 text-xs font-bold uppercase tracking-widest">
+                <?= $escaper->escapeHtml($viewModel->getStatusLabel()) ?>
+            </span>
+        </div>
+        <h3 class="relative font-league-gothic text-white text-4xl text-center leading-tight mb-3">
+            <?php if ($viewModel->isRenewalPending()): ?>
+                RENEWAL<br/>FAILED
+            <?php else: ?>
+                MEMBERSHIP<br/>EXPIRED
+            <?php endif; ?>
+        </h3>
+        <p class="relative text-white text-sm text-center leading-relaxed" style="opacity:.6;max-width:190px;">
+            <?= $escaper->escapeHtml($viewModel->isRenewalPending()
+                ? __('Update your card to keep your member benefits.')
+                : __('Renew to restore your member benefits instantly.')) ?>
+        </p>
+    </div>
+
+    <!-- RIGHT: Renewal CTA ─────────────────────────────────────────────── -->
+    <div class="bg-white flex-1 flex flex-col justify-center px-5 py-8 sm:px-8 sm:py-12 lg:px-12 lg:py-16">
+        <h2 class="font-league-gothic text-3xl sm:text-4xl text-ahy-blue uppercase leading-tight mb-4">
+            <?= $escaper->escapeHtml($viewModel->isRenewalPending()
+                ? __("We Couldn't Process Your Renewal")
+                : __('Renew Your Membership')) ?>
+        </h2>
+        <div class="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6">
+            <svg class="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <p class="text-sm text-yellow-700">
+                <?= $escaper->escapeHtml($viewModel->isRenewalPending()
+                    ? __('Your renewal payment was due on %1 and your card was declined. Please update your payment card.', $viewModel->getFormattedRenewalDate())
+                    : __('Your membership expired on %1.', $viewModel->getFormattedRenewalDate())) ?>
+            </p>
+        </div>
+        <p class="text-gray-500 text-sm leading-relaxed mb-8">
+            <?= $escaper->escapeHtml($viewModel->isRenewalPending()
+                ? __("We'll keep trying for the next few days. Update your card or renew now to restore your member pricing, early-bird access, and savings tracking right away.")
+                : __('Renew now to restore your member pricing, early-bird access, and savings tracking.')) ?>
+        </p>
+        <a href="<?= $escaper->escapeUrl($viewModel->getRenewUrl()) ?>"
+           class="inline-flex items-center justify-center
+                  w-full sm:w-auto sm:self-start
+                  bg-ahy-red hover:bg-ahy-red-light
+                  text-white font-bold rounded-full px-10 h-14 transition-colors">
+            <?= $escaper->escapeHtml($viewModel->isRenewalPending()
+                ? __('Renew Now')
+                : __('Renew Membership')) ?>
+            <?= $heroicons->arrowRightHtml('ml-2 shrink-0', 18, 18) ?>
+        </a>
+    </div>
+</div>
+
+<?php else: ?>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     STATE C — Cancelled
+     ═══════════════════════════════════════════════════════════════════ -->
+<div class="overflow-hidden rounded-xl shadow-xl flex flex-col lg:flex-row">
+
+    <!-- MOBILE: dark header strip ─────────────────────────────────────── -->
+    <div class="lg:hidden relative overflow-hidden px-5 py-4 flex items-center justify-between gap-3"
+         style="background-color:#0d2f47;
+                background-image:repeating-linear-gradient(135deg,transparent,transparent 20px,rgba(255,255,255,.022) 20px,rgba(255,255,255,.022) 21px);">
+        <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:3px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div>
+        <div class="relative flex items-center gap-3">
+            <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png" alt="Caliber Nation" class="h-7 shrink-0"/>
+            <p class="text-white text-sm font-bold"><?= $escaper->escapeHtml(__('Caliber Nation')) ?></p>
+        </div>
+        <div class="relative flex items-center gap-1.5 shrink-0">
+            <span class="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+            <span class="text-red-400 text-xs font-bold uppercase tracking-wide">
+                <?= $escaper->escapeHtml($viewModel->getStatusLabel()) ?>
+            </span>
+        </div>
+    </div>
+
+    <!-- LEFT: Dark panel (desktop only) ────────────────────────────────── -->
+    <div class="hidden lg:flex flex-col items-center justify-center relative overflow-hidden lg:w-2/5 px-10 py-16"
+         style="background-color:#0d2f47;">
+        <!-- <div class="absolute inset-0 pointer-events-none"
+             style="background:radial-gradient(ellipse at 12% 18%,rgba(6,79,132,.7) 0%,transparent 55%);"></div>
+        <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+             style="height:4px;background:linear-gradient(90deg,#d83a3a 0%,#ff4545 50%,#d83a3a 100%);"></div> -->
+        <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+             alt="Caliber Nation" class="relative w-32 mb-3"/>
+        <div class="relative flex items-center gap-2 mb-5">
+            <!-- <span class="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0"></span> -->
+            <span class="text-white text-xs font-bold uppercase tracking-widest" style="opacity:.55;">
+                <?= $escaper->escapeHtml($viewModel->getStatusLabel()) ?>
+            </span>
+        </div>
+        <!--
+            Cancelled is PAID-THROUGH: while renewal_date is still in the future the
+            member keeps every benefit, so the panel must not imply they've lost access.
+        -->
+        <h3 class="relative font-league-gothic text-white text-4xl text-center leading-tight mb-3">
+            <?php if ($viewModel->isWithinPaidThrough()): ?>
+                BENEFITS<br/>STILL ON
+            <?php else: ?>
+                COME BACK<br/>ANYTIME
+            <?php endif; ?>
+        </h3>
+        <p class="relative text-white text-sm text-center leading-relaxed" style="opacity:.6;max-width:190px;">
+            <?= $escaper->escapeHtml($viewModel->isWithinPaidThrough()
+                ? __('Auto-renew is off. You keep all benefits until %1.', $viewModel->getFormattedRenewalDate())
+                : __('Rejoin and instantly regain all member benefits.')) ?>
+        </p>
+    </div>
+
+    <!-- RIGHT: Inline rejoin flow (Magewire) ───────────────────────────── -->
+    <div class="bg-white flex-1 px-5 py-8 sm:px-8 sm:py-12 lg:px-12 lg:py-16">
+        <?= $block->getChildHtml('membership_rejoin') ?>
+    </div>
+</div>
+
+<?php endif; ?>
+
+<!--
+    Add-card modal — the SAME modal used on the account dashboard. Opened from the
+    auto-renew "Add a card" prompt (Magewire child) via a window event, so the member
+    can add a card without leaving the membership page. Hidden until triggered.
+-->
+<div x-data="{ showAddCard: false }"
+     @cn-open-add-card.window="showAddCard = true; document.body.classList.add('overflow-hidden')">
+    <div x-show="showAddCard"
+         x-cloak
+         x-transition
+         @keydown.window.escape="showAddCard = false; document.body.classList.remove('overflow-hidden')"
+         x-init="$watch('showAddCard', v => { if (!v) document.body.classList.remove('overflow-hidden') })"
+         class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-white/30 backdrop-blur-sm address-form-wrapper">
+        <div @click.away="showAddCard = false; document.body.classList.remove('overflow-hidden')"
+             class="bg-ahy-yellow-card rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-auto p-6 relative max-height-modal">
+            <button @click="showAddCard = false; document.body.classList.remove('overflow-hidden')"
+                    class="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition"
+                    aria-label="<?= $escaper->escapeHtmlAttr(__('Close')) ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <?php
+            $addCardModal = $block->getLayout()->createBlock(\Magento\Framework\View\Element\Template::class);
+            $addCardModal->setTemplate('Ahy_Authorizenet::inter-new-card.phtml');
+            $addCardModal->setData('address_helper', $viewModels->require(\Ahy\Authorizenet\ViewModel\CustomerAddressHelper::class));
+            // Return to the membership page after saving (opt-in referer).
+            $addCardModal->setData('redirect_url', $block->getUrl('caliber-nation/account'));
+            echo $addCardModal->toHtml();
+            ?>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <fieldset name="display_settings">
+        <field name="ahy_use_subcategory_layout" sortOrder="200" formElement="checkbox">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>boolean</dataType>
+                <label translate="true">Use Subcategory Card Layout</label>
+                <dataScope>ahy_use_subcategory_layout</dataScope>
+                <notice translate="true">Enable to replace product grid with subcategory cards + featured products section.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="number">0</map>
+                            <map name="true" xsi:type="number">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+
+        <field name="ahy_featured_products_count" sortOrder="201" formElement="input">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Featured Products Count</label>
+                <dataScope>ahy_featured_products_count</dataScope>
+                <notice translate="true">Number of featured products shown below subcategory cards. Default: 8</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+        </field>
+
+        <field name="ahy_featured_source_id" sortOrder="203" formElement="input">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Featured Products Source Category ID</label>
+                <dataScope>ahy_featured_source_id</dataScope>
+                <notice translate="true">Enter the ID of the child category whose products populate the Featured Products section. That category will be hidden from subcategory cards.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+        </field>
+
+        <field name="ahy_featured_title" sortOrder="204" formElement="input">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Featured Products Section Title</label>
+                <dataScope>ahy_featured_title</dataScope>
+                <notice translate="true">Heading text for the featured products section. Default: Featured Products</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+        </field>
+
+       <field name="ahy_featured_brands_title" sortOrder="205" formElement="input">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Featured Brands Section Title</label>
+                <dataScope>ahy_featured_brands_title</dataScope>
+                <notice translate="true">Heading shown above the featured brands grid. Leave empty to hide the section.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+        </field>
+
+        <dynamicRows name="ahy_featured_brands" sortOrder="206">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="componentType" xsi:type="string">dynamicRows</item>
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <label translate="true">Featured Brands</label>
+                <addButtonLabel translate="true">Add Brand</addButtonLabel>
+                <componentType>dynamicRows</componentType>
+                <additionalClasses>
+                    <class name="ahy-featured-brands-rows">true</class>
+                </additionalClasses>
+            </settings>
+            <container name="record" component="Magento_Ui/js/dynamic-rows/record">
+                <argument name="data" xsi:type="array">
+                    <item name="config" xsi:type="array">
+                        <item name="componentType" xsi:type="string">container</item>
+                        <item name="isTemplate" xsi:type="boolean">true</item>
+                        <item name="is_collection" xsi:type="boolean">true</item>
+                    </item>
+                </argument>
+                <field name="name" formElement="input" sortOrder="10">
+                    <argument name="data" xsi:type="array">
+                        <item name="config" xsi:type="array">
+                            <item name="source" xsi:type="string">category</item>
+                        </item>
+                    </argument>
+                    <settings>
+                        <dataType>text</dataType>
+                        <label translate="true">Brand Name</label>
+                        <dataScope>name</dataScope>
+                    </settings>
+                </field>
+                <field name="link" formElement="input" sortOrder="20">
+                    <argument name="data" xsi:type="array">
+                        <item name="config" xsi:type="array">
+                            <item name="source" xsi:type="string">category</item>
+                        </item>
+                    </argument>
+                    <settings>
+                        <dataType>text</dataType>
+                        <label translate="true">Link</label>
+                        <dataScope>link</dataScope>
+                        <notice translate="true">Destination URL or slug, e.g. /patagonia or https://example.com/patagonia. Leave empty to auto-generate a slug from the name.</notice>
+                    </settings>
+                </field>
+                <field name="image" formElement="fileUploader" sortOrder="30">
+                    <argument name="data" xsi:type="array">
+                        <item name="config" xsi:type="array">
+                            <item name="source" xsi:type="string">category</item>
+                        </item>
+                    </argument>
+                    <settings>
+                        <label translate="true">Image</label>
+                        <dataScope>image</dataScope>
+                    </settings>
+                    <formElements>
+                        <fileUploader>
+                            <settings>
+                                <uploaderConfig>
+                                    <param xsi:type="url" name="url" path="ahy_plprevamp/featuredBrand/upload"/>
+                                </uploaderConfig>
+                                <previewTmpl>Magento_Catalog/image-preview</previewTmpl>
+                                <maxFileSize>2097152</maxFileSize>
+                                <allowedExtensions>jpg jpeg gif png webp svg</allowedExtensions>
+                            </settings>
+                        </fileUploader>
+                    </formElements>
+                </field>
+                <actionDelete template="Magento_Backend/dynamic-rows/cells/action-delete" sortOrder="40">
+                    <settings>
+                        <dataType>text</dataType>
+                        <componentType>actionDelete</componentType>
+                    </settings>
+                </actionDelete>
+            </container>
+        </dynamicRows>
+
+        <field name="ahy_card_image" sortOrder="207" formElement="fileUploader">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <label translate="true">Category Card Image</label>
+                <dataScope>ahy_card_image</dataScope>
+                <notice translate="true">Custom image for this category's card in subcategory layout. Falls back to default category image if not set.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+            <formElements>
+                <fileUploader>
+                    <settings>
+                        <uploaderConfig>
+                            <param xsi:type="url" name="url" path="catalog/category_image/upload"/>
+                        </uploaderConfig>
+                        <previewTmpl>Magento_Catalog/image-preview</previewTmpl>
+                        <maxFileSize>2097152</maxFileSize>
+                        <allowedExtensions>jpg jpeg gif png webp</allowedExtensions>
+                    </settings>
+                </fileUploader>
+            </formElements>
+        </field>
+    </fieldset>
+</form>

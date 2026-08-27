@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="Ahy_PlpRevamp::css/catnav-styles.css"/>
+    </head>
+    <body>
+        <referenceBlock name="marketplace_sellerprofile_layout_ahy" template="Ahy_PlpRevamp::seller/profile/profile_ahy.phtml"/>
+    </body>
+</page>

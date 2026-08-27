@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <ahy_plprevamp>
+            <featured_products>
+                <marketplace_seller_id></marketplace_seller_id>
+            </featured_products>
+            <all_brands>
+                <banner_image></banner_image>
+            </all_brands>
+        </ahy_plprevamp>
+    </default>
+</config>

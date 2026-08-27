@@ -1,0 +1,36 @@
+{
+    "name": "ahy/module-discount-alert",
+    "description": "Scans the catalog for products exceeding a configurable discount threshold and sends a weekly digest email to a configured recipient.",
+    "require": {
+        "php": ">=8.1",
+        "magento/framework": ">=103.0.0",
+        "magento/module-store": ">=101.0.0",
+        "magento/module-config": ">=101.0.0",
+        "magento/module-catalog": ">=104.0.0",
+        "magento/module-backend": ">=102.0.0",
+        "magento/module-eav": ">=102.0.0",
+        "magento/module-email": ">=101.0.0",
+        "magento/module-ui": ">=101.0.0",
+        "symfony/console": ">=4.4"
+    },
+    "type": "magento2-module",
+    "version": "1.2.0",
+    "license": [
+        "MIT"
+    ],
+    "authors": [
+        {
+            "name": "Afzal Sayed",
+            "homepage": "https://github.com/afzal-sayed/",
+            "role": "Developer"
+        }
+    ],
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Ahy\\DiscountAlert\\": ""
+        }
+    }
+}

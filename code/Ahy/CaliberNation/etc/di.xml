@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Ahy\CaliberNation\Api\Data\MembershipInterface"
+                type="Ahy\CaliberNation\Model\Membership"/>
+    <preference for="Ahy\CaliberNation\Api\MembershipRepositoryInterface"
+                type="Ahy\CaliberNation\Model\MembershipRepository"/>
+    <preference for="Ahy\CaliberNation\Api\Data\MembershipSearchResultsInterface"
+                type="Magento\Framework\Api\SearchResults"/>
+
+    <!-- P7: read-only member-pricing API. -->
+    <preference for="Ahy\CaliberNation\Api\MemberPricingInterface"
+                type="Ahy\CaliberNation\Model\MemberPricing"/>
+    <preference for="Ahy\CaliberNation\Api\Data\MemberPriceInterface"
+                type="Ahy\CaliberNation\Model\MemberPrice"/>
+
+    <type name="Magewirephp\Magewire\Model\Component\Resolver\Layout">
+        <plugin name="ahy_caliber_nation_layout_resolver"
+                type="Ahy\CaliberNation\Plugin\Magewire\CaliberNationLayoutResolverPlugin"
+                sortOrder="10"/>
+    </type>
+
+    <!-- Enforce "no refunds" for the membership product. -->
+    <type name="Magento\Sales\Api\CreditmemoManagementInterface">
+        <plugin name="ahy_caliber_nation_block_membership_refund"
+                type="Ahy\CaliberNation\Plugin\BlockMembershipRefund"/>
+    </type>
+
+    <!-- Turn off auto-renew if the membership's renewal card is deleted. -->
+    <type name="Magento\Vault\Api\PaymentTokenRepositoryInterface">
+        <plugin name="ahy_caliber_nation_disable_autorenew_on_card_delete"
+                type="Ahy\CaliberNation\Plugin\DisableAutoRenewOnCardDelete"/>
+    </type>
+
+    <!-- Fix Hyva virtual-cart checkout init crash for addressless customers. -->
+    <type name="Hyva\Checkout\Observer\Frontend\HyvaCheckoutHyvaCheckoutInitAfter">
+        <plugin name="ahy_caliber_nation_fix_virtual_billing"
+                type="Ahy\CaliberNation\Plugin\HyvaCheckoutVirtualBillingFix"/>
+    </type>
+
+    <!-- Fix Webkul MpMultiShipping order-placed observer crash on virtual orders. -->
+    <type name="Webkul\MpMultiShipping\Observer\SalesOrderPlaceAfterObserver">
+        <plugin name="ahy_caliber_nation_webkul_virtual_shipping_fix"
+                type="Ahy\CaliberNation\Plugin\WebkulVirtualOrderShippingFix"/>
+    </type>
+
+    <!-- B0: link a newly-vaulted card to the customer's membership (for auto-renewal). -->
+    <type name="Magento\Vault\Api\PaymentTokenRepositoryInterface">
+        <plugin name="ahy_caliber_nation_link_vault_token"
+                type="Ahy\CaliberNation\Plugin\LinkVaultTokenToMembership"/>
+    </type>
+
+    <!-- Bypass shipping-method-required check when membership is in cart.
+         The Amasty promo adds a physical free decal, making the cart non-virtual.
+         The decal is always fulfilled free by the seller — no shipping selection needed. -->
+    <type name="Magento\Quote\Model\ValidationRules\ShippingMethodValidationRule">
+        <plugin name="ahy_caliber_nation_bypass_shipping_for_membership"
+                type="Ahy\CaliberNation\Plugin\Quote\BypassShippingForMembershipCart"/>
+    </type>
+
+    <!-- B4: admin membership grid data source. -->
+    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+        <arguments>
+            <argument name="collections" xsi:type="array">
+                <item name="ahy_caliber_nation_membership_listing_data_source" xsi:type="string">Ahy\CaliberNation\Model\ResourceModel\Membership\Grid\Collection</item>
+                <item name="ahy_caliber_nation_seller_participation_listing_data_source" xsi:type="string">Ahy\CaliberNation\Model\ResourceModel\SellerParticipation\Grid\Collection</item>
+                <item name="ahy_caliber_nation_member_price_rule_listing_data_source" xsi:type="string">Ahy\CaliberNation\Model\ResourceModel\MemberPriceRule\Grid\Collection</item>
+                <item name="ahy_caliber_nation_refund_request_listing_data_source" xsi:type="string">Ahy\CaliberNation\Model\ResourceModel\RefundRequest\Grid\Collection</item>
+            </argument>
+        </arguments>
+    </type>
+</config>

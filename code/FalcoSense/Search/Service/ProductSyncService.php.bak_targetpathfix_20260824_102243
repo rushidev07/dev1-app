@@ -1,0 +1,982 @@
+<?php
+declare(strict_types=1);
+
+namespace FalcoSense\Search\Service;
+
+use FalcoSense\Search\Helper\Data;
+use Magento\Catalog\Model\Product;
+use Magento\CatalogInventory\Api\StockRegistryInterface;
+use Magento\CatalogInventory\Api\Data\StockItemInterface;
+use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Framework\App\ResourceConnection;
+use Magento\UrlRewrite\Model\UrlFinderInterface;
+use Psr\Log\LoggerInterface;
+
+class ProductSyncService
+{
+    public function __construct(
+        private readonly Data                      $helper,
+        private readonly StockRegistryInterface    $stockRegistry,
+        private readonly CategoryCollectionFactory $categoryCollectionFactory,
+        private readonly LoggerInterface           $logger,
+        private readonly UrlFinderInterface        $urlFinder,
+        private readonly ResourceConnection        $resourceConnection,
+    ) {}
+
+    /**
+     * Normalize a Magento product and POST it to the platform ingest endpoint.
+     * Returns true on success, false on failure (never throws — must not break product save).
+     */
+    public function sync(Product $product, int $magentoStoreId = 0, ?StockItemInterface $stockItem = null): bool
+    {
+        // ── TEMPORARY HARDCODE: client 112, store 1 (commented out) ─────────
+        // $endpointUrl     = 'http://localhost:8080/api/v1/ingest/products';
+        // $apiKey          = 'ba259a5102519b183f3e13d056eb6214987ae140e2d867489b1dafebc7395a00';
+        // $platformStoreId = 22; // stores.id for client_112 store_1
+        // ─────────────────────────────────────────────────────────────────────
+
+        $endpointUrl     = $this->helper->getEndpointUrl($magentoStoreId);
+        $apiKey          = $this->helper->getApiKey($magentoStoreId);
+        $platformStoreId = $this->helper->getPlatformStoreId($magentoStoreId);
+
+        if (!$endpointUrl || !$apiKey) {
+            $this->logger->warning('[SmartSearch] Sync skipped: endpoint URL or API key not configured.');
+            return false;
+        }
+
+        try {
+            $normalized = $this->normalize($product, $magentoStoreId, $stockItem);
+            $this->logger->debug(sprintf(
+                '[SmartSearch][RT] Normalized product %d: name=%s sku=%s price=%s in_stock=%s',
+                $product->getId(),
+                $normalized['name'] ?? '?',
+                $normalized['sku'] ?? '?',
+                $normalized['price'] ?? '?',
+                $normalized['in_stock'] ? 'true' : 'false'
+            ));
+
+            // Disabled or out-of-stock — remove from the platform instead of upserting
+            // stale/inactive data. Re-enabling/restocking later flows back in through
+            // the normal upsert path the next time this fires.
+            if ((int) $normalized['status'] === 2 || $normalized['in_stock'] === false) {
+                $this->logger->info(sprintf(
+                    '[SmartSearch][RT] Product %d is disabled/out-of-stock (status=%d, in_stock=%s) — deleting from platform instead of syncing.',
+                    $product->getId(), (int) $normalized['status'], $normalized['in_stock'] ? 'true' : 'false'
+                ));
+                return $this->delete((int) $product->getId(), $magentoStoreId, $endpointUrl, $apiKey, $platformStoreId);
+            }
+
+            // Overpriced — placeholder/test pricing (e.g. 99999) must not sync. Unlike
+            // disabled/OOS above, this only SKIPS the sync; it deliberately never deletes
+            // anything already on the platform. The overpriced check also looks at each
+            // embedded variant, not just the product's own top-level price: a configurable
+            // parent can have a perfectly reasonable own price while one child variant
+            // carries placeholder pricing — normalize() embeds every variant inside this
+            // product's own document, so a bad variant price pollutes the parent doc either way.
+            if ($this->isOverpriced($normalized)) {
+                $this->logger->info(sprintf(
+                    '[SmartSearch][RT] Product %d (or a variant) exceeds max sync price (%s) — skipping sync, leaving any existing platform data untouched.',
+                    $product->getId(), Data::MAX_SYNC_PRICE
+                ));
+                return true;
+            }
+
+            $payload = [
+                'batch_id' => $this->uuid4(),
+                'store_id' => $platformStoreId,
+                'realtime' => true,
+                'products' => [$normalized],
+            ];
+
+            $this->logger->info(sprintf(
+                '[SmartSearch][RT] POSTing product %d to %s (store_id=%d, payload_bytes=%d)',
+                $product->getId(),
+                $endpointUrl,
+                $platformStoreId,
+                strlen(json_encode($payload))
+            ));
+
+            $code = $this->post($endpointUrl, $apiKey, $payload);
+
+            if ($code >= 200 && $code < 300) {
+                $this->logger->info(sprintf('[SmartSearch][RT] Product %d synced OK (HTTP %d).', $product->getId(), $code));
+                return true;
+            }
+
+            $this->logger->error(sprintf('[SmartSearch][RT] Product %d sync FAILED (HTTP %d).', $product->getId(), $code));
+            return false;
+        } catch (\Throwable $e) {
+            $this->logger->error('[SmartSearch][RT] Sync failed for product ' . $product->getId() . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            return false;
+        }
+    }
+
+    /**
+     * Normalize and POST a batch of products in one request.
+     *
+     * Return codes:
+     *   >= 0  : number of products accepted
+     *   -1    : fatal config error (no URL / no key / 401 auth failure) — abort sync
+     *   -2    : product limit reached (403) — stop sending, don't abort
+     *   -3    : transient error (5xx / network timeout) — caller should retry
+     */
+    public function syncBatch(array $products, int $magentoStoreId = 0): int
+    {
+        if (empty($products)) {
+            return 0;
+        }
+
+        // ── TEMPORARY HARDCODE: client 112, store 1 (commented out) ─────────
+        // $endpointUrl     = 'http://localhost:8080/api/v1/ingest/products';
+        // $apiKey          = 'ba259a5102519b183f3e13d056eb6214987ae140e2d867489b1dafebc7395a00';
+        // $platformStoreId = 22;
+        // ─────────────────────────────────────────────────────────────────────
+
+        $endpointUrl     = $this->helper->getEndpointUrl($magentoStoreId);
+        $apiKey          = $this->helper->getApiKey($magentoStoreId);
+        $platformStoreId = $this->helper->getPlatformStoreId($magentoStoreId);
+
+        if (!$endpointUrl || !$apiKey) {
+            $this->logger->warning('[SmartSearch] Batch sync skipped: endpoint URL or API key not configured.');
+            return -1;
+        }
+
+        $normalized = [];
+        foreach ($products as $product) {
+            try {
+                $normalized[] = $this->normalize($product, $magentoStoreId);
+            } catch (\Throwable $e) {
+                $this->logger->warning('[SmartSearch] Could not normalize product ' . $product->getId() . ': ' . $e->getMessage());
+            }
+        }
+
+        if (empty($normalized)) {
+            return 0;
+        }
+
+        try {
+            $payload = [
+                'batch_id' => $this->uuid4(),
+                'store_id' => $platformStoreId,
+                'products' => $normalized,
+            ];
+
+            $httpCode = $this->post($endpointUrl, $apiKey, $payload);
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                return count($normalized);
+            }
+            if ($httpCode === 401 || $httpCode === 0) {
+                return -1; // fatal — bad key or no connection
+            }
+            if ($httpCode === 403) {
+                return -2; // product limit reached
+            }
+            if ($httpCode === 429) {
+                return -3; // rate limited — transient
+            }
+            return -3; // 5xx or other — transient
+        } catch (\Throwable $e) {
+            $this->logger->error('[SmartSearch] Batch sync exception: ' . $e->getMessage());
+            return -3;
+        }
+    }
+
+    /**
+     * Remove a single product from the platform (DB rows + OpenSearch document),
+     * scoped to whichever store's API key/endpoint is passed. Never throws — must
+     * not break product save/observer flows.
+     *
+     * The 3 trailing params let callers that already resolved endpoint/key/platform
+     * store id (e.g. sync()'s disabled/OOS branch) avoid re-resolving them; omit
+     * them to have delete() resolve its own from $magentoStoreId.
+     */
+    public function delete(
+        int     $productId,
+        int     $magentoStoreId = 0,
+        ?string $endpointUrl = null,
+        ?string $apiKey = null,
+        ?int    $platformStoreId = null
+    ): bool {
+        $endpointUrl     ??= $this->helper->getEndpointUrl($magentoStoreId);
+        $apiKey          ??= $this->helper->getApiKey($magentoStoreId);
+        $platformStoreId ??= $this->helper->getPlatformStoreId($magentoStoreId);
+
+        if (!$endpointUrl || !$apiKey) {
+            $this->logger->warning('[SmartSearch] Delete skipped: endpoint URL or API key not configured.');
+            return false;
+        }
+
+        try {
+            $payload = [
+                'store_id'    => $platformStoreId,
+                'product_ids' => [(string) $productId],
+            ];
+
+            $this->logger->info(sprintf(
+                '[SmartSearch][RT] DELETEing product %d from %s (store_id=%d).',
+                $productId, $endpointUrl, $platformStoreId
+            ));
+
+            $code = $this->delete_http($endpointUrl, $apiKey, $payload);
+
+            if ($code >= 200 && $code < 300) {
+                $this->logger->info(sprintf('[SmartSearch][RT] Product %d deleted OK (HTTP %d).', $productId, $code));
+                return true;
+            }
+
+            $this->logger->error(sprintf('[SmartSearch][RT] Product %d delete FAILED (HTTP %d).', $productId, $code));
+            return false;
+        } catch (\Throwable $e) {
+            $this->logger->error('[SmartSearch][RT] Delete failed for product ' . $productId . ': ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Remove a batch of products from the platform in one request (used by the
+     * cron disabled/OOS sweep — see Cron\ProductSync).
+     *
+     * Return codes mirror syncBatch(): >= 0 sent, -1 fatal, -2 n/a (unused here), -3 transient.
+     */
+    public function deleteBatch(array $productIds, int $magentoStoreId = 0): int
+    {
+        if (empty($productIds)) {
+            return 0;
+        }
+
+        $endpointUrl     = $this->helper->getEndpointUrl($magentoStoreId);
+        $apiKey          = $this->helper->getApiKey($magentoStoreId);
+        $platformStoreId = $this->helper->getPlatformStoreId($magentoStoreId);
+
+        if (!$endpointUrl || !$apiKey) {
+            $this->logger->warning('[SmartSearch] Batch delete skipped: endpoint URL or API key not configured.');
+            return -1;
+        }
+
+        try {
+            $payload = [
+                'store_id'    => $platformStoreId,
+                'product_ids' => array_map('strval', $productIds),
+            ];
+
+            $httpCode = $this->delete_http($endpointUrl, $apiKey, $payload);
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                return count($productIds);
+            }
+            if ($httpCode === 401 || $httpCode === 0) {
+                return -1;
+            }
+            return -3;
+        } catch (\Throwable $e) {
+            $this->logger->error('[SmartSearch] Batch delete exception: ' . $e->getMessage());
+            return -3;
+        }
+    }
+
+    /**
+     * Fetches every product ID the platform currently has stored for this
+     * store — used by FullSyncCommand's reconciliation pass to find products
+     * that vanished from Magento's database without ever going through a
+     * delete call. The platform resolves client/store purely from the API
+     * key, same as every other call here — nothing scope-relevant is sent.
+     *
+     * Returns null on ANY failure (missing config, network error, non-2xx,
+     * unparseable response). Callers MUST treat null as "could not verify —
+     * do nothing", never as "the platform has zero products": conflating the
+     * two would make an unrelated network hiccup look identical to "delete
+     * everything," which is exactly the outcome this whole feature exists to
+     * prevent.
+     *
+     * @return string[]|null
+     */
+    public function getPlatformProductIds(int $magentoStoreId = 0): ?array
+    {
+        $endpointUrl = $this->helper->getEndpointUrl($magentoStoreId);
+        $apiKey      = $this->helper->getApiKey($magentoStoreId);
+
+        if (!$endpointUrl || !$apiKey) {
+            $this->logger->warning('[SmartSearch] Reconciliation: endpoint URL or API key not configured — skipping.');
+            return null;
+        }
+
+        $ch = curl_init($endpointUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPGET        => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_HTTPHEADER     => ['X-Api-Key: ' . $apiKey],
+        ]);
+
+        $raw      = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false) {
+            $this->logger->error('[SmartSearch] Reconciliation: cURL error fetching platform product IDs: ' . $curlErr);
+            return null;
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            $this->logger->error('[SmartSearch] Reconciliation: HTTP ' . $httpCode . ' fetching platform product IDs. Body: ' . substr((string) $raw, 0, 500));
+            return null;
+        }
+
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded) || !isset($decoded['product_ids']) || !is_array($decoded['product_ids'])) {
+            $this->logger->error('[SmartSearch] Reconciliation: unexpected response shape fetching platform product IDs: ' . substr((string) $raw, 0, 500));
+            return null;
+        }
+
+        return array_map('strval', $decoded['product_ids']);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * True if the product's own price, or (for a configurable) any embedded
+     * variant's price, exceeds the sync cap. See the caller in sync() for why
+     * variants matter here too.
+     */
+    private function isOverpriced(array $normalized): bool
+    {
+        if ((float) ($normalized['price'] ?? 0) > Data::MAX_SYNC_PRICE) {
+            return true;
+        }
+        foreach ($normalized['variants'] ?? [] as $variant) {
+            if ((float) ($variant['price'] ?? 0) > Data::MAX_SYNC_PRICE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function normalize(Product $product, int $magentoStoreId, ?StockItemInterface $preloadedStockItem = null): array
+    {
+        $productId = (int) $product->getId();
+        // Use the pre-loaded stock item when provided (e.g. from StockChangeObserver) to avoid
+        // reading the stale in-memory StockRegistry cache within the same request.
+        $stockItem = $preloadedStockItem ?? $this->stockRegistry->getStockItem($productId);
+        $inStock   = (bool) $stockItem->getIsInStock();
+        $qty       = (int) $stockItem->getQty();
+
+
+        // Categories
+        $categories = $this->buildCategories($product->getCategoryIds(), $magentoStoreId);
+
+        // Brand: this is a Webkul Marketplace multi-vendor store — a product's real
+        // "brand" is the selling vendor's registered shop name (marketplace_userdata.
+        // shop_title), not whatever happens to be in the product_brand/manufacturer
+        // EAV attribute. Those attributes are frequently blank or stale for
+        // marketplace-listed products (confirmed: thousands of active marketplace
+        // products have neither set), while the seller's shop_title is the value
+        // actually meant to represent the product's brand in this store's data model.
+        // Only fall back to the EAV attributes for products with no seller (admin-
+        // uploaded/adminassign=1) or where the seller genuinely has no shop_title set.
+        $brand = $this->resolveMarketplaceBrand($productId, $magentoStoreId);
+
+        // The actual product_brand/manufacturer EAV value, independent of the
+        // marketplace-seller override above — sent separately as manufacturer_brand
+        // so the platform has access to the real brand even when a seller is assigned.
+        $manufacturerBrand = $this->resolveEavBrand($productId, $magentoStoreId);
+
+        if ($brand === '') {
+            $brand = $manufacturerBrand;
+        }
+
+        // Attributes — dynamically pulled from all product EAV attributes.
+        // Codes listed here are stripped before sending to the platform.
+        // To allow an attribute through, remove it from this list.
+        $excludedAttributeCodes = [
+            // ── Core product fields already sent at top level ─────────────────
+            'sku', 'name', 'description', 'short_description', 'url_key', 'url_path',
+            'price', 'special_price', 'tier_price', 'minimal_price',
+            'min_amount', 'max_amount', 'price_rate',
+            'status', 'visibility',
+
+            // ── Product brand / manufacturer — mapped to top-level brand field ─
+            'product_brand', 'manufacturer',
+
+            // ── Image fields and their alt-text labels ────────────────────────
+            'image', 'small_image', 'thumbnail', 'swatch_image',
+            'image_label', 'small_image_label', 'thumbnail_label',
+            'media_gallery',
+
+            // ── SEO / layout / design ─────────────────────────────────────────
+            'meta_title', 'meta_description', 'meta_keyword',
+            'page_layout', 'custom_layout', 'custom_layout_update',
+            'custom_design', 'custom_design_from', 'custom_design_to',
+            'options_container',
+
+            // ── Magento system / internal flags ───────────────────────────────
+            'category_ids', 'required_options', 'has_options',
+            'created_at', 'updated_at',
+            'tax_class_id', 'quantity_and_stock_status',
+            'msrp', 'msrp_display_actual_price_type',
+            'price_type', 'price_view', 'sku_type', 'weight_type', 'shipment_type',
+            'links_purchased_separately', 'links_title', 'samples_title',
+            'gift_message_available',
+
+            // ── Date / promotional window fields ──────────────────────────────
+            'news_from_date', 'news_to_date',
+            'special_from_date', 'special_to_date',
+            'product_from',                            // "Product from" date field
+
+            // ── Gift card internals ───────────────────────────────────────────
+            'gift_card_amounts', 'gift_code_pattern', 'mpgiftcard_conditions',
+            'allow_amount_range', 'expire_after_day', 'can_redeem', 'denominations',
+
+            // ── Subscription / membership internals ───────────────────────────
+            'enable_subscription', 'customer_define_startdate', 'auto_bill',
+            'maximum_payment_failures', 'magazine_delivery_frequency',
+            'membership_duration', 'membership_feature',
+            'membership_related_group_id', 'membership_sort_order',
+
+            // ── Creator / CMS content fields ──────────────────────────────────
+            'creator_bundle_product_link', 'creator_description',
+            'creator_image', 'creator_images', 'creator_name',
+            'banner_content', 'shipping_and_returns', 'more_specs', 'tips',
+
+            // ── Internal sync / import identifiers ────────────────────────────
+            'flxpoint_sku',                            // 3rd-party feed SKU
+            'upc_number',                              // barcode — not a useful filter
+            'isbn', 'manufacturer_number',             // internal product codes
+            'product_option', 'product_option_2',
+            'wesupply_estimation_display',
+
+            // ── Boolean marketing/admin flags (no filter value) ───────────────
+            'new', 'sale', 'featured', 'erin_recommends', 'eco_collection',
+            'paperback', 'youth', 'no_longer_available', 'ammo_ready_product',
+            'performance_fabric', 'tactical', 'subsonic', 'supersonic',
+            'california_compliant', 'caliber_eligible_shipping',
+            'certified_bear_resistant', 'ffl_selection_required',
+            'age_verification_required', 'add_prop_69_warning',
+            'celebrity_favorite', 'celebrity_spotlight',
+        ];
+
+        $attributes = [];
+        foreach ($product->getAttributes() as $attribute) {
+            $code  = $attribute->getAttributeCode();
+            $label = (string) $attribute->getFrontendLabel();
+            $input = $attribute->getFrontendInput();
+
+            // Skip system/excluded attributes and anything without a visible label.
+            // Also skip generic placeholder codes like attribute_1…attribute_110.
+            if (\in_array($code, $excludedAttributeCodes, true)
+                || $label === ''
+                || preg_match('/^attribute_\d+$/i', $code)
+            ) {
+                continue;
+            }
+
+            $val = $product->getData($code);
+            if ($val === null || $val === '' || $val === false) {
+                continue;
+            }
+
+            // Select/multiselect/swatch — resolve option_id to label
+            if (in_array($input, ['select', 'multiselect', 'swatch_visual', 'swatch_text'], true)) {
+                $text = $product->getAttributeText($code);
+                if ($text === false || $text === '') {
+                    continue;
+                }
+                $value = is_array($text) ? implode(', ', $text) : (string) $text;
+            } else {
+                // varchar / decimal / text — use raw value
+                if (is_array($val)) {
+                    // Flatten: keep only scalar leaves, skip nested arrays (e.g. Magento price_info structs)
+                    $scalars = array_filter($val, 'is_scalar');
+                    if (empty($scalars)) {
+                        continue;
+                    }
+                    $value = implode(', ', array_map('strval', $scalars));
+                } else {
+                    $value = (string) $val;
+                }
+                if ($value === '') {
+                    continue;
+                }
+            }
+
+            $attributes[] = [
+                'name'  => $label,
+                'value' => $value,
+            ];
+        }
+
+        // Variants (configurable children)
+        // getUsedProducts() returns only ENABLED children — if empty, all children are disabled.
+        $variants = [];
+        if ($product->getTypeId() === 'configurable') {
+            foreach ($product->getTypeInstance()->getUsedProducts($product) as $child) {
+                $childStock = $this->stockRegistry->getStockItem((int) $child->getId());
+                $childImage = $child->getData('image');
+                $variants[] = [
+                    'variant_id'    => (string) $child->getId(),
+                    'name'          => (string) ($child->getName() ?: $product->getName()),
+                    'sku'           => (string) $child->getSku(),
+                    'price'         => (float) ($child->getPrice() ?: $product->getPrice()),
+                    'special_price' => $child->getSpecialPrice() !== null ? (float) $child->getSpecialPrice() : null,
+                    'in_stock'      => (bool) $childStock->getIsInStock(),
+                    'qty'           => (int) $childStock->getQty(),
+                    'image'         => ($childImage && $childImage !== 'no_selection') ? $childImage : null,
+                ];
+            }
+
+            $qty = 0;
+
+            // No enabled children → hide parent from search results via in_stock=false.
+            // The visibility gate requires in_stock=true, so this pulls it out of results
+            // without touching the parent's actual Magento stock record.
+            if (empty($variants)) {
+                $inStock = false;
+            } elseif (!array_filter(array_column($variants, 'in_stock'))) {
+                $inStock = false;
+            }
+        }
+
+        // For configurable products with no base price, derive from lowest variant price
+        $basePrice = (float) $product->getPrice();
+        if ($basePrice <= 0 && !empty($variants)) {
+            $variantPrices = array_filter(array_column($variants, 'price'), fn($p) => $p > 0);
+            if (!empty($variantPrices)) {
+                $basePrice = min($variantPrices);
+            }
+        }
+
+        // Determine effective special_price: parent first, then min variant effective price
+        $parentSpecial = $product->getSpecialPrice() !== null ? (float) $product->getSpecialPrice() : null;
+        $effectiveSpecial = ($parentSpecial !== null && $parentSpecial > 0) ? $parentSpecial : null;
+        if ($effectiveSpecial === null && !empty($variants)) {
+            $minEffective = PHP_FLOAT_MAX;
+            foreach ($variants as $v) {
+                $vp = (float) ($v['price'] ?? 0);
+                $vs = isset($v['special_price']) && $v['special_price'] !== null ? (float) $v['special_price'] : null;
+                $eff = ($vs !== null && $vs > 0 && $vs < $vp) ? $vs : ($vp > 0 ? $vp : PHP_FLOAT_MAX);
+                $minEffective = min($minEffective, $eff);
+            }
+            if ($minEffective < $basePrice && $minEffective < PHP_FLOAT_MAX) {
+                $effectiveSpecial = $minEffective;
+            }
+        }
+
+        // visibility=1 means "Not Visible Individually" — these are child/variant products
+        $isVariant = ((int) $product->getVisibility() === 1);
+
+        return [
+            'product_id'        => (string) $product->getId(),
+            'sku'               => (string) $product->getSku(),
+            'type'              => (string) $product->getTypeId(),
+            'name'              => (string) $product->getName(),
+            'price'             => $basePrice,
+            'special_price'     => $effectiveSpecial,
+            'in_stock'          => $inStock,
+            'qty'               => $qty,
+            'visibility'        => (int) $product->getVisibility(),
+            'is_variant'        => $isVariant,
+            'status'            => (int) $product->getStatus(),
+            'brand'             => $brand,
+            'manufacturer_brand' => $manufacturerBrand,
+            'url_key'           => $this->resolveUrlKey($product, $magentoStoreId),
+            'description'       => strip_tags((string) ($product->getData('description') ?: '')),
+            'short_description' => strip_tags((string) ($product->getData('short_description') ?: '')),
+            'images'            => ['main_image' => (string) ($product->getData('image') ?: '')],
+            'categories'        => $categories,
+            'attributes'        => $attributes,
+            'variants'          => $variants,
+        ];
+    }
+
+    /**
+     * Resolve a product's brand from Webkul Marketplace seller data instead of the
+     * product_brand/manufacturer EAV attributes. Returns '' (not null) when there's
+     * no seller assignment at all, or the seller has no shop_title configured — the
+     * caller falls back to the EAV attributes in that case.
+     *
+     * Note: marketplace_product.adminassign does NOT mean "no real seller" — it's
+     * set when an admin assigned the product to the seller via the assignment grid
+     * tool, as opposed to the seller adding it themselves. The seller_id is equally
+     * valid either way (confirmed against Webkul\Marketplace\Block\Adminhtml\
+     * Customer\Edit\Tab\Grid\Product), so adminassign is deliberately NOT filtered on.
+     *
+     * Queried directly via ResourceConnection (not Webkul's own helper methods)
+     * because Webkul's getSellerCollectionObj() resolves the seller's store scope
+     * from Magento's *ambient* current-store context, which is unset/wrong when
+     * this runs from cron or a queue-triggered observer — we already know the
+     * correct store id from the caller, so we filter by it explicitly instead.
+     */
+    private function resolveMarketplaceBrand(int $productId, int $storeId): string
+    {
+        try {
+            $connection = $this->resourceConnection->getConnection();
+
+            $sellerRow = $connection->fetchRow(
+                $connection->select()
+                    ->from($this->resourceConnection->getTableName('marketplace_product'), ['seller_id'])
+                    ->where('mageproduct_id = ?', $productId)
+                    ->where('status = ?', 1)
+                    ->limit(1)
+            );
+
+            if (!$sellerRow) {
+                return '';
+            }
+
+            $sellerId = (int) $sellerRow['seller_id'];
+            if (!$sellerId) {
+                return '';
+            }
+
+            // Prefer a store-specific shop_title; fall back to the default (store_id=0) row.
+            $shopTitle = $connection->fetchOne(
+                $connection->select()
+                    ->from($this->resourceConnection->getTableName('marketplace_userdata'), ['shop_title'])
+                    ->where('seller_id = ?', $sellerId)
+                    ->where('store_id IN (?)', [$storeId, 0])
+                    ->where('shop_title IS NOT NULL')
+                    ->where("TRIM(shop_title) != ''")
+                    ->order('store_id DESC')
+                    ->limit(1)
+            );
+
+            return $shopTitle !== false ? trim((string) $shopTitle) : '';
+        } catch (\Throwable $e) {
+            $this->logger->warning('[SmartSearch] Could not resolve marketplace brand for product ' . $productId . ': ' . $e->getMessage());
+            return '';
+        }
+    }
+
+    /**
+     * The real product_brand/manufacturer EAV value, with no marketplace-seller
+     * involvement — used for the manufacturer_brand field so the actual brand is
+     * always available on the platform even when resolveMarketplaceBrand() picks
+     * the seller's shop title for the (legacy) brand field.
+     *
+     * Queried directly via ResourceConnection instead of $product->getData()/
+     * getAttributeText() — the loaded product model resolves a store-scoped EAV
+     * row even for attributes marked "Global" scope, and ~9.5k products in this
+     * catalog carry a stale store-view-level NULL row (left over from a time the
+     * attribute may have been store-scoped) that shadows a perfectly good
+     * store_id=0 (default) value. Falling back explicitly to store_id=0 when the
+     * store-specific row is NULL/missing avoids losing the brand for those.
+     */
+    private function resolveEavBrand(int $productId, int $storeId): string
+    {
+        foreach (['product_brand', 'manufacturer'] as $attributeCode) {
+            $value = $this->resolveEavAttributeValue($productId, $storeId, $attributeCode);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+        return '';
+    }
+
+    private function resolveEavAttributeValue(int $productId, int $storeId, string $attributeCode): string
+    {
+        try {
+            $connection = $this->resourceConnection->getConnection();
+
+            $attrRow = $connection->fetchRow(
+                $connection->select()
+                    ->from(['ea' => $this->resourceConnection->getTableName('eav_attribute')], ['attribute_id', 'backend_type'])
+                    ->join(
+                        ['et' => $this->resourceConnection->getTableName('eav_entity_type')],
+                        'et.entity_type_id = ea.entity_type_id',
+                        []
+                    )
+                    ->where('et.entity_type_code = ?', 'catalog_product')
+                    ->where('ea.attribute_code = ?', $attributeCode)
+                    ->limit(1)
+            );
+
+            if (!$attrRow || (string) $attrRow['backend_type'] === 'static') {
+                return '';
+            }
+
+            $attributeId = (int) $attrRow['attribute_id'];
+            $backendType = (string) $attrRow['backend_type'];
+            $valueTable  = $this->resourceConnection->getTableName('catalog_product_entity_' . $backendType);
+
+            // Prefer the store-specific row; fall back to the default (store_id=0)
+            // row when the store-specific one is NULL or absent.
+            $rawValue = $connection->fetchOne(
+                $connection->select()
+                    ->from($valueTable, ['value'])
+                    ->where('entity_id = ?', $productId)
+                    ->where('attribute_id = ?', $attributeId)
+                    ->where('store_id IN (?)', [$storeId, 0])
+                    ->where('value IS NOT NULL')
+                    ->order('store_id DESC')
+                    ->limit(1)
+            );
+
+            if ($rawValue === false || trim((string) $rawValue) === '') {
+                return '';
+            }
+
+            if ($backendType !== 'int') {
+                return trim((string) $rawValue);
+            }
+
+            // select/dropdown attribute — resolve the option_id to its label
+            $label = $connection->fetchOne(
+                $connection->select()
+                    ->from($this->resourceConnection->getTableName('eav_attribute_option_value'), ['value'])
+                    ->where('option_id = ?', (int) $rawValue)
+                    ->where('store_id IN (?)', [$storeId, 0])
+                    ->order('store_id DESC')
+                    ->limit(1)
+            );
+
+            return ($label !== false && trim((string) $label) !== '') ? trim((string) $label) : '';
+        } catch (\Throwable $e) {
+            $this->logger->warning("[SmartSearch] Could not resolve EAV attribute {$attributeCode} for product {$productId}: " . $e->getMessage());
+            return '';
+        }
+    }
+
+    private function buildCategories(array $categoryIds, int $storeId): array
+    {
+        if (empty($categoryIds)) {
+            return [];
+        }
+
+        try {
+            // Load the leaf categories the product belongs to.
+            // url_path gives the full relative URL (e.g. "hunting-gear/hunting-accessories").
+            $collection = $this->categoryCollectionFactory->create();
+            $collection->addAttributeToFilter('entity_id', ['in' => $categoryIds])
+                       ->addAttributeToSelect(['name', 'path', 'url_key', 'url_path'])
+                       ->setStoreId($storeId);
+
+            // Collect every ancestor ID we'll need to resolve full paths
+            $allAncestorIds = [];
+            foreach ($collection as $cat) {
+                // path = "1/2/10/45" — strip root (depth 0) and root category (depth 1)
+                $ids = \array_slice(explode('/', $cat->getPath()), 2);
+                foreach ($ids as $id) {
+                    $allAncestorIds[(int)$id] = true;
+                }
+            }
+
+            // Load all ancestor names in a single query
+            $nameMap = [];
+            if (!empty($allAncestorIds)) {
+                $ancestors = $this->categoryCollectionFactory->create();
+                $ancestors->addAttributeToFilter('entity_id', ['in' => array_keys($allAncestorIds)])
+                          ->addAttributeToSelect(['name'])
+                          ->setStoreId($storeId);
+                foreach ($ancestors as $anc) {
+                    $nameMap[(int)$anc->getId()] = (string)$anc->getName();
+                }
+            }
+
+            $categories = [];
+            foreach ($collection as $cat) {
+                $pathIds   = \array_slice(explode('/', $cat->getPath()), 2);
+                $pathNames = array_filter(array_map(
+                    static fn($id) => $nameMap[(int)$id] ?? '',
+                    $pathIds
+                ));
+
+                // url_path is the full relative URL slug stored by Magento,
+                // e.g. "hunting-gear/hunting-accessories". Fall back to url_key
+                // for top-level categories where url_path may equal url_key.
+                $urlPath = (string) ($cat->getData('url_path') ?: $cat->getData('url_key') ?: '');
+
+                $categories[] = [
+                    'id'   => (string) $cat->getId(),
+                    'name' => (string) $cat->getName(),
+                    'path' => implode(' > ', $pathNames),
+                    'url'  => $urlPath,
+                ];
+            }
+
+            return $categories;
+        } catch (\Throwable $e) {
+            $this->logger->warning('[SmartSearch] Could not load categories: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * POST payload to the platform endpoint.
+     * Returns the HTTP status code, or 0 on a cURL/network error.
+     */
+    private function post(string $url, string $apiKey, array $payload): int
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $headers = [
+            'Content-Type: application/json',
+            'X-Api-Key: ' . $apiKey,
+            'X-Signature: sha256=' . hash_hmac('sha256', $json, $apiKey),
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $json,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 120,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_HTTPHEADER     => $headers,
+        ]);
+
+        $raw      = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false) {
+            $this->logger->error('[SmartSearch][RT] cURL error: ' . $curlErr . ' — URL: ' . $url);
+            return 0;
+        }
+
+        $preview = substr((string) $raw, 0, 800);
+        if ($httpCode >= 200 && $httpCode < 300) {
+            $this->logger->debug('[SmartSearch][RT] HTTP ' . $httpCode . ' response: ' . $preview);
+        } else {
+            $this->logger->error('[SmartSearch][RT] HTTP ' . $httpCode . ' from platform. URL: ' . $url . ' — Body: ' . $preview);
+        }
+
+        return $httpCode;
+    }
+
+    /**
+     * DELETE payload to the platform endpoint.
+     * Returns the HTTP status code, or 0 on a cURL/network error.
+     */
+    private function delete_http(string $url, string $apiKey, array $payload): int
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $headers = [
+            'Content-Type: application/json',
+            'X-Api-Key: ' . $apiKey,
+            'X-Signature: sha256=' . hash_hmac('sha256', $json, $apiKey),
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => 'DELETE',
+            CURLOPT_POSTFIELDS     => $json,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_HTTPHEADER     => $headers,
+        ]);
+
+        $raw      = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false) {
+            $this->logger->error('[SmartSearch][RT] cURL error (DELETE): ' . $curlErr . ' — URL: ' . $url);
+            return 0;
+        }
+
+        $preview = substr((string) $raw, 0, 800);
+        if ($httpCode >= 200 && $httpCode < 300) {
+            $this->logger->debug('[SmartSearch][RT] DELETE HTTP ' . $httpCode . ' response: ' . $preview);
+        } else {
+            $this->logger->error('[SmartSearch][RT] DELETE HTTP ' . $httpCode . ' from platform. URL: ' . $url . ' — Body: ' . $preview);
+        }
+
+        return $httpCode;
+    }
+
+    private function uuid4(): string
+    {
+        $data    = random_bytes(16);
+        $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+        $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+
+    /**
+     * Returns the product's real, working URL slug.
+     *
+     * Checks url_rewrite FIRST, not the url_key EAV attribute — deliberately the
+     * reverse of the "obvious" order. This catalog's import pipeline (FlxPoint —
+     * see app/code/Ahy/FlxPoint/Helper/CreateCsvFile.php::_generateProductUrlKey())
+     * derives url_key from the product NAME alone for the base product row, with no
+     * uniqueness enforcement, and writes url_rewrite rows via raw
+     * "INSERT ... ON DUPLICATE KEY UPDATE" — so whenever two products land on the
+     * same generated slug, the later import silently steals the url_rewrite row and
+     * repoints it at itself. The url_key attribute is left holding a slug that may
+     * now belong to a completely different product, or (for many affected products)
+     * may never have had a url_rewrite of its own at all.
+     *
+     * url_rewrite — scoped to THIS product's own entity_id — cannot suffer that
+     * collision: it's the table Magento's own router actually reads, so a row
+     * found here is guaranteed unique and live. Confirmed against real data
+     * (Aug 2026 FlxPoint duplicate-url_key investigation): 12,299 products had a
+     * url_key attribute value that disagreed with their own working url_rewrite
+     * entry, and one single colliding slug was shared by 181 different products
+     * with only one of them holding a working route.
+     *
+     * A product can have MANY url_rewrite rows at once — one root/canonical entry
+     * (target_path "catalog/product/view/id/{id}") plus one per category it's
+     * assigned to (target_path "catalog/product/view/id/{id}/category/{catId}"),
+     * all equally valid, all sharing the same trailing slug. The canonical one is
+     * preferred when present since it's the stable, category-independent link;
+     * any category-prefixed row is an equally correct fallback since Magento
+     * always keeps their trailing slug identical to the canonical one.
+     *
+     * Falls back to the raw url_key attribute only when this product has no
+     * url_rewrite of its own at all — at that point nothing in Magento actually
+     * routes to this product, so returning the (possibly collided) attribute
+     * value is a last resort, not a fix.
+     */
+    private function resolveUrlKey(Product $product, int $storeId): string
+    {
+        $productId    = (int) $product->getId();
+        $scopeStoreId = $storeId ?: 1;
+
+        try {
+            // redirect_type => 0 excludes stale 301-redirect rows left behind when a
+            // product's URL key changes — without it, this could return an old,
+            // dead request_path instead of the current live one.
+            $ownRewrites = $this->urlFinder->findAllByData([
+                'entity_id'     => $productId,
+                'entity_type'   => 'product',
+                'store_id'      => $scopeStoreId,
+                'redirect_type' => 0,
+            ]);
+
+            if (!empty($ownRewrites)) {
+                $canonicalTarget = 'catalog/product/view/id/' . $productId;
+                foreach ($ownRewrites as $rewrite) {
+                    if ($rewrite->getTargetPath() === $canonicalTarget) {
+                        return $this->slugFromRequestPath($rewrite->getRequestPath());
+                    }
+                }
+                // No root/canonical row — any category-prefixed row of this
+                // product's own still yields the correct trailing slug.
+                return $this->slugFromRequestPath($ownRewrites[0]->getRequestPath());
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('[SmartSearch] url_rewrite lookup failed for product ' . $productId . ': ' . $e->getMessage());
+        }
+
+        // Last resort — this product has no url_rewrite of its own, so nothing in
+        // Magento actually routes to it under any slug; the attribute is the only
+        // value left to send, even though it may collide with another product's URL.
+        return (string) $product->getUrlKey();
+    }
+
+    /**
+     * request_path is like "logo-baseball-cap.html" or, for a category-prefixed
+     * rewrite, "mens/shirts/logo-baseball-cap.html" — either way, the product's
+     * own slug is just the last path segment with its suffix stripped.
+     */
+    private function slugFromRequestPath(string $requestPath): string
+    {
+        return preg_replace('/\.[^.]+$/', '', basename($requestPath));
+    }
+}

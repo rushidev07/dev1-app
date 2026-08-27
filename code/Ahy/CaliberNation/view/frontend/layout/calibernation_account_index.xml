@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      layout="2columns-left"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+
+    <!-- Pull in the My Account sidebar navigation -->
+    <update handle="customer_account"/>
+
+    <body>
+        <referenceBlock name="page.main.title">
+            <action method="setPageTitle">
+                <argument translate="true" name="title" xsi:type="string">Caliber Membership</argument>
+            </action>
+        </referenceBlock>
+
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="calibernation.account.membership.overview"
+                   template="Ahy_CaliberNation::account/membership-overview.phtml"
+                   cacheable="false">
+                <arguments>
+                    <argument name="view_model"
+                              xsi:type="object">Ahy\CaliberNation\ViewModel\Account\MembershipOverview</argument>
+                </arguments>
+
+                <!-- Magewire child: auto-renew toggle + cancellation flow (STATE A) -->
+                <block class="Magento\Framework\View\Element\Template"
+                       name="calibernation.account.membership.manager"
+                       as="membership_manager"
+                       template="Ahy_CaliberNation::account/membership-manager.phtml">
+                    <arguments>
+                        <argument name="magewire"
+                                  xsi:type="object">Ahy\CaliberNation\Magewire\Account\MembershipManager</argument>
+                    </arguments>
+                </block>
+
+                <!-- Magewire child: inline rejoin flow (STATE C — cancelled) -->
+                <block class="Magento\Framework\View\Element\Template"
+                       name="calibernation.account.membership.rejoin"
+                       as="membership_rejoin"
+                       template="Ahy_CaliberNation::account/membership-rejoin.phtml">
+                    <arguments>
+                        <argument name="magewire"
+                                  xsi:type="object">Ahy\CaliberNation\Magewire\Account\MembershipRejoin</argument>
+                    </arguments>
+                </block>
+
+            </block>
+        </referenceContainer>
+    </body>
+</page>

@@ -1,0 +1,32 @@
+<?php
+/**
+ * Copyright © Ahy consulting All rights reserved.
+ * "Members save an average of $X" messaging (P4.3). Store-wide, cache-safe.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$vm = $block->getData('averageSavings');
+if (!$vm || !$vm->isAvailable()) {
+    return;
+}
+?>
+<div class="caliber-average-savings container mx-auto px-4" style="margin-top:3rem;margin-bottom:3rem;">
+    <div class="text-center bg-white"
+         style="max-width:48rem;margin:0 auto;padding:3rem 2rem;border-radius:1rem;
+                border:1px solid #eee;box-shadow:0 10px 30px rgba(0,0,0,0.08);">
+        <p class="text-ahy-blue" style="font-size:1.25rem;line-height:1.3;">
+            <?= $escaper->escapeHtml($vm->getIntro()) ?>
+        </p>
+        <p class="font-league-gothic text-ahy-red"
+           style="font-size:4.5rem;line-height:1;margin-top:0.5rem;">
+            <?= /* @noEscape */ $vm->getFormattedAverage() ?>
+        </p>
+        <div style="width:3rem;height:2px;background:#e01a2b;margin:1.5rem auto 1.25rem;"></div>
+        <?php if ($vm->getSavingsMessage()): ?>
+            <p class="text-gray-500" style="font-size:0.95rem;max-width:28rem;margin:0 auto;line-height:1.5;">
+                <?= $escaper->escapeHtml($vm->getSavingsMessage()) ?>
+            </p>
+        <?php endif; ?>
+    </div>
+</div>

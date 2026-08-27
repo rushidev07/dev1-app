@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="FalcoSense\Search\Block\Search"
+                   name="ahy_smartsearch_search"
+                   template="FalcoSense_Search::search/results.phtml"
+                   before="-"/>
+        </referenceContainer>
+
+        <!-- Remove the default Magento search result block -->
+        <referenceBlock name="search.result" remove="true"/>
+
+        <!--
+            Remove Magento_LayeredNavigation's search sidebar block. It is declared
+            independently of search.result (in sidebar.main, by a different module's
+            own catalogsearch_result_index.xml), so removing search.result above does
+            NOT stop it: Magento\LayeredNavigation\Block\Navigation\Search builds its
+            facet/filter counts from the configured search engine (Elasticsearch/
+            OpenSearch) eagerly during layout generation, on every request, regardless
+            of which controller ran or whether it's ever echoed. This page's filtering
+            is driven by the FalcoSense platform API, not this block, so it must be
+            removed too or every request still queries the search engine for facets.
+        -->
+        <referenceBlock name="catalogsearch.leftnav" remove="true"/>
+    </body>
+</page>

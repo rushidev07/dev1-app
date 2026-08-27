@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!--
+    Removes the legacy Ahy_Caliber "Yotpo points" block from the My Account
+    dashboard. That block keys off customer group 6 (now the Caliber Nation
+    member group) and calls the Yotpo loyalty API, which errors when it returns
+    null. It is superseded by the Caliber Nation membership overview and is
+    irrelevant for our members. Non-invasive: the legacy module is untouched.
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="calibermember" remove="true"/>
+    </body>
+</page>

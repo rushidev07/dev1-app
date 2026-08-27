@@ -1,0 +1,47 @@
+<!--@subject Your Caliber Nation membership has been cancelled @-->
+<!--@vars {
+"var first_name":"First Name",
+"var end_date":"Benefits-until date",
+"var total_savings":"Lifetime member savings",
+"var has_savings":"Has savings (boolean)",
+"var store_name":"Store Name",
+"var account_url":"Account URL"
+} @-->
+{{template config_path="design/email/header_template"}}
+
+<table border="0" cellpadding="0" cellspacing="0" style="width:100%;">
+    <tr>
+        <td>
+            <h1 style="color:#0a2540;">Your membership has been cancelled, {{var first_name}}</h1>
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                We've cancelled your Caliber Nation membership and turned off auto-renew — you won't be charged again.
+            </p>
+            {{depend end_date}}
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                You'll keep your member benefits until <strong>{{var end_date}}</strong>, the end of the period you've already paid for.
+            </p>
+            {{/depend}}
+            {{depend has_savings}}
+            <p style="font-size:14px;color:#1b7a3d;line-height:1.6;font-weight:bold;">
+                You saved {{var total_savings}} as a Caliber Nation member. Thank you for being part of the club.
+            </p>
+            {{/depend}}
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                Changed your mind? You can rejoin anytime.
+            </p>
+            <p style="margin:24px 0;">
+                <a href="{{store url='caliber-nation'}}?scrollTo=signup"
+                   style="background:#e01a2b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:4px;font-weight:bold;font-size:14px;">
+                    Rejoin Caliber Nation
+                </a>
+            </p>
+            <p style="font-size:13px;color:#777;">
+                Manage your account anytime from your
+                <a href="{{var account_url}}" style="color:#e01a2b;">account dashboard</a>.
+                Thank you for being a member of {{var store_name}}.
+            </p>
+        </td>
+    </tr>
+</table>
+
+{{template config_path="design/email/footer_template"}}

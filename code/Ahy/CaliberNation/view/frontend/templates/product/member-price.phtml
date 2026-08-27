@@ -1,0 +1,34 @@
+<?php
+/**
+ * Copyright © Ahy consulting All rights reserved.
+ * Regular-vs-Caliber price teaser for the product detail page (P5).
+ *
+ * The PRICE is a marketing teaser shown to EVERYONE and is identical per product, so
+ * it's rendered server-side and is safe to full-page-cache. The label is always
+ * "Members pay" — a factual statement true for every viewer (it states what members
+ * pay, not that the viewer IS one), so it needs no per-customer data and can never go
+ * stale. Only the soft "Join" link is toggled client-side from the
+ * `caliber-nation-savings` customer-data section (hidden for confirmed members); if
+ * that section is briefly stale it merely shows/hides a link — the prominent Renew
+ * banner already covers lapsed members, so there is no wrong "you're a member" claim.
+ *
+ * @var \Magento\Catalog\Block\Product\View $block
+ */
+$viewModel = $block->getData('memberPriceViewModel');
+$product   = $block->getProduct();
+
+if (!$viewModel || !$product || !$viewModel->isEnabled() || !$viewModel->hasMemberPrice($product)) {
+    return;
+}
+?>
+<div class="caliber-member-price mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm"
+     x-data="{ member: false }"
+     @private-content-loaded.window="if ($event.detail.data['caliber-nation-savings']) member = !!$event.detail.data['caliber-nation-savings'].member">
+    <span class="font-semibold text-amber-800"><?= $block->escapeHtml(__('Members pay')) ?>:</span>
+    <span class="font-bold text-amber-900"><?= /* @noEscape */ $viewModel->getFormattedMemberPrice($product) ?></span>
+    <span class="text-gray-500 line-through ml-1"><?= /* @noEscape */ $viewModel->getFormattedRegularPrice($product) ?></span>
+    <span class="ml-1 text-green-700"><?= $block->escapeHtml(__('Save %1', $viewModel->getFormattedSavings($product))) ?></span>
+    <a x-show="!member" href="<?= $block->escapeUrl($block->getUrl('caliber-nation')) ?>" class="ml-2 underline text-amber-800">
+        <?= $block->escapeHtml(__('Join Caliber Nation')) ?>
+    </a>
+</div>

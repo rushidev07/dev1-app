@@ -1,0 +1,406 @@
+/*
+ * Discount Alert review grid.
+ *
+ * Fills the gaps the core admin grid styles leave for a server-rendered table: the filter
+ * tab and panel, applied-filter chips, toolbar and pager. Palette and metrics follow the
+ * admin theme (#eb5202 primary, #303030 body text, #007bdb links, #e3e3e3 rules).
+ */
+
+/* Header: the Filters tab sits on the rule, as in the core grids */
+.ahy-da-header {
+    align-items: flex-end;
+    border-bottom: 1px solid #e3e3e3;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    min-height: 38px;
+    padding-top: 2rem;
+}
+
+.ahy-da-search {
+    display: flex;
+    max-width: 460px;
+    padding: 18px 0 0;
+    width: 45%;
+}
+
+.ahy-da-search-input {
+    border: 1px solid #adadad;
+    border-radius: 1px 0 0 1px;
+    border-right: 0;
+    color: #303030;
+    font-size: 1.4rem;
+    font-style: italic;
+    height: 34px;
+    padding: 0 12px;
+    width: 100%;
+}
+
+.ahy-da-search-input:focus {
+    border-color: #007bdb;
+    box-shadow: none;
+    outline: none;
+}
+
+.ahy-da-search-button {
+    background: #fff;
+    border: 1px solid #adadad;
+    border-radius: 0 1px 1px 0;
+    color: #303030;
+    cursor: pointer;
+    font-size: 1.4rem;
+    padding: 0 18px;
+}
+
+.ahy-da-search-button:hover {
+    background: #f5f5f5;
+}
+
+.ahy-da-filter-toggle {
+    align-items: center;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    color: #303030;
+    display: inline-flex;
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: -1px;
+    min-height: 38px;
+    padding: 0.5rem 2rem;
+    text-decoration: none;
+}
+
+.ahy-da-filter-toggle span {
+    display: inline-block;
+    font-size: 1.5rem;
+    padding: 1rem;
+}
+
+.ahy-da-filter-toggle:hover {
+    color: #303030;
+    text-decoration: none;
+}
+
+.ahy-da-filter-toggle._active {
+    background: #fff;
+    border-color: #e3e3e3;
+    border-top: 3px solid #eb5202;
+}
+
+/* Filter panel: open area closed by a rule, no surrounding box */
+.ahy-da-filter-panel {
+    background: #fff;
+    border-bottom: 1px solid #e3e3e3;
+    padding: 25px 0 22px;
+}
+
+.ahy-da-filter-fields {
+    display: grid;
+    gap: 22px 30px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ahy-da-filter-field .admin__field-label {
+    color: #303030;
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 600;
+    padding: 0 0 8px;
+    text-align: left;
+    width: auto;
+}
+
+.ahy-da-filter-field .admin__control-text,
+.ahy-da-filter-field .admin__control-select {
+    font-size: 1.4rem;
+    height: 34px;
+    width: 100%;
+}
+
+.ahy-da-filter-range {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+
+.ahy-da-filter-range span {
+    color: #303030;
+    font-size: 1.4rem;
+}
+
+.ahy-da-filter-footer {
+    align-items: center;
+    display: flex;
+    gap: 25px;
+    justify-content: flex-end;
+    padding: 28px 0 0;
+}
+
+.ahy-da-link-cancel {
+    color: #007bdb;
+    font-size: 1.4rem;
+    text-decoration: none;
+}
+
+.ahy-da-link-cancel:hover {
+    text-decoration: underline;
+}
+
+/* Applied filter chips */
+.ahy-da-chips {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 15px 0 0;
+}
+
+.ahy-da-chips-label {
+    color: #303030;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.ahy-da-chip {
+    background: #f5f5f5;
+    border: 1px solid #e3e3e3;
+    border-radius: 2px;
+    color: #303030;
+    font-size: 1.3rem;
+    padding: 5px 10px;
+}
+
+.ahy-da-chip a {
+    color: #858585;
+    font-size: 1.5rem;
+    margin-left: 8px;
+    text-decoration: none;
+}
+
+.ahy-da-chip a:hover {
+    color: #eb5202;
+}
+
+.ahy-da-chips-clear {
+    color: #007bdb;
+    font-size: 1.4rem;
+    text-decoration: none;
+}
+
+.ahy-da-chips-clear:hover {
+    text-decoration: underline;
+}
+
+/* Toolbar: mass action and count left, pager right */
+.ahy-da-toolbar {
+    align-items: center;
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    padding: 18px 0;
+}
+
+.ahy-da-toolbar-left {
+    align-items: center;
+    display: flex;
+    gap: 18px;
+}
+
+.ahy-da-selection-count,
+.ahy-da-records {
+    color: #303030;
+    font-size: 1.4rem;
+}
+
+.ahy-da-selection-count {
+    font-weight: 600;
+}
+
+/* Buttons: one step larger than the core default */
+.ahy-da-grid .action-secondary,
+.ahy-da-grid .action-default,
+.ahy-da-filter-panel .action-secondary {
+    font-size: 1.4rem;
+    line-height: 1.8rem;
+    padding: 9px 20px;
+}
+
+.ahy-da-grid .action-primary {
+    font-size: 1.4rem;
+    line-height: 1.8rem;
+    padding: 1rem 2rem;
+}
+
+/* Column headings stay white on the dark head, as in every core grid */
+.ahy-da-grid .data-grid-th,
+.ahy-da-grid .data-grid-th a,
+.ahy-da-grid .data-grid-th .data-grid-cell-content {
+    font-size: 1.4rem;
+    text-align: left;
+}
+
+.ahy-da-grid .data-grid-th a,
+.ahy-da-grid .data-grid-th a:visited,
+.ahy-da-grid .data-grid-th a:active {
+    color: #fff;
+    text-decoration: none;
+}
+
+.ahy-da-grid .data-grid-th a:hover {
+    color: #fff;
+    text-decoration: underline;
+}
+
+/* Body cells: left aligned throughout, one step larger */
+.ahy-da-grid .data-grid tbody td {
+    font-size: 1.4rem;
+    text-align: left;
+}
+
+.ahy-da-grid .data-grid tbody td a,
+.ahy-da-grid .ahy-da-product-link {
+    color: #007bdb;
+    font-size: 1.4rem;
+    text-decoration: none;
+}
+
+.ahy-da-grid .data-grid tbody td a:hover,
+.ahy-da-grid .ahy-da-product-link:hover {
+    color: #006bb4;
+    text-decoration: underline;
+}
+
+.ahy-da-grid .data-grid td.ahy-da-action-cell {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.ahy-da-muted {
+    color: #858585;
+}
+
+.ahy-da-grid .grid-severity-notice span,
+.ahy-da-grid .grid-severity-critical span,
+.ahy-da-grid .grid-severity-minor span {
+    font-size: 1.3rem;
+}
+
+/* Row action: outlined primary, filling on hover, so 50 rows do not shout */
+.ahy-da-grid .ahy-da-row-action {
+    background: #fff;
+    border: 1px solid #eb5202;
+    border-radius: 3px;
+    color: #eb5202;
+    cursor: pointer;
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.8rem;
+    padding: 7px 18px;
+}
+
+.ahy-da-grid .ahy-da-row-action:hover {
+    background: #eb5202;
+    color: #fff;
+}
+
+.ahy-da-grid .ahy-da-row-action:focus {
+    box-shadow: 0 0 3px 1px #007bdb;
+    outline: none;
+}
+
+/* Pager */
+.ahy-da-pager {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.ahy-da-pager-label {
+    color: #303030;
+    font-size: 1.4rem;
+}
+
+.ahy-da-pager-limit {
+    font-size: 1.4rem;
+    height: 34px;
+    width: auto;
+}
+
+.ahy-da-pager-page {
+    font-size: 1.4rem;
+    height: 34px;
+    text-align: center;
+    width: 56px;
+}
+
+.ahy-da-pager-arrow {
+    background: #fff;
+    border: 1px solid #adadad;
+    border-radius: 2px;
+    color: #303030;
+    font-size: 1.8rem;
+    line-height: 1;
+    padding: 7px 14px;
+    text-decoration: none;
+}
+
+.ahy-da-pager-arrow:hover {
+    background: #f5f5f5;
+    color: #303030;
+    text-decoration: none;
+}
+
+.ahy-da-pager-arrow._disabled {
+    color: #cacaca;
+    cursor: default;
+}
+
+/* Hidden once the script takes over submitting on change */
+.ahy-da-pager-go._js-hidden {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    .ahy-da-filter-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Back link on the run review page */
+.ahy-da-breadcrumb {
+    padding: 0 0 12px;
+}
+
+.ahy-da-breadcrumb a {
+    color: #007bdb;
+    font-size: 1.4rem;
+    text-decoration: none;
+}
+
+.ahy-da-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+/* Review link in the runs listing, styled as the outlined row action */
+.ahy-da-grid a.ahy-da-row-action {
+    display: inline-block;
+    text-decoration: none;
+}
+
+.ahy-da-grid a.ahy-da-row-action:hover {
+    color: #fff;
+    text-decoration: none;
+}
+
+/*
+ * A row can now offer more than one action, so the cell lays them out in a row that wraps
+ * on narrow screens rather than letting the buttons collide.
+ */
+.ahy-da-action-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+}

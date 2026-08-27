@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <tab id="ahy" translate="label" sortOrder="900">
+            <label>Ahy</label>
+        </tab>
+        <section id="ahy_discount_alert" translate="label" type="text" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
+            <label>Discount Alert</label>
+            <tab>ahy</tab>
+            <resource>Ahy_DiscountAlert::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>General</label>
+                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Discount Alert</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="notify_on_change_only" translate="label comment" type="select" sortOrder="15" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Only Email When the List Changes</label>
+                    <comment>Yes: an email is sent only when products have been added to, or removed from, the flagged list since the previous run. No: every run sends an email. Runs are recorded either way.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="threshold" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Discount Threshold (%)</label>
+                    <comment>Products discounted by more than this percentage are included in the alert. Between 1 and 99.</comment>
+                    <validate>required-entry validate-number validate-number-range number-range-1-99</validate>
+                </field>
+                <field id="recipient_email" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Alert Recipient Email</label>
+                    <comment>Primary email address (To) that receives the discount alert digest.</comment>
+                    <validate>required-entry validate-email</validate>
+                </field>
+                <field id="cc_emails" translate="label comment" type="textarea" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>CC Recipients</label>
+                    <comment>Optional. Additional addresses to CC. Separate multiple emails with commas.</comment>
+                </field>
+                <field id="bcc_emails" translate="label comment" type="textarea" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>BCC Recipients</label>
+                    <comment>Optional. Additional addresses to BCC. Separate multiple emails with commas.</comment>
+                </field>
+            </group>
+            <group id="email" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Email Contents</label>
+                <field id="product_limit" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Products Listed in Email</label>
+                    <comment>How many of the deepest-discounted products appear in the email body. The attached CSV always holds the full list.</comment>
+                    <validate>required-entry validate-digits validate-digits-range digits-range-1-500</validate>
+                </field>
+                <field id="max_products" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Maximum Products per Run</label>
+                    <comment>Upper bound on products collected, recorded and written to the CSV. Caps memory use and attachment size on very large result sets. Use 0 for no limit.</comment>
+                    <validate>required-entry validate-digits</validate>
+                </field>
+            </group>
+            <group id="security" translate="label" type="text" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Review Link</label>
+                <field id="link_lifetime" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Review Link Lifetime (days)</label>
+                    <comment>How long the "Review &amp; Disable" link in the email keeps working. Use 0 to never expire.</comment>
+                    <validate>required-entry validate-digits</validate>
+                </field>
+            </group>
+            <group id="schedule" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Schedule</label>
+                <field id="cron_expr" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Alert Frequency</label>
+                    <comment>How often the alert runs. Times follow the store timezone set under General &gt; Locale Options, not the server clock. Changes take effect on the next cron run.</comment>
+                    <source_model>Ahy\DiscountAlert\Model\Config\Source\CronFrequency</source_model>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

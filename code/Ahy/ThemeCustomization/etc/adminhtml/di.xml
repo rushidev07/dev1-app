@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Ahy consulting All rights reserved.
+ * See COPYING.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!--
+        Webkul_SellerSubAccount ships two admin customer-delete plugins whose bodies are
+        copy-pasted controller code. They call $this->resultRedirectFactory,
+        $this->_formKeyValidator, $this->getRequest(), $this->initCurrentCustomer() and
+        $this->_customerRepository from inside a plugin class, where none of those exist:
+
+            Warning: Undefined property: Webkul\SellerSubAccount\Plugin\Controller\Seller\
+            Delete::$resultRedirectFactory in .../Seller/Delete.php on line 124
+
+        The around plugin died on its first statement, so the core execute() never ran and
+        NO admin could delete any customer. Their MassDelete plugin is additionally
+        registered against massAction(), a protected method interception cannot reach.
+
+        Both are disabled here and replaced with Ahy plugins that only do the sub-account
+        cleanup and delegate the delete itself back to the core controller. The Webkul
+        files are left untouched so a module upgrade stays a clean overwrite.
+
+        Type names below intentionally keep Webkul's leading backslash so these entries
+        merge onto the same DI node as theirs.
+    -->
+    <type name="\Magento\Customer\Controller\Adminhtml\Index\Delete">
+        <plugin name="Webkul_SellerSubAccount::SellerDeleteControllerPlugin" disabled="true"/>
+        <plugin name="ahy_theme_customization_seller_sub_account_customer_delete"
+                type="Ahy\ThemeCustomization\Plugin\Webkul\SellerSubAccount\CustomerDelete"
+                sortOrder="1"/>
+    </type>
+
+    <type name="\Magento\Customer\Controller\Adminhtml\Index\MassDelete">
+        <plugin name="Webkul_SellerSubAccount::SellerMassDeleteControllerPlugin" disabled="true"/>
+        <plugin name="ahy_theme_customization_seller_sub_account_customer_mass_delete"
+                type="Ahy\ThemeCustomization\Plugin\Webkul\SellerSubAccount\CustomerMassDelete"
+                sortOrder="1"/>
+    </type>
+
+</config>

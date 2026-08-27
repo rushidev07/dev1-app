@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <acl>
+        <resources>
+            <resource id="Magento_Backend::admin">
+                <resource id="Ahy_FlxPointApproval::product_approval" title="FlxPoint Product Approval" sortOrder="10">
+                    <resource id="Ahy_FlxPointApproval::product_approval_approve" title="Approve Products" sortOrder="10"/>
+                    <resource id="Ahy_FlxPointApproval::product_approval_reject" title="Reject Products" sortOrder="20"/>
+                    <resource id="Ahy_FlxPointApproval::config" title="FlxPoint Approval Configuration" sortOrder="30"/>
+                </resource>
+            </resource>
+        </resources>
+    </acl>
+</config>

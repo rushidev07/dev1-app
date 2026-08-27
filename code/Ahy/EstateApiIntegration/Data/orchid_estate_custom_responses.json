@@ -1,0 +1,18 @@
+[
+  { "zip_code": "20190", "upc": "818778023509", "response": 2 },
+  { "zip_code": "20170", "upc": "818778023509", "response": 5 },
+  { "zip_code": "20191", "upc": "818778023509", "response": 1 },
+  { "zip_code": "20171", "upc": "818778023509", "response": 3 },
+
+  { "zip_code": "90232", "upc": "818778023509", "response": { "restriction": "A", "shipping_restriction": "FF", "age_restriction": "FFF" } },
+  { "zip_code": "37219", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "AA", "age_restriction": "AAA" } },
+  { "zip_code": "60020", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "BB", "age_restriction": "AAA" } },
+  { "zip_code": "02804", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "BB", "age_restriction": "BBB" } },
+  { "zip_code": "96712", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "SHI", "age_restriction": "BBB" } },
+  { "zip_code": "07029", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "SNJ", "age_restriction": "ANJ" } },
+  { "zip_code": "14094", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "CC", "age_restriction": "AAA" } },
+  { "zip_code": "19712", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "AA", "age_restriction": "ADE" } },
+  { "zip_code": "20790", "upc": "818778023509", "response": { "restriction": "B", "shipping_restriction": "AA", "age_restriction": "AMD" } },
+  { "zip_code": "51008", "upc": "850057976113", "response": { "restriction": "A", "shipping_restriction": "FF", "age_restriction": "FFF" } },
+  { "zip_code": "37138", "upc": "123412341234", "response": 5 }
+]

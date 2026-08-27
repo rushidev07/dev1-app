@@ -1,0 +1,73 @@
+<?php
+/**
+ * Layered Navigation sidebar — styled to match Klevu kuFilterBox design
+ */
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\LayeredNavigation\Block\Navigation;
+
+/** @var Navigation $block */
+/** @var Escaper $escaper */
+?>
+<?php if ($block->canShowBlock()): ?>
+<div class="kuFilters"
+     role="navigation"
+     aria-label="Product Filters"
+     x-data="{ isMobile: false, blockOpen: false }"
+     x-init="isMobile = window.matchMedia('(max-width: 767px)').matches"
+     @resize.window.debounce="isMobile = window.matchMedia('(max-width: 767px)').matches"
+>
+    <!-- Mobile: FILTER BY toggle button -->
+    <div class="flex md:hidden my-4">
+        <button @click="blockOpen = !blockOpen"
+                type="button"
+                class="border-2 border-[#0d2f47] text-[#0d2f47] uppercase text-xs tracking-widest font-bold py-3 px-6 rounded-full w-full">
+            Filter By
+        </button>
+    </div>
+
+    <!-- Filter groups: always visible on desktop, toggle on mobile -->
+    <div :class="isMobile ? (blockOpen ? 'block' : 'hidden') : 'block'">
+
+        <?= $block->getChildHtml('state') ?>
+
+        <?php
+            $productCount = $block->getLayer()->getProductCollection()->getSize();
+        ?>
+        <div class="pb-3">
+            <p class="font-semibold text-[#0d2f47] border-b-2 border-[#0d2f47] inline-block pb-1">
+                (<?= (int)$productCount ?> <?= (int)$productCount === 1 ? $escaper->escapeHtml(__('Item')) : $escaper->escapeHtml(__('Items')) ?>)
+            </p>
+        </div>
+
+        <?php foreach ($block->getFilters() as $filter): ?>
+            <?php if ($filter->getItemsCount()): ?>
+            <div class="kuFilterBox" x-data="{ open: true }">
+
+                <!-- Header matches Klevu .kuFilterHead inner div -->
+                <div class="flex justify-between items-center cursor-pointer py-4 border-t border-[#eeeeee] w-full"
+                     @click="open = !open">
+                    <span class="text-lg capitalize font-semibold" style="color: #0d2f47;">
+                        <?= $escaper->escapeHtml(__($filter->getName())) ?>
+                    </span>
+                    <!-- Chevron rotates: points down when open, right when closed -->
+                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-300 text-[#0d2f47]"
+                         :style="open ? '' : 'transform:rotate(-90deg)'"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+
+                <!-- Filter items -->
+                <div x-show="open" class="kuFilterNames">
+                    <?= /* @noEscape */ $block->getChildBlock('renderer')->render($filter) ?>
+                </div>
+
+            </div>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>

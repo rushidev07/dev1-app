@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Ahy_PlpRevamp">
+        <sequence>
+            <module name="Ahy_ThemeCustomization"/>
+            <!-- <module name="Klevu_Categorynavigation"/> -->
+            <!-- <module name="Klevu_FrontendJs"/> -->
+            <!-- <module name="Klevu_Search"/> -->
+            <module name="FalcoSense_Search"/>
+            <module name="Magento_Catalog"/>
+            <module name="Webkul_Marketplace"/>
+        </sequence>
+    </module>
+</config>

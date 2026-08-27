@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="header-search" template="FalcoSense_Search::search/search-form.phtml"/>
+        <referenceContainer name="before.body.end">
+            <block class="FalcoSense\Search\Block\Search"
+                   name="ahy_smartsearch_autocomplete"
+                   template="FalcoSense_Search::search/autocomplete.phtml"
+                   cacheable="false"/>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="ahy_smartsearch_visitor_cookie"
+                   template="FalcoSense_Search::visitor_cookie.phtml"
+                   cacheable="false"/>
+            <block class="FalcoSense\Search\Block\GeoConsent"
+                   name="ahy_geo_consent"
+                   template="FalcoSense_Search::geo-consent.phtml"
+                   cacheable="false"
+                   ifconfig="smart_search/general/enabled"/>
+        </referenceContainer>
+    </body>
+</page>

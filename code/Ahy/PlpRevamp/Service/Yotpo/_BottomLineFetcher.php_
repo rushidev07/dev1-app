@@ -1,0 +1,95 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Ahy\PlpRevamp\Service\Yotpo;
+
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Promise\Utils;
+use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Store\Model\ScopeInterface;
+use Psr\Log\LoggerInterface;
+
+class BottomlineFetcher
+{
+    private const YOTPO_APP_KEY_PATH = 'yotpo/settings/app_key';
+    private const YOTPO_API_BASE     = 'https://api-cdn.yotpo.com/v1/widget/%s/products/%d/reviews.json?per_page=0';
+    private const CURL_TIMEOUT       = 5;
+
+    public function __construct(
+        private readonly ScopeConfigInterface $scopeConfig,
+        private readonly LoggerInterface      $logger,
+        private readonly Client               $httpClient,
+    ) {}
+
+    /**
+     * Fetch Yotpo bottomline (score + count) for multiple product IDs in parallel.
+     *
+     * @param int[] $ids
+     * @return array<string, array{score: float, count: int}>
+     */
+    public function fetch(array $ids): array
+    {
+        $appKey = (string)$this->scopeConfig->getValue(self::YOTPO_APP_KEY_PATH, ScopeInterface::SCOPE_STORE);
+
+        if (empty($appKey)) {
+            $this->logger->warning('Ahy_PlpRevamp: Yotpo app key not configured (yotpo/settings/app_key).');
+            return $this->emptyResults($ids);
+        }
+
+        $promises = [];
+        foreach ($ids as $id) {
+            $url            = sprintf(self::YOTPO_API_BASE, $appKey, $id);
+            $promises[$id]  = $this->httpClient->getAsync($url, ['timeout' => self::CURL_TIMEOUT]);
+        }
+
+        $settled = Utils::settle($promises)->wait();
+
+        $results = [];
+        foreach ($settled as $id => $outcome) {
+            if ($outcome['state'] === 'fulfilled') {
+                $results[(string)$id] = $this->parseResponse((string)$outcome['value']->getBody(), $id);
+            } else {
+                /** @var RequestException $reason */
+                $reason = $outcome['reason'];
+                $this->logger->error(sprintf(
+                    'Ahy_PlpRevamp: Yotpo API failed for product %d — %s',
+                    $id,
+                    $reason->getMessage()
+                ));
+                $results[(string)$id] = ['score' => 0.0, 'count' => 0];
+            }
+        }
+
+        return $results;
+    }
+
+    private function parseResponse(string $body, int $id): array
+    {
+        $data       = json_decode($body, true);
+        $bottomline = $data['response']['bottomline'] ?? null;
+
+        if ($bottomline === null) {
+            $this->logger->warning(sprintf(
+                'Ahy_PlpRevamp: Yotpo response missing bottomline for product %d.',
+                $id
+            ));
+            return ['score' => 0.0, 'count' => 0];
+        }
+
+        return [
+            'score' => round((float)($bottomline['average_score'] ?? 0), 1),
+            'count' => (int)($bottomline['total_review'] ?? 0),
+        ];
+    }
+
+    private function emptyResults(array $ids): array
+    {
+        $results = [];
+        foreach ($ids as $id) {
+            $results[(string)$id] = ['score' => 0.0, 'count' => 0];
+        }
+        return $results;
+    }
+}

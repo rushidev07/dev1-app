@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!-- Inject membership signup section after the main CMS content block -->
+        <referenceContainer name="content">
+            <!-- "Members save an average of $X" messaging (P4.3). -->
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation_average_savings"
+                   template="Ahy_CaliberNation::messaging/average-savings.phtml"
+                   before="caliber_nation_membership_signup">
+                <arguments>
+                    <argument name="averageSavings" xsi:type="object">Ahy\CaliberNation\ViewModel\AverageSavings</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation_membership_signup"
+                   template="Ahy_CaliberNation::membership-signup.phtml">
+                <arguments>
+                    <argument name="magewire" xsi:type="object">
+                        Ahy\CaliberNation\Magewire\MembershipSignup
+                    </argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

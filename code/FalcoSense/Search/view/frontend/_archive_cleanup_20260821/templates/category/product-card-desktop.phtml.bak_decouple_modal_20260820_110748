@@ -1,0 +1,90 @@
+<?php
+/**
+ * Desktop product card, rendered once per page load as a static Alpine <template>
+ * fragment and looped client-side by x-for in category/results.phtml.
+ * No PHP variables are needed here — all data comes from the Alpine `product` scope.
+ */
+?>
+<div class="bg-white relative flex flex-col group">
+
+    <button @click.prevent="addToWishlist(product)"
+            :disabled="wishLoading[product.product_id] === true"
+            aria-label="Add to Wish List" type="button"
+            class="absolute top-2.5 right-2.5 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center text-ahy-blue hover:text-red-500 shadow-sm transition">
+        <template x-if="wishLoading[product.product_id] === true">
+            <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+        </template>
+        <template x-if="wishLoading[product.product_id] !== true">
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20" fill="currentColor">
+                <path d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+            </svg>
+        </template>
+    </button>
+
+    <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+       @click="trackClick(product, index + 1)" class="block overflow-hidden">
+        <img :src="imgUrl(product.image)"
+             :alt="product.name"
+             width="244" height="244"
+             class="w-full object-contain object-center p-3"
+             :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+             style="max-width:244px;height:244px;margin:0 auto;display:block"
+             loading="eager"
+             fetchpriority="high"
+             @error="handleImgError($event)"
+             :data-original-src="product.image"/>
+    </a>
+
+    <div class="flex flex-col flex-1 px-6 pb-4">
+
+        <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+           class="line-clamp-2 !text-lg !font-extrabold text-ahy-blue leading-normal mt-1 h-[3.4rem]"
+           :title="cleanName(product.name)" x-text="cleanName(product.name)" @click="trackClick(product, index + 1)"></a>
+
+        <p class="text-xs text-gray-500 mt-1 line-clamp-1"
+           x-text="'Sold By ' + (product.brand || 'The Everest Marketplace')"></p>
+
+        <div class="AhyPrice min-h-[5.5rem] flex flex-col !overflow-visible mt-1">
+            <template x-if="product.price && product.special_price && product.special_price < product.price">
+                <div>
+                    <div class="text-ahy-red text-xs font-bold uppercase">Deal</div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(product.special_price)"></span>
+                        <span class="text-sm text-gray-400 line-through" x-html="hyva.formatPrice(product.price)"></span>
+                    </div>
+                </div>
+            </template>
+            <template x-if="product.price && (!product.special_price || product.special_price >= product.price)">
+                <div class="flex flex-col items-baseline">
+                    <span class="capitalize text-ahy-red !font-bold !text-sm" x-show="product.type === 'configurable'">From</span>
+                    <span class="text-2xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(product.price)"></span>
+                </div>
+            </template>
+            <template x-if="!product.price">
+                <span class="capitalize !flex justify-center items-center w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 font-bold !border-2 !border-ahy-blue">See Options</span>
+            </template>
+        </div>
+
+        <div class="flex items-center justify-between">
+            <p class="capitalize !text-gray-900 !font-semibold !text-sm" :class="isFreeShipping(product) ? '' : 'invisible'">FREE Shipping</p>
+            <div class="w-full mt-auto pt-3 max-w-[160px] md:flex md:justify-end">
+                <template x-if="product.type !== 'configurable'">
+                    <button @click.prevent="addSimpleToCart(product)"
+                            :class="cartLoading[product.product_id] === true ? 'opacity-60 pointer-events-none' : ''"
+                            class="capitalize kuBtnDark !flex justify-center items-center gap-2 !w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 md:!w-[90px] md:!text-xs md:!py-1 md:!px-3 lg:!w-full lg:!text-sm lg:!py-1.5 lg:!px-2.5 font-bold !border-2 !border-ahy-blue">
+                        <svg x-show="cartLoading[product.product_id] === true" class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                        <svg x-show="cartLoading[product.product_id] !== true" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span class="md:hidden lg:block" x-text="cartLoading[product.product_id] === true ? 'Adding…' : 'Add'"></span>
+                        <span class="hidden md:block lg:hidden" x-text="cartLoading[product.product_id] === true ? '…' : 'Add'"></span>
+                    </button>
+                </template>
+                <template x-if="product.type === 'configurable'">
+                    <button @click.prevent="$dispatch('ahy-open-config-modal', product)"
+                            class="capitalize kuBtnDark !flex justify-center items-center !w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 md:!w-[90px] md:!text-xs md:!py-1 md:!px-3 lg:!w-full lg:!text-sm lg:!py-1.5 lg:!px-2.5 font-bold !border-2 !border-ahy-blue">
+                        <span>Options</span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>

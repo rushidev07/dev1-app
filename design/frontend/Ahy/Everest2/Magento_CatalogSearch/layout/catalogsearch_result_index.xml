@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="1column"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!-- Remove all default/Klevu/Hyva/marketplace search result blocks — SmartSearch renders its own -->
+        <referenceBlock name="search.result"         remove="true"/>
+        <referenceBlock name="klevu_content_top"      remove="true"/>
+        <referenceBlock name="catalogsearch.leftnav"  remove="true"/>
+        <referenceBlock name="catalog.compare.sidebar" remove="true"/>
+        <referenceContainer name="sidebar.main"      remove="true"/>
+        <!-- Webkul MpAssignProduct injects a full product ListProduct block — remove it -->
+        <referenceBlock name="mpassign.list"          remove="true"/>
+        <!-- Remove search result list blocks added by Hyva/core that may still load collections -->
+        <referenceBlock name="search_result_list"     remove="true"/>
+        <referenceBlock name="search.search_terms_log" remove="true"/>
+    </body>
+</page>

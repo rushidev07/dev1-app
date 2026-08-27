@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Header cumulative-savings badge: per-customer data section (FPC-safe).
+         Section name: caliber-nation-savings. -->
+    <type name="Magento\Customer\CustomerData\SectionPool">
+        <arguments>
+            <argument name="sectionSourceMap" xsi:type="array">
+                <item name="caliber-nation-savings" xsi:type="string">Ahy\CaliberNation\CustomerData\MemberSavings</item>
+            </argument>
+        </arguments>
+    </type>
+</config>

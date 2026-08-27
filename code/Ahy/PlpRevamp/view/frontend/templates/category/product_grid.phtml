@@ -1,0 +1,757 @@
+<?php
+/** @var \Ahy\PlpRevamp\Block\Category\ProductGrid $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+$products   = $block->getProductCollection();
+$total      = $block->getTotalCount();
+$totalPages = $block->getTotalPages();
+$curPage    = $block->getCurrentPage();
+$sortOrder  = $block->getCurrentSortOrder();
+$formKey    = $escaper->escapeHtmlAttr($block->getFormKey());
+
+if (!$total) {
+    return;
+}
+
+// Collect product IDs for Yotpo batch fetch (collection already loaded above)
+$productIds = [];
+foreach ($products as $_p) {
+    $productIds[] = (int)$_p->getId();
+}
+$yotpoEndpoint = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+
+$sortOptions = [                                                                                                                                                                                  
+      'position'   => 'Relevance',                                                                                                                                                                  
+      'price_asc'  => 'Price: Low to High',                                                                                                                                                         
+      'price_desc' => 'Price: High to Low',                                                                                                                                                         
+  ];
+?>
+<script>
+(function() {
+    if (typeof window.fetchSwatchesPhpPlp !== 'undefined') return;
+    var BASE = '<?= $escaper->escapeJs($block->getBaseUrl()) ?>';
+    window.fetchSwatchesPhpPlp = async function(productId) {
+        var id   = '_' + productId;
+        var swatchEl   = document.getElementById('php_swatch_html'   + id);
+        var priceEl    = document.getElementById('php_product_price'  + id);
+        var galleryEl  = document.getElementById('php_swatch_gallery' + id);
+        var atcWrapEl  = document.getElementById('php_atc_wrap'       + id);
+        if (!swatchEl) return;
+        swatchEl.innerHTML = '<div style="padding:16px;color:#666;">Loading options…</div>';
+        try {
+            var res  = await fetch(BASE + 'ahy_themecustomization/index/GetProductSwatchesDetails?product_id=' + productId + '&v=' + Date.now());
+            var data = await res.json();
+            if (data.success === true) {
+                ['swatchesScriptContentDynamic','swatchesPriceScript','swatchesGalleryScript'].forEach(function(sid) {
+                    var old = document.getElementById(sid); if (old) old.remove();
+                });
+                [['swatchesScriptContentDynamic', data.swatch_script],
+                 ['swatchesPriceScript',          data.product_price_script],
+                 ['swatchesGalleryScript',         data.product_swatch_gallery_script]
+                ].forEach(function(pair) {
+                    var s = document.createElement('script');
+                    s.type = 'text/javascript'; s.id = pair[0]; s.innerHTML = pair[1];
+                    document.body.appendChild(s);
+                });
+                swatchEl.innerHTML = data.swatch_html;
+                if (priceEl)   priceEl.innerHTML   = data.product_price_html;
+                // if (galleryEl) {
+                //     galleryEl.innerHTML = data.product_swatch_gallery_html;
+                //     var modifiedHtml = galleryEl.innerHTML.replace(/<div[^>]*\bclass\s*=\s*(['"])(?:(?!\1)[^>])*\border-1\s+w-full\s+md:w-5\/12\s+lg:w-1\/2\s+(?:(?!\1)[^>])*\1[^>]*>/gi, '<div>');
+                //     galleryEl.innerHTML = modifiedHtml;
+                //     var mm = document.getElementById('meet-marcus'); if (mm) mm.remove();
+                // }
+                if (galleryEl) {
+                        galleryEl.innerHTML = data.product_swatch_gallery_html;
+                        // Remove width/padding constraints from gallery wrapper — class varies by Hyvä version
+                        // (was "border-1 w-full md:w-5/12 lg:w-1/2", now "order-1 w-full md:w-3/5 md:h-auto md:pl-2 md:pr-6")
+                        var gw = galleryEl.querySelector('div[class*="md:w-"]');
+                        if (gw) {
+                            gw.className = gw.className
+                                .replace(/\bmd:w-\S+/g, '')
+                                .replace(/\bmd:h-\S+/g, '')
+                                .replace(/\bmd:p[lr]-\S+/g, '');
+                        }
+                        var mm = document.getElementById('meet-marcus'); if (mm) mm.remove();
+                    }
+                if (atcWrapEl) atcWrapEl.style.display = 'block';
+            } else {
+                swatchEl.innerHTML = data.message || 'Unable to load options.';
+            }
+        } catch(e) {
+            console.error('fetchSwatchesPhpPlp', e);
+            swatchEl.innerHTML = 'Error loading options.';
+        }
+    };
+})();
+</script>
+
+<!-- PHP Product Grid — mirrors Klevu card design exactly -->
+<div id="ahy-php-plp-container" class="ahy-php-plp kuSearchResultsPageContainer"
+     x-data="{}"
+     x-init="$store.yotpoReviews.fetch(<?= /* @noEscape */ json_encode($productIds) ?>, '<?= $yotpoEndpoint ?>')"
+     style="margin-top:32px;display:flex;gap:30px;align-items:flex-start;">
+
+    <!-- Left: Filter sidebar — width mirrors Klevu: 25% max 276px + 30px gap = same as Klevu table-cell -->
+    <div class="ahy-php-plp-sidebar" style="width:25%;max-width:276px;flex-shrink:0;min-width:0;">
+        <?= $block->getChildHtml('ahy.subcategory.product.grid.leftnav') ?>
+    </div>
+
+    <!-- Right: toolbar + grid + pagination -->
+    <div class="px-2"style="flex:1;min-width:0;">
+
+        <!-- Toolbar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 16px;border-bottom:1px solid #e5e7eb;margin-bottom:16px;">
+            <span class="kuResultsNumber !font-semibold text-ahy-blue" style="font-size:0.875rem;">
+                <?= (int)$total ?> Products
+            </span>
+
+            <!-- Sort by — matches Klevu kuDropdown style -->
+            <div x-data="{ open: false }" style="position:relative;">
+                <button @click="open = !open"
+                        @keydown.escape.window="open = false"
+                        type="button"
+                        style="display:flex;align-items:center;gap:6px;border:none;padding:6px 12px;font-size:0.8rem;font-weight:600;color:#0d2f47;cursor:pointer;border-radius:4px;white-space:nowrap;">
+                    <span style="font-weight:400;">Sort by:</span>
+                    <strong><?= $escaper->escapeHtml($sortOptions[$sortOrder] ?? 'Best Match') ?></strong>
+                    <svg :style="open ? 'transform:rotate(180deg)' : ''" style="transition:transform 0.2s;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0d2f47" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div x-show="open"
+                     @click.outside="open = false"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     style="position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #e5e7eb;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:50;min-width:180px;">
+                    <?php foreach ($sortOptions as $val => $label): ?>
+                    <a href="javascript:void(0)"
+                       @click="open = false; (function(){ var u = new URL(window.location.href); u.searchParams.set('product_list_order', '<?= $escaper->escapeJs($val) ?>'); u.searchParams.delete('p'); typeof ahyAjaxFilter !== 'undefined' ? ahyAjaxFilter(u.toString()) : (window.location.href = u.toString()); })()"
+                       style="display:block;padding:9px 14px;font-size:0.8rem;color:#0d2f47;text-decoration:none;cursor:pointer;<?= $sortOrder === $val ? 'font-weight:700;background:#f5f7f9;' : '' ?>"
+                       onmouseover="this.style.background='#f5f7f9'" onmouseout="this.style.background='<?= $sortOrder === $val ? '#f5f7f9' : 'transparent' ?>'">
+                        <?= $escaper->escapeHtml($label) ?>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Grid -->
+        <div class="kuResults">
+            <ul style="display:flex;flex-wrap:wrap;align-items:stretch;list-style:none;padding:0;margin:0;">
+                <?php foreach ($products as $product): ?>
+                <?php
+                    $imageUrl   = $block->getProductImageUrl($product);
+                    $webpUrl    = $imageUrl ? preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $imageUrl) : '';
+                    $hasDisc    = $block->hasDiscount($product);
+                    $savingsPct = $block->getSavingsPercent($product);
+                    $dispPrice  = $block->getDisplayPrice($product);
+                    $origPrice  = (float)$product->getPrice();
+                    $isInStock  = $block->isInStock($product);
+                    $stockQty   = $block->getStockQty($product);
+                    $isSimple   = $block->isSimple($product);
+                    $sellerName = $block->getSellerName($product);
+                    $productId  = (int)$product->getId();
+                    $productUrl = $escaper->escapeUrl($product->getProductUrl());
+                    $productName = $escaper->escapeHtml($product->getName());
+                    $atcUrl     = $escaper->escapeUrl($block->getAddToCartUrl($product));
+                ?>
+                <li ku-product-block class="klevuProduct md:h-auto !static !p-0" style="padding:5px;box-sizing:border-box;" data-id="<?= $productId ?>">
+
+                    <div class="kuProdWrap !static bg-white border border-ahy-bg !flex md:!block items-center">
+
+                        <!-- Image section -->
+                        <main ku-block data-block-id="ku_landing_result_item_info" class="w-full ahy-plp-card-container">
+
+                            <!-- Stock badge -->
+                            <?php if ($isInStock && $stockQty > 0 && $stockQty <= 10): ?>
+                            <div style="position:absolute;left:8px;top:8px;z-index:10;">
+                                <span class="rounded border-2 border-ahy-stock-green bg-white px-2 py-1 text-xs font-semibold capitalize text-ahy-stock-green">
+                                    <?= $stockQty ?> Left
+                                </span>
+                            </div>
+                            <?php endif; ?>
+                            <div class="kuProdTop">
+                                <div class="klevuImgWrap">
+                                    <a href="<?= $productUrl ?>">
+                                        <?php if ($imageUrl): ?>
+                                        <picture>
+                                            <img
+                                                src="<?= $escaper->escapeUrl($webpUrl) ?>"
+                                                data-original-src="<?= $escaper->escapeUrl($imageUrl) ?>"
+                                                onerror="if(this.src.endsWith('.webp')){this.onerror=null;this.src=this.getAttribute('data-original-src');}"
+                                                alt="<?= $productName ?>"
+                                                class="kuProdImg"
+                                                loading="lazy"
+                                            />
+                                        </picture>
+                                        <?php else: ?>
+                                        <div style="width:100%;height:244px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                        </div>
+                                        <?php endif; ?>
+                                    </a>
+                                </div>
+
+                                <!-- Mobile color count placeholder -->
+                                <div class="flex md:hidden justify-center h-[18px]">
+                                    <div class="capitalize text-xs !text-ahy-blue"></div>
+                                </div>
+                            </div>
+
+                            <!-- Wishlist — desktop only, absolute top-right -->
+                            <button x-data="initWishlist()"
+                                    @click.prevent="addToWishlist(<?= $productId ?>)"
+                                    aria-label="Add to Wish List"
+                                    type="button"
+                                    class="rounded-full inline-flex ring-1 ring-gray-300 absolute top-2.5 right-2.5 w-9 h-9 shadow-xl bg-white p-0 border-0 shrink-0 items-center justify-center text-gray-500 hover:text-red-600 ml-2 wishlist-icon-position">
+                                <svg class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20">
+                                    <defs><style>.wishList{fill:#0d2f47;}</style></defs>
+                                    <path class="wishList" d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                </svg>
+                            </button>
+                        </main>
+
+                        <!-- Content: name + seller + ratings + price + ATC -->
+                        <footer ku-block data-block-id="ku_landing_result_item_footer" class="!static md:w-auto" style="display:flex;flex-direction:column;flex:1;min-width:0;">
+
+                            <!-- Name + seller + ratings -->
+                            <div class="kuProdBottom !pt-2 !pb-0" style="height:auto!important;">
+                                <div class="kuName kuClippedOne mt-2">
+                                    <a href="<?= $productUrl ?>"
+                                       class="klevuProductClick line-clamp-2 !text-lg !font-extrabold !h-[3.4rem] !text-ahy-blue !leading-normal"
+                                       title="<?= $productName ?>"
+                                       style="text-decoration:none;">
+                                        <?= $productName ?>
+                                    </a>
+                                </div>
+                                <div class="capitalize !text-xs text-ahy-rating-text !font-medium line-clamp-1 h-4">
+                                    <?php if ($sellerName): ?>
+                                    <span class="capitalize">Sold by <?= $escaper->escapeHtml($sellerName) ?></span>
+                                    <?php else: ?>
+                                    <span class="capitalize opacity-0">sold by</span>
+                                    <?php endif; ?>
+                                </div>
+                                <!-- Dynamic Yotpo star ratings -->
+                                <div x-data="{ get _r(){ return $store.yotpoReviews ? $store.yotpoReviews.data['<?= $productId ?>'] : null } }"
+                                     style="display:flex;align-items:center;gap:6px;margin-top:8px;margin-bottom:4px;">
+                                    <div style="display:flex;gap:2px;">
+                                        <template x-for="i in [1,2,3,4,5]" :key="i">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                                 :fill="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                                 :stroke="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                                 stroke-width="1">
+                                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                                            </svg>
+                                        </template>
+                                    </div>
+                                    <span x-text="_r ? '(' + _r.count + ')' : ''" style="font-size:0.75rem;color:#6b7280;"></span>
+                                </div>
+                            </div>
+
+                            <!-- Pricing: CaliberNation left, normal price right -->
+                            <div class="ahy-price-section ahy-plp-revamp-price-container">
+                                <div class="ahy-price-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+                                    <!-- CaliberNation col -->
+                                    <div class="caliber-nation-price-col">
+                                        <div class="calibernation-price-title">CaliberNation Price</div>
+                                        <div style="font-size:1.8rem;font-weight:700;color:#dc2626;">$0.00</div>
+                                        <div class="ahy-plp-member-save-container">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                                            <div class="ahy-plp-members-save-container"><span class="ahy-plp-member-save-title">MEMBERS SAVE $0.00<br></span><span class="ahy-plp-member-save-msrp-title">0% OFF MSRP</span></div>
+                                        </div>
+                                        <a href="/caliber-nation" class="ahy-plp-join-caliber">
+                                            JOIN CALIBER >
+                                            <!-- <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg> -->
+                                        </a>
+                                    </div>
+
+                                    <!-- Normal price col -->
+                                    <div class="normal-price-col ahy-plp-normal-price-container">
+                                        <?php if (!$isInStock): ?>
+                                            <div style="font-weight:700;color:#dc2626;font-size:0.9rem;">Out of Stock</div>
+                                        <?php else: ?>
+                                            <div class="ahy-plp-normal-price-title">
+                                                <?= $hasDisc ? 'Sale Price' : ($isSimple ? 'Price' : 'From') ?>
+                                            </div>
+                                            <div style="font-weight:800 !important;color:#12334b;" class="ahy-plp-normal-price"
+                                                 x-html="hyva.formatPrice(<?= $dispPrice ?>)">
+                                                $<?= number_format($dispPrice, 2) ?>
+                                            </div>
+                                            <?php if ($hasDisc): ?>
+                                            <div class="ahy-plp-non-member-container">
+                                                <span style="color:#ffffff;font-weight:600;" class="ahy-plp-non-member-section">NON-MEMBERS SAVE <?= $savingsPct ?>% OFF MSRP</span>
+                                            </div>
+                                            <div class="ahy-plp-msrp-title">
+                                                MSRP <span style="text-decoration:line-through;"
+                                                            x-html="hyva.formatPrice(<?= $origPrice ?>)">
+                                                    $<?= number_format($origPrice, 2) ?>
+                                                </span>
+                                            </div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <!-- Add to Cart + mobile wishlist -->
+                            <div class="kuProdAdditional !static !visible !inset-0 !w-full !border-0 !bg-transparent ahy-atc-wrap" style="margin-top:auto;padding-top:10px;">
+                                <div class="!static kuProdAdditionalData ahy-plp-add-to-cart-button-container">
+                                    <div class="flex gap-2 items-center ahy-plp-button-container">
+
+                                        <?php if (!$isInStock): ?>
+                                            <!-- Out of stock -->
+                                            <div style="flex:1;min-width:0;">
+                                                <a href="<?= $productUrl ?>"
+                                                   class="capitalize kuBtnDark !flex justify-center items-center w-full !rounded-full !text-white !text-sm !py-1.5 !px-2.5 font-bold !border-0"
+                                                   style="background-color:#0d2f47;text-decoration:none;">
+                                                    <span class="!text-sm px-2 font-bold">Details</span>
+                                                </a>
+                                            </div>
+
+                                        <?php elseif (!$isSimple): ?>
+                                            <!-- Configurable/grouped: Options — slide-out swatch drawer -->
+                                            <div style="flex:1;min-width:0;" x-data="{ open: false }">
+                                                <button type="button"
+                                                        @click.prevent="open = true; fetchSwatchesPhpPlp(<?= $productId ?>)"
+                                                        class="capitalize kuBtnDark !flex justify-center items-center w-full !rounded-full !text-white !text-sm !py-1.5 !px-2.5 font-bold !border-0 !transition-none hover:!bg-[#0d2f47] hover:!opacity-100 ahy-plp-add-to-option-size"
+                                                        style="background-color:#0d2f47;cursor:pointer;">
+                                                    <span class="!text-sm px-2 font-bold">Options</span>
+                                                </button>
+                                                <template x-teleport="body">
+                                                    <div x-show="open" class="fixed inset-0 overflow-hidden z-[500]" @click.self="open=false">
+                                                        <div class="absolute inset-0 overflow-hidden">
+                                                            <div class="absolute inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="open=false"></div>
+                                                            <section class="absolute inset-y-0 right-0 pl-10 max-w-full flex">
+                                                                <div class="relative w-screen max-w-md">
+                                                                    <div class="h-full flex flex-col p-6 bg-white shadow-xl overflow-y-scroll">
+                                                                        <div class="px-4 sm:px-6">
+                                                                            <div class="flex items-start justify-between">
+                                                                                <h2 class="text-lg font-medium text-gray-900"><?= $productName ?></h2>
+                                                                                <div class="ml-3 h-7 flex items-center">
+                                                                                    <button class="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none" @click="open=false">
+                                                                                        <span class="sr-only">Close</span>
+                                                                                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                                                        </svg>
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div id="php_swatch_gallery_<?= $productId ?>" class="py-4"></div>
+                                                                        <div id="php_product_price_<?= $productId ?>"></div>
+                                                                        <div class="quickviewsidecart-parent-node" @close-quickview.window="open=false">
+                                                                            <div id="php_atc_wrap_<?= $productId ?>" class="kuAddtocart quickview-sidecart !m-0 z-30 bg-white absolute right-0 left-0 bottom-0 p-8" style="display:none;">
+                                                                                <button disabled title="Please choose your options" class="btn bg-ahy-red hover:bg-ahy-red-light rounded-full focus:ring-transparent w-full" id="product-addtocart-button">
+                                                                                    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 ml-4 md:ml-0 lg:ml-2" viewBox="0 0 30.61 25.71">
+                                                                                        <style>.stroke-2{stroke-width:2!important}.cls-1,.cls-2{fill:none!important;stroke:#0d2f47}.cls-1{stroke-linecap:round;stroke-linejoin:round}.cls-2{stroke-miterlimit:10}</style>
+                                                                                        <polyline class="cls-1 stroke-2" points="0.75 0.75 5.51 0.75 10.82 15.88 25.24 15.88 29.86 3.3 10.84 3.3"/>
+                                                                                        <circle class="cls-2 stroke-2" cx="11.98" cy="22.46" r="2.5"/>
+                                                                                        <circle class="cls-2 stroke-2" cx="24.48" cy="22.46" r="2.5"/>
+                                                                                    </svg>
+                                                                                    <span class="w-full font-bold py-3 md:py-0 relative md:left-0">Please Select Options</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div id="php_swatch_html_<?= $productId ?>" class="mb-16"></div>
+                                                                    </div>
+                                                                </div>
+                                                            </section>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+
+                                        <?php else: ?>
+                                            <!-- Simple in stock: Add to Cart -->
+                                                                                        <div style="flex:1;min-width:0;"
+                                                 x-data="{ loading: false }"
+                                                 @click.prevent="
+                                                    if (loading) return;
+                                                    loading = true;
+                                                    const fd = new FormData();
+                                                    fd.append('product', '<?= $productId ?>');
+                                                    fd.append('qty', '1');
+                                                    fd.append('form_key', hyva.getFormKey());
+                                                    fetch('<?= $atcUrl ?>', {
+                                                        method: 'POST',
+                                                        body: new URLSearchParams(fd),
+                                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' }
+                                                    })
+                                                    .then(res => res.ok ? res.json().catch(() => ({})) : {})
+                                                    .then(() => {
+                                                        window.dispatchEvent(new CustomEvent('product-addtocart-success'));
+                                                        window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                                                    })
+                                                    .catch(() => window.dispatchEvent(new CustomEvent('product-addtocart-error')))
+                                                    .finally(() => {
+                                                        setTimeout(() => {
+                                                            loading = false;
+                                                            window.dispatchEvent(new CustomEvent('toggle-cart'));
+                                                        }, 800);
+                                                    });
+                                                 ">
+                                                <button type="button"
+                                                        :disabled="loading"
+                                                        class="capitalize kuBtnDark !flex justify-center items-center w-full !rounded-full !text-white !text-sm !py-1.5 !px-2.5 font-bold !border-0 ahy-plp-add-to-option-size"
+                                                        style="background-color:#0d2f47;cursor:pointer;position:relative;">
+                                                    <template x-if="loading">
+                                                        <span class="absolute inset-0 flex justify-center items-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 128 128">
+                                                                <g>
+                                                                    <circle cx="16" cy="64" r="4" fill="#fff"/>
+                                                                    <circle cx="16" cy="64" r="8" fill="#fff" transform="rotate(45 64 64)"/>
+                                                                    <circle cx="16" cy="64" r="12" fill="#fff" transform="rotate(90 64 64)"/>
+                                                                    <circle cx="16" cy="64" r="16" fill="#fff" transform="rotate(135 64 64)"/>
+                                                                    <animateTransform attributeName="transform" type="rotate" values="45 64 64;90 64 64;135 64 64;180 64 64;225 64 64;270 64 64;315 64 64;0 64 64" calcMode="discrete" dur="960ms" repeatCount="indefinite"/>
+                                                                </g>
+                                                            </svg>
+                                                        </span>
+                                                    </template>
+                                                    <span :style="loading ? 'visibility:hidden' : ''" class="flex items-center gap-1">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 lg:ml-2" viewBox="0 0 30.61 25.71">
+                                                            <polyline fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="0.75 0.75 5.51 0.75 10.82 15.88 25.24 15.88 29.86 3.3 10.84 3.3"/>
+                                                            <circle fill="none" stroke="#ffffff" stroke-width="2.5" stroke-miterlimit="10" cx="11.98" cy="22.46" r="2.5"/>
+                                                            <circle fill="none" stroke="#ffffff" stroke-width="2.5" stroke-miterlimit="10" cx="24.48" cy="22.46" r="2.5"/>
+                                                        </svg>
+                                                        <span class="!text-sm px-2 font-bold">Add to Cart</span>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <!-- Mobile wishlist -->
+                                        <!-- <button x-data="initWishlist()"
+                                                @click.prevent="addToWishlist(<//?= $productId ?>)"
+                                                aria-label="Add to Wish List"
+                                                type="button"
+                                                class="rounded-full w-9 h-9 md:hidden ring-1 ring-gray-300 bg-white p-0 border-0 inline-flex shrink-0 items-center justify-center text-gray-500 hover:text-red-600">
+                                            <svg class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20">
+                                                <path style="fill:#0d2f47;" d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.74,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                            </svg>
+                                        </button> -->
+
+                                    </div>
+                                </div>
+                            </div>
+
+                        </footer>
+                    </div>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+
+        <!-- Pagination — matches Klevu kuPagination style -->
+        <?php if ($totalPages > 1): ?>
+        <div class="kuPagination" style="display:flex;justify-content:center;align-items:center;gap:32px;padding:32px 0;">
+
+            <!-- Prev arrow -->
+            <?php if ($curPage > 1): ?>
+            <a href="<?= $escaper->escapeUrl($block->getPagerUrl($curPage - 1)) ?>" style="text-decoration:none;">
+                <button aria-label="Previous" style="background:#fff;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.12);border-radius:9999px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                    <img src="/media/icons/arrow-nav.svg" class="w-6" style="width:24px;transform:rotate(90deg);margin-right:2px;" alt="Previous">
+                </button>
+            </a>
+            <?php else: ?>
+            <button aria-label="Previous" disabled style="background:#fff;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.12);border-radius:9999px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;opacity:0.3;cursor:not-allowed;">
+                <img src="/media/icons/arrow-nav.svg" style="width:24px;transform:rotate(90deg);margin-right:2px;" alt="Previous">
+            </button>
+            <?php endif; ?>
+
+            <!-- Page X of Y dropdown -->
+            <div x-data="{ open: false }" style="position:relative;display:inline-block;">
+                <a href="javascript:void(0)"
+                   @click.prevent="open = !open"
+                   style="display:flex;align-items:center;gap:6px;color:#0d2f47;text-decoration:none;">
+                    <button type="button" style="display:flex;align-items:center;font-weight:700;color:#0d2f47;background:none;border:none;cursor:pointer;font-size:0.9rem;gap:6px;">
+                        <span>Page <?= (int)$curPage ?> of <?= (int)$totalPages ?></span>
+                        <span :class="{ 'rotate-180': open }"
+                              style="display:inline-block;width:20px;height:20px;background-image:url('/media/icons/arrow-nav.svg');background-size:contain;background-repeat:no-repeat;background-position:center;transition:transform 0.2s;margin-left:4px;"></span>
+                    </button>
+                </a>
+
+                <!-- SVG arrow indicator -->
+                <svg x-show="open" style="position:absolute;left:50%;transform:translateX(-50%);top:28px;width:40px;height:24px;color:#0d2f47;fill:currentColor;stroke:currentColor;z-index:10;" width="8" height="8">
+                    <rect x="14" y="-10" width="35" height="35" transform="rotate(45)"/>
+                </svg>
+
+                <!-- Page dropdown list -->
+                <nav x-show="open"
+                     @click.outside="open = false"
+                     style="position:absolute;left:50%;transform:translateX(-50%);top:44px;z-index:20;width:160px;background:#fff;border-top:2px solid #0d2f47;border-radius:2px;box-shadow:0 4px 16px rgba(13,47,71,0.15);max-height:208px;overflow-y:auto;padding:16px;">
+                    <?php for ($pg = 1; $pg <= $totalPages; $pg++): ?>
+                    <div style="display:flex;padding:12px 0;border-bottom:1px solid #e5e7eb;">
+                        <a href="<?= $escaper->escapeUrl($block->getPagerUrl($pg)) ?>"
+                           @click="open = false"
+                           style="color:#0d2f47;text-decoration:none;font-weight:<?= $pg === $curPage ? '700' : '400' ?>;">
+                            Page <?= (int)$pg ?>
+                        </a>
+                    </div>
+                    <?php endfor; ?>
+                </nav>
+            </div>
+
+            <!-- Next arrow -->
+            <?php if ($curPage < $totalPages): ?>
+            <a href="<?= $escaper->escapeUrl($block->getPagerUrl($curPage + 1)) ?>" style="text-decoration:none;">
+                <button aria-label="Next" style="background:#fff;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.12);border-radius:9999px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                    <img src="/media/icons/arrow-nav.svg" style="width:24px;transform:rotate(270deg);margin-left:2px;" alt="Next">
+                </button>
+            </a>
+            <?php else: ?>
+            <button aria-label="Next" disabled style="background:#fff;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.12);border-radius:9999px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;opacity:0.3;cursor:not-allowed;">
+                <img src="/media/icons/arrow-nav.svg" style="width:24px;transform:rotate(270deg);margin-left:2px;" alt="Next">
+            </button>
+            <?php endif; ?>
+
+        </div>
+        <?php endif; ?>
+
+    </div><!-- end right col -->
+</div><!-- end ahy-php-plp -->
+
+<style>
+/* Grid columns */
+.ahy-php-plp .kuResults ul li { width: 33.33%; }
+.ahy-plp-revamp-price-container{
+    padding: 1rem 1.5rem !important;
+}
+.ahy-plp-normal-price-container{
+    /* padding-left: 0.5rem; */
+    display: flex;
+    flex-direction: column;
+}
+.ahy-plp-normal-price{
+    font-size: 1.5rem;
+    letter-spacing: 0.5px;
+    padding-left: 0.5rem;
+}
+.ahy-plp-non-member-section{
+    font-size: 0.7rem;
+}
+.ahy-plp-non-member-container{
+    text-align: center;
+    padding: 0.3rem 0.7rem;
+    background: #D30100;
+    border-radius: 6px;
+    min-height: 3rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 9rem;
+}
+.calibernation-price-title{
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #dc2626;
+    letter-spacing: 0.04em;
+}
+.ahy-plp-normal-price-title{
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #12334b;
+    letter-spacing: 0.04em;
+    padding-left: 0.5rem;
+}
+.ahy-plp-join-caliber{
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #dc2626;
+    text-decoration: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    width: 100%;
+}
+.ahy-plp-card-container{
+    position: relative;
+    padding-top: 2rem;
+}
+.ahy-plp-member-save-title{
+    font-size: 0.7rem;
+    color: #166534;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+}
+.ahy-plp-member-save-msrp-title{
+    font-size: 0.9rem;
+    color: #166534;
+    font-weight: 700;
+    padding-left: 0.3rem;
+    /* line-height: 1.3;
+    text-align: center; */
+
+}
+.wishlist-icon-position{
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+.ahy-plp-add-to-option-size{
+    padding: 0.8rem !important;
+}
+.ahy-plp-button-container{
+        min-height: 3rem;
+}
+.ahy-plp-member-save-container{
+    background: #dcfce7;
+    padding: 0.3rem 0.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    border-radius: 6px;
+    min-height: 3rem;
+    display: flex;
+    justify-content: center;
+    align-items: start;
+}
+.ahy-plp-msrp-title{
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 6px;
+    padding-left: 0.5rem;
+}
+.ahy-plp-members-save-container{
+    display: flex;
+    flex-direction: column;
+}
+.ahy-plp-add-to-cart-button-container{
+    padding: 1rem 1.5rem 2rem;
+}
+/* Price section — narrower cards due to sidebar, reduce padding vs Klevu */
+.ahy-php-plp .ahy-price-section { padding: 10px 25px 0 !important; }
+.ahy-php-plp .ahy-price-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; background-image: linear-gradient(#e5e7eb, #e5e7eb); background-size: 1px 100%; background-position: center; background-repeat: no-repeat; }
+.ahy-php-plp .ahy-price-grid .caliber-nation-price-col { border-right: none !important; border-bottom:hidden !important; padding-right: 0.5rem;}
+.ahy-php-plp .ahy-price-grid > div { min-width: 0; }
+
+/* Tablet ≤1100px: 2-col cards */
+@media (max-width: 1100px) {
+    .ahy-php-plp .kuResults ul li { width: 50%; }
+}
+
+/* Mobile ≤767px: sidebar stacks above, 1-col cards, vertical card layout — mirrors catnav-styles.css mobile rules */
+@media (max-width: 767px) {
+    .ahy-php-plp { flex-direction: column !important; }
+    .ahy-php-plp-sidebar { width: 100% !important; max-width: 100% !important; }
+    .ahy-php-plp .kuResults ul li { width: 100% !important; }
+    .ahy-php-plp .kuProdWrap { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
+    .ahy-php-plp .kuProdWrap > footer[ku-block] { display: flex !important; flex-direction: column !important; flex: 1 !important; min-width: 0 !important; }
+    .ahy-php-plp .klevuImgWrap { height: 160px !important; }
+    .ahy-php-plp .ahy-price-section { padding: 8px 26px 0 !important; margin-bottom: 20px !important; }
+}
+@media (max-width: 767px) and (min-width: 480px) {
+    .ahy-php-plp .klevuImgWrap { height: 200px !important; }
+}
+@media (max-width: 767px) and (min-width: 640px) {
+    .ahy-php-plp .klevuImgWrap { height: 240px !important; }
+}
+
+/* Very small screens ≤480px: 1-col cards */
+@media (max-width: 480px) {
+    .ahy-php-plp .kuResults ul li {
+        width: 100%;
+    }
+
+    .ahy-plp-non-member-container {
+        text-align: center;
+        padding: 0.3rem 0.7rem;
+        background: #D30100;
+        border-radius: 6px;
+        min-height: 3rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 8.7rem;
+    }
+    .ahy-plp-member-save-title{
+        font-size: 0.7rem;
+        color: #166534;
+        font-weight: 600;
+        line-height: 1.3;
+        text-align: left;
+    }
+    .ahy-plp-member-save-msrp-title{
+    font-size: 0.9rem;
+    color: #166534;
+    font-weight: 700;
+    /* line-height: 1.3;
+    text-align: center; */
+    }
+
+    .ahy-plp-normal-price-container{
+    display: flex;
+    flex-direction: column;
+    }
+
+} /* ← closes @media */
+
+
+/* Pagination dropdown scrollbar — matches Klevu .ahy-swipeable */
+.ahy-php-plp .kuPagination nav {
+    scrollbar-width: thin;
+    scrollbar-color: #0d2f47 #efeadd;
+    filter: drop-shadow(0px 0 11px rgba(13,47,71,0.5));
+}
+.ahy-php-plp .kuPagination nav::-webkit-scrollbar {
+    width: 5px;
+    background-color: #efeadd;
+    border-radius: 17px;
+}
+.ahy-php-plp .kuPagination nav::-webkit-scrollbar-thumb {
+    background-color: #0d2f47;
+    border-radius: 17px;
+}
+</style>
+<script>
+(function() {
+    function ahyAjaxFilter(url) {
+        var container = document.getElementById('ahy-php-plp-container');
+        if (!container) { window.location.href = url; return; }
+        container.style.opacity = '0.4';
+        container.style.pointerEvents = 'none';
+        window.history.pushState({ ahyFilter: true }, '', url);
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var newContainer = doc.getElementById('ahy-php-plp-container');
+                if (!newContainer) { window.location.href = url; return; }
+                var fresh = document.createElement('div');
+                fresh.id = 'ahy-php-plp-container';
+                fresh.className = container.className;
+                fresh.setAttribute('style', newContainer.getAttribute('style') || '');
+                fresh.innerHTML = newContainer.innerHTML;
+                container.parentNode.replaceChild(fresh, container);
+            })
+            .catch(function() { window.location.href = url; });
+    }
+    window.ahyAjaxFilter = ahyAjaxFilter;
+
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('#ahy-php-plp-container a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+        // Only intercept filter sidebar and pagination — let product card links navigate normally
+        var inSidebar = e.target.closest('.ahy-php-plp-sidebar');
+        var inPagination = e.target.closest('.kuPagination');
+        if (!inSidebar && !inPagination) return;
+        e.preventDefault();
+        ahyAjaxFilter(href);
+    });
+
+    window.addEventListener('popstate', function() {
+        ahyAjaxFilter(window.location.href);
+    });
+})();
+</script>

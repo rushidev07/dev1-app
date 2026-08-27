@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!--
+            Override Hyvä's own "header-search" block. A plain template="..."
+            override here doesn't stick: Magento always lets theme-level layout
+            files win over module layout files for the "template" attribute, and
+            Hyva's own default theme resets this block's template to its own
+            stock file regardless of module load order (confirmed directly via
+            Magento's own template hints and temporary debug logging in
+            Magento\Framework\View\Layout\Generator\Block::generateBlock() on
+            2026-08-20).
+
+            That merge only ever touches the "template" attribute, never
+            "class" — so instead of fighting for template=, this assigns a
+            custom class whose getTemplate() ignores whatever "template" value
+            layout XML ends up with and always returns our own path. See
+            Block/HeaderSearchForm.php for details.
+        -->
+        <block name="header-search" class="FalcoSense\Search\Block\HeaderSearchForm"/>
+    </body>
+</page>

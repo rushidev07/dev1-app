@@ -1,0 +1,52 @@
+<?php
+declare(strict_types=1);
+
+namespace FalcoSense\Search\Controller\Search;
+
+use FalcoSense\Search\Helper\Data;
+use FalcoSense\Search\Service\SearchTokenService;
+use Magento\Framework\App\Action\Action;
+use Magento\Framework\App\Action\Context;
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Store\Model\StoreManagerInterface;
+
+/**
+ * Returns a fresh short-lived search token for the current store.
+ * Called client-side when the embedded token has expired (401 from platform).
+ * Not FPC-cached because it is an AJAX/JSON endpoint.
+ */
+class Token extends Action implements HttpGetActionInterface
+{
+    public function __construct(
+        Context                              $context,
+        private readonly JsonFactory         $jsonFactory,
+        private readonly SearchTokenService  $tokenService,
+        private readonly Data                $helper,
+        private readonly StoreManagerInterface $storeManager,
+    ) {
+        parent::__construct($context);
+    }
+
+    public function execute()
+    {
+        $result = $this->jsonFactory->create();
+        $result->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate', true);
+
+        try {
+            $storeId = (int) $this->storeManager->getStore()->getId();
+            $platformStoreId = (int) $this->helper->getPlatformStoreId($storeId);
+            $token = $this->tokenService->getToken($platformStoreId);
+
+            if ($token === '') {
+                return $result->setHttpResponseCode(503)
+                    ->setData(['success' => false, 'error' => 'Token service unavailable.']);
+            }
+
+            return $result->setData(['success' => true, 'token' => $token]);
+        } catch (\Throwable $e) {
+            return $result->setHttpResponseCode(500)
+                ->setData(['success' => false, 'error' => 'Internal error.']);
+        }
+    }
+}

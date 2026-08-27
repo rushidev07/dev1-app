@@ -1,0 +1,389 @@
+<?php
+
+declare(strict_types=1);
+
+use Ahy\ApplePay\ViewModel\Payment\Method\ApplePay as ApplePayViewModel;
+use Ahy\ApplePay\ViewModel\Braintree as BraintreeViewModel;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
+use Magento\Framework\Escaper;
+
+/** @var ViewModelRegistry $viewModels */
+/** @var HyvaCsp $hyvaCsp */
+/** @var Escaper $escaper */
+
+/** @var BraintreeViewModel $braintreeViewModel */
+$braintreeViewModel = $viewModels->require(BraintreeViewModel::class);
+/** @var ApplePayViewModel $applePayViewModel */
+$applePayViewModel = $viewModels->require(ApplePayViewModel::class);
+?>
+
+<div>
+    <script>
+        const braintreeApplePay = () => {
+            return {
+                applePayToken: false,
+                braintreeApplePayMethod: "applepay",
+                braintreeApplePayId: "braintreeApplePay",
+                showApplePayButtonOnCheckout: window.ApplePaySession,
+
+                hasApplePayToken() {
+                    return this.applePayToken;
+                },
+
+                hasNoApplePayToken() {
+                    return !this.applePayToken;
+                },
+
+                initialise() {
+                    console.log('[Pravin Check] initialise() called');
+                    console.log('[Pravin Check]   window.ApplePaySession:', typeof window.ApplePaySession);
+                    console.log('[Pravin Check]   window.braintree?.client VERSION:', window.braintree?.client?.VERSION || 'not loaded');
+                    console.log('[Pravin Check]   window.braintree?.applePay VERSION:', window.braintree?.applePay?.VERSION || 'not loaded');
+                    console.log('[Pravin Check]   window.applePayScript flag:', window.applePayScript);
+                    console.log('[Pravin Check]   customElements.get("apple-pay-button"):', customElements.get('apple-pay-button'));
+
+                    if (!window.ApplePaySession) {
+                        console.warn('[Pravin Check]   BAILING — window.ApplePaySession is falsy');
+                        return;
+                    }
+
+                    const applePayContainer = document.getElementById('payment-method-option-braintree_applepay');
+                    console.log('[Pravin Check]   applePayContainer (#payment-method-option-braintree_applepay):', applePayContainer);
+                    if (applePayContainer) {
+                        applePayContainer.classList.add('braintree-applepay-visible');
+                    } else {
+                        console.warn('[Pravin Check]   applePayContainer NOT FOUND in DOM');
+                    }
+
+                    const requiredJsFiles = [];
+
+                    // Always load 3.111.0 — never trust what other modules set in window.braintree.
+                    // Express buttons may have already set client@3.67.0 / applePay@3.92.2 which would
+                    // cause INCOMPATIBLE_VERSIONS. createScriptLoadPromise deduplicates same-URL tags.
+                    requiredJsFiles.push(this.createScriptLoadPromise('https://js.braintreegateway.com/web/3.111.0/js/client.min.js'));
+                    requiredJsFiles.push(this.createScriptLoadPromise('https://js.braintreegateway.com/web/3.111.0/js/apple-pay.min.js'));
+                    requiredJsFiles.push(this.createScriptLoadPromise('https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js'));
+
+                    console.log('[Pravin Check]   always loading all 3 scripts at 3.111.0 — dedup handles already-in-DOM scripts');
+
+                    Promise.all(requiredJsFiles)
+                        .then(() => {
+                            console.log('[Pravin Check] Promise.all resolved — all scripts done');
+                            console.log('[Pravin Check]   window.braintree.client VERSION:', window.braintree?.client?.VERSION || 'STILL UNDEFINED');
+                            console.log('[Pravin Check]   window.braintree.applePay VERSION:', window.braintree?.applePay?.VERSION || 'STILL UNDEFINED');
+                            console.log('[Pravin Check]   customElements.get("apple-pay-button"):', customElements.get('apple-pay-button'));
+                            return this.initialiseApplePay();
+                        })
+                        .then(this.addEvents.bind(this));
+                },
+
+                async initialiseApplePay() {
+                    console.log('[Pravin Check] initialiseApplePay() called');
+                    console.log('[Pravin Check]   this.applePayToken:', this.applePayToken);
+
+                    if (this.applePayToken) {
+                        console.log('[Pravin Check]   BAILING — applePayToken already set');
+                        return;
+                    }
+
+                    console.log('[Pravin Check]   window.braintree.client:', window.braintree?.client?.VERSION || 'UNDEFINED');
+                    console.log('[Pravin Check]   window.ApplePaySession.canMakePayments():', window.ApplePaySession?.canMakePayments());
+
+                    if (!window.braintree.client || !window.ApplePaySession.canMakePayments()) {
+                        console.warn('[Pravin Check]   BAILING — braintree.client missing or canMakePayments() false');
+                        return;
+                    }
+
+                    console.log('[Pravin Check]   calling braintree.client.create...');
+                    let clientInstance;
+                    try {
+                        clientInstance = await window.braintree.client.create({
+                            authorization: "<?= $escaper->escapeJs($braintreeViewModel->getClientToken()) ?>",
+                        });
+                        console.log('[Pravin Check]   braintree.client.create SUCCESS');
+                    } catch (err) {
+                        console.error('[Pravin Check]   braintree.client.create FAILED:', err);
+                        return;
+                    }
+
+                    console.log('[Pravin Check]   calling braintree.applePay.create...');
+                    let applePayInstance;
+                    try {
+                        applePayInstance = await window.braintree.applePay.create({
+                            client: clientInstance,
+                        });
+                        console.log('[Pravin Check]   braintree.applePay.create SUCCESS');
+                    } catch (err) {
+                        console.error('[Pravin Check]   braintree.applePay.create FAILED:', err);
+                        return;
+                    }
+
+                    console.log('[Pravin Check]   creating <apple-pay-button> element...');
+                    console.log('[Pravin Check]   customElements.get("apple-pay-button") BEFORE createElement:', customElements.get('apple-pay-button'));
+                    const applePayButton = document.createElement('apple-pay-button');
+                    console.log('[Pravin Check]   <apple-pay-button> created:', applePayButton, '| constructor:', applePayButton.constructor.name);
+                    applePayButton.buttonstyle = "black";
+                    applePayButton.addEventListener('click', async (e) => {
+                        this.showLoader();
+
+                        const totalElement = document.querySelector('[data-grand-total]');
+                        const grandTotal = totalElement?.dataset?.grandTotal;
+
+                        var paymentRequest = applePayInstance.createPaymentRequest({
+                            total: {
+                                label: '<?= $escaper->escapeJs($applePayViewModel->getMerchantName()) ?>',
+                                amount: Number(grandTotal).toFixed(2),
+                            },
+                            currencyCode: '<?= $escaper->escapeJs($braintreeViewModel->getCurrency()) ?>',
+                        });
+
+                        if (!paymentRequest) {
+                            // TODO: Test this:
+                            fetch('/rest/V1/applepay/frontend/log', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    message: 'Failed to create Apple Pay paymentRequest',
+                                    level: 'error'
+                                })
+                            });
+
+                            this.showError('<?= $escaper->escapeJs(
+                                __('Braintree ApplePay unable to create paymentRequest.')
+                            ) ?>');
+                        }
+
+                        try {
+                            var session = new ApplePaySession(1, paymentRequest);
+                            session.onvalidatemerchant = function(event) {
+                                applePayInstance.performValidation({
+                                    validationURL: event.validationURL,
+                                    displayName: '<?= $escaper->escapeJs($applePayViewModel->getMerchantName()) ?>',
+                                }, function(validationErr, merchantSession) {
+                                    if (validationErr) {
+                                        session.abort();
+                                        console.error('Braintree ApplePay Error validating merchant: ', validationErr);
+                                        this.showError('<?= $escaper->escapeJs(__('Error validating merchant.')) ?>');
+
+                                        // TODO: Test this:
+                                        fetch('/rest/V1/applepay/frontend/log', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                message: {
+                                                    event: 'merchant_validation_failed',
+                                                    error: validationErr
+                                                },
+                                                level: 'error'
+                                            })
+                                        });
+
+                                        return;
+                                    }
+
+                                    session.completeMerchantValidation(merchantSession);
+                                });
+                            };
+
+                            session.oncancel = () => {
+                                this.showError('<?= $escaper->escapeJs(__('Payment cancelled.')) ?>');
+
+                                // TODO: Test this:
+                                fetch('/rest/V1/applepay/frontend/log', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        message: 'Apple Pay session cancelled by user',
+                                        level: 'warning'
+                                    })
+                                });
+                            }
+
+                            session.onpaymentauthorized = (event) => {
+                                applePayInstance.tokenize({
+                                    token: event.payment.token
+                                }, async (tokenizeErr, payload) => {
+                                    if (tokenizeErr) {
+                                        console.error('Error tokenizing Apple Pay:', tokenizeErr);
+                                        this.showError('<?= $escaper->escapeJs(__('Error authorizing payment.')) ?>');
+                                        session.completePayment(ApplePaySession.STATUS_FAILURE);
+
+                                        // TODO: Test this:
+                                        fetch('/rest/V1/applepay/frontend/log', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                message: {
+                                                    event: 'applepay_tokenization_failed',
+                                                    error: tokenizeErr
+                                                },
+                                                level: 'error'
+                                            })
+                                        });
+
+                                        return;
+                                    }
+
+                                    await Magewire.find('checkout.payment.method.' + this.braintreeApplePayMethod).setToken(payload.nonce);
+                                    this.applePayToken = true;
+                                    this.clearError();
+                                    session.completePayment(ApplePaySession.STATUS_SUCCESS);
+                                });
+                            };
+
+                            session.begin();
+                        } catch (err) {
+                            console.error('Braintree ApplePay Unable to create ApplePaySession', err);
+                            this.showError('<?= $escaper->escapeJs(__('Unable to create Apple Pay session.')) ?>');
+                            return;
+                        }
+                    });
+
+                    const applePayElement = document.getElementById('braintreeApplePayButton');
+                    console.log('[Pravin Check]   #braintreeApplePayButton element:', applePayElement, '| childElementCount:', applePayElement?.childElementCount);
+
+                    if (!applePayElement) {
+                        console.error('[Pravin Check]   #braintreeApplePayButton NOT FOUND in DOM — button cannot be appended');
+                    } else if (applePayElement.childElementCount > 0) {
+                        console.log('[Pravin Check]   #braintreeApplePayButton already has children — skipping append');
+                    } else {
+                        applePayElement.append(applePayButton);
+                        console.log('[Pravin Check]   <apple-pay-button> appended to #braintreeApplePayButton');
+                        console.log('[Pravin Check]   customElements.get("apple-pay-button") AFTER append:', customElements.get('apple-pay-button'));
+                        console.log('[Pravin Check]   applePayButton.offsetHeight after append:', applePayButton.offsetHeight, '(0 = invisible/unregistered web component)');
+                    }
+                },
+
+                addEvents() {
+                    window.addEventListener('checkout:init:after', () => {
+                        hyvaCheckout.validation.register(this.braintreeApplePayId, async function () {
+                            if (!this.applePayToken) {
+                                this.showError('<?= $escaper->escapeJs(
+                                    __('Please complete payment validation with Apple Pay first.')
+                                ) ?>');
+                            }
+
+                            return this.applePayToken || false;
+                        }.bind(this), document.getElementById(this.braintreeApplePayId));
+                    }, {
+                        once: true
+                    });
+
+                    window.Magewire.hook('message.processed', (message, component) => {
+                        if (component.id === 'checkout.billing-details.address-list') {
+                            this.applePayToken = false;
+
+                            // TODO: Test this:
+                            fetch('/rest/V1/applepay/frontend/log', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    message: 'Apple Pay token cleared due to address change',
+                                    level: 'info'
+                                })
+                            });
+                        }
+
+                        const method = message.updateQueue[0].method;
+
+                        if (method !== 'setToken'
+                            && component.id === 'checkout.payment.method.applepay'
+                            && !this.applePayToken) {
+                            this.initialiseApplePay();
+                        }
+                    }, { once: true });
+
+                    Magewire.on('payment_method_selected', (obj) => {
+                        if (!obj) return;
+
+                        const method = obj.method;
+                        if (method !== this.braintreeApplePayMethod.replace('-', '_')) {
+                            hyvaCheckout.validation.remove(this.braintreeApplePayId);
+                        }
+                    });
+                },
+
+                createScriptLoadPromise(url) {
+                    console.log('[Pravin Check] createScriptLoadPromise() called for:', url);
+                    return new Promise((resolve, reject) => {
+                        const existing = document.querySelector('script[src="' + url + '"]');
+                        if (existing) {
+                            console.log('[Pravin Check]   already in DOM:', url, '| loaded:', !!existing.dataset.scriptLoaded);
+                            if (existing.dataset.scriptLoaded) {
+                                resolve();
+                            } else {
+                                existing.addEventListener('load', resolve, { once: true });
+                                existing.addEventListener('error', reject, { once: true });
+                            }
+                            return;
+                        }
+
+                        const script = document.createElement('script');
+                        script.src = url;
+
+                        script.addEventListener('load', function() {
+                            console.log('[Pravin Check] Script load event fired:', url);
+                            script.dataset.scriptLoaded = '1';
+                            resolve();
+                        }, false);
+
+                        script.addEventListener('error', function(event) {
+
+                            // TODO: Test this:
+                            fetch('/rest/V1/applepay/frontend/log', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    message: {
+                                        event: 'script_load_failed',
+                                        src: url
+                                    },
+                                    level: 'error'
+                                })
+                            });
+
+                            reject();
+                        }, false);
+
+                        document.body.appendChild(script);
+                    })
+                },
+
+                showLoader() {
+                    window.dispatchEvent(new Event('magewire:loader:start'));
+                },
+
+                hideLoader() {
+                    window.dispatchEvent(new Event('magewire:loader:done'));
+                },
+
+                showError(message) {
+                    this.hideLoader();
+                    hyvaCheckout.payment.dispatchExceptionMessage(
+                        message,
+                        'error'
+                    );
+                },
+
+                clearError() {
+                    hyvaCheckout.payment.dispatchSuccessMessage('');
+                }
+            }
+        };
+
+        window.addEventListener('alpine:init', () => Alpine.data('braintreeApplePay', braintreeApplePay), { once: true })
+    </script>
+    <!-- <?//php $hyvaCsp->registerInlineScript(); ?> -->
+</div>
+<style>
+    apple-pay-button {
+        display: inline-block;
+        width: 100%;
+    }
+
+    apple-pay-button .apple-pay-btn {
+        padding: 0.4rem;
+        border-radius: 100vh;
+    }
+</style>

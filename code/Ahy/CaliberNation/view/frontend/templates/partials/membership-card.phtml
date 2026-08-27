@@ -1,0 +1,116 @@
+<?php
+/**
+ * Caliber Nation — Reusable Premium Membership Card
+ *
+ * Usage:
+ *   $card = $block->getLayout()
+ *       ->createBlock(\Magento\Framework\View\Element\Template::class)
+ *       ->setTemplate('Ahy_CaliberNation::partials/membership-card.phtml')
+ *       ->setData('member_name', 'JOHN DOE')   // optional
+ *       ->setData('tier', 'ANNUAL');            // optional, defaults to ANNUAL
+ *
+ *   echo '<div style="max-width:320px;">' . $card->toHtml() . '</div>';
+ *
+ * All sizing uses cqw (CSS container query width units) via inline styles —
+ * no <style> block needed, works identically at any container width.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ */
+
+$memberName = strtoupper((string) ($block->getData('member_name') ?: ''));
+$tier       = strtoupper((string) ($block->getData('tier')        ?: 'ANNUAL'));
+?>
+
+<div class="relative rounded-2xl overflow-hidden w-full"
+     style="container-type: inline-size;
+            aspect-ratio: 1.586 / 1;
+            background-color: #0d2f47;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1),
+                        0 30px 70px rgba(0,0,0,0.55),
+                        0 0 0 1px rgba(255,255,255,0.06);">
+
+    <!-- Diagonal stripe texture -->
+    <div class="absolute inset-0 pointer-events-none"
+         style="background-image: repeating-linear-gradient(
+                    135deg,
+                    transparent,
+                    transparent 20px,
+                    rgba(255,255,255,0.022) 20px,
+                    rgba(255,255,255,0.022) 21px
+                );"></div>
+
+    <!-- Top-left blue radial glow -->
+    <div class="absolute inset-0 pointer-events-none"
+         style="background: radial-gradient(ellipse at 12% 18%, rgba(6,79,132,0.7) 0%, transparent 55%);"></div>
+
+    <!-- Bottom-right red warmth -->
+    <div class="absolute inset-0 pointer-events-none"
+         style="background: radial-gradient(ellipse at 88% 88%, rgba(216,58,58,0.15) 0%, transparent 45%);"></div>
+
+    <!-- Faint "CN" watermark -->
+    <div class="absolute -translate-y-1/2 font-league-gothic text-white select-none pointer-events-none leading-none"
+         style="top: 43%; right: 3.5cqw; font-size: 37.5cqw; opacity: 0.035;">CN</div>
+
+    <!-- Red bottom accent bar -->
+    <div class="absolute bottom-0 left-0 right-0 pointer-events-none"
+         style="height: 1.25cqw;
+                background: linear-gradient(90deg, #d83a3a 0%, #ff4545 50%, #d83a3a 100%);"></div>
+
+    <!-- Card content -->
+    <div class="relative h-full flex flex-col"
+         style="padding: 5.5cqw 7cqw 6cqw 7cqw;">
+
+        <!-- TOP: Hero text -->
+        <div>
+            <h2 class="font-league-gothic text-white select-none"
+                style="font-size: 15cqw;
+                       line-height: 0.88;
+                       letter-spacing: 0.02em;
+                       text-shadow: 0 2px 24px rgba(0,0,0,0.35);">
+                CALIBER<br/>NATION
+            </h2>
+        </div>
+
+        <!-- FOOTER: always pinned to bottom -->
+        <div class="mt-auto">
+            <div style="height: 1px;
+                        margin-bottom: 1cqw;
+                        background: linear-gradient(90deg, rgba(216,58,58,0.85) 0%, rgba(216,58,58,0.2) 100%);"></div>
+            <div class="flex items-end justify-between">
+
+                <?php if ($memberName): ?>
+                <div>
+                    <p class="text-white uppercase"
+                       style="font-size: 3.6cqw; opacity: 0.4; letter-spacing: 0.16em; margin-bottom: 1cqw;">
+                        Member Name
+                    </p>
+                    <p class="text-white font-semibold uppercase"
+                       style="font-size: 4cqw; letter-spacing: 0.13em;">
+                        <?= htmlspecialchars($memberName) ?>
+                    </p>
+                </div>
+                <?php else: ?>
+                <div>
+                    <p class="text-white font-semibold uppercase"
+                       style="font-size: 4cqw; letter-spacing: 0.13em; opacity: 0.5;">
+                        Caliber Nation
+                    </p>
+                </div>
+                <?php endif; ?>
+
+                <div class="text-right">
+                    <p class="text-white uppercase"
+                       style="font-size: 3.6cqw; opacity: 0.4; letter-spacing: 0.16em; margin-bottom: 1cqw;">
+                        Plan
+                    </p>
+                    <p class="font-bold uppercase"
+                       style="font-size: 4cqw; letter-spacing: 0.1em; color: #d83a3a;">
+                        <?= htmlspecialchars($tier) ?>
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>

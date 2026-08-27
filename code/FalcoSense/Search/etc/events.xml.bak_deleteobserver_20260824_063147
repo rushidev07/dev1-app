@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+
+    <!-- Fires after any product is saved — checks relevant attribute changes before queuing -->
+    <event name="catalog_product_save_after">
+        <observer name="falcosense_search_product_save"
+                  instance="FalcoSense\Search\Observer\ProductSaveObserver"/>
+    </event>
+
+    <!-- Fires after stock qty / in_stock changes -->
+    <event name="cataloginventory_stock_item_save_after">
+        <observer name="falcosense_search_stock_change"
+                  instance="FalcoSense\Search\Observer\StockChangeObserver"/>
+    </event>
+
+    <!-- Fires in global scope after order is placed (Hyva/Magewire checkout runs outside frontend scope) -->
+    <event name="sales_order_place_after">
+        <observer name="ahy_smartsearch_purchase_global"
+                  instance="FalcoSense\Search\Observer\PurchaseObserver"/>
+    </event>
+
+
+</config>

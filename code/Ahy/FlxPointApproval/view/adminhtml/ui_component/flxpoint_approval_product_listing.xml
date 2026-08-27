@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">flxpoint_approval_product_listing.flxpoint_approval_product_listing_data_source</item>
+        </item>
+    </argument>
+
+    <settings>
+        <spinner>flxpoint_approval_product_listing_columns</spinner>
+        <deps>
+            <dep>flxpoint_approval_product_listing.flxpoint_approval_product_listing_data_source</dep>
+        </deps>
+    </settings>
+
+    <!-- Data Source -->
+    <dataSource name="flxpoint_approval_product_listing_data_source" component="Magento_Ui/js/grid/provider">
+        <settings>
+            <storageConfig>
+                <param name="indexField" xsi:type="string">entity_id</param>
+            </storageConfig>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Ahy_FlxPointApproval::product_approval</aclResource>
+        <dataProvider class="Ahy\FlxPointApproval\Ui\DataProvider\Product\ListingDataProvider"
+                      name="flxpoint_approval_product_listing_data_source">
+            <settings>
+                <requestFieldName>entity_id</requestFieldName>
+                <primaryFieldName>entity_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+
+    <!-- Listing Toolbar -->
+    <listingToolbar name="listing_top">
+        <settings>
+            <sticky>true</sticky>
+        </settings>
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
+        <filters name="listing_filters">
+            <settings>
+                <templates>
+                    <filters>
+                        <select>
+                            <param name="template" xsi:type="string">ui/grid/filters/elements/ui-select</param>
+                            <param name="component" xsi:type="string">Magento_Ui/js/form/element/ui-select</param>
+                        </select>
+                    </filters>
+                </templates>
+            </settings>
+        </filters>
+        <massaction name="listing_massaction">
+            <action name="approve">
+                <settings>
+                    <url path="ahy_flxpoint_approval/product/massApprove"/>
+                    <type>approve</type>
+                    <label translate="true">Approve</label>
+                    <confirm>
+                        <title translate="true">Approve Products</title>
+                        <message translate="true">Are you sure you want to approve the selected products? This will trigger their import into Magento.</message>
+                    </confirm>
+                </settings>
+            </action>
+            <action name="reject">
+                <settings>
+                    <url path="ahy_flxpoint_approval/product/massRejectForm"/>
+                    <type>reject</type>
+                    <label translate="true">Reject</label>
+                </settings>
+            </action>
+        </massaction>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+
+    <!-- Columns -->
+    <columns name="flxpoint_approval_product_listing_columns">
+        <settings>
+            <editorConfig>
+                <param name="selectProvider" xsi:type="string">flxpoint_approval_product_listing.flxpoint_approval_product_listing.flxpoint_approval_product_listing_columns.ids</param>
+                <param name="enabled" xsi:type="boolean">false</param>
+            </editorConfig>
+            <childDefaults>
+                <param name="fieldAction" xsi:type="array">
+                    <item name="provider" xsi:type="string">flxpoint_approval_product_listing.flxpoint_approval_product_listing.flxpoint_approval_product_listing_columns_editor</item>
+                    <item name="target" xsi:type="string">startEdit</item>
+                    <item name="params" xsi:type="array">
+                        <item name="0" xsi:type="string">${ $.$data.rowIndex }</item>
+                        <item name="1" xsi:type="boolean">true</item>
+                    </item>
+                </param>
+            </childDefaults>
+        </settings>
+
+        <!-- Checkbox Column -->
+        <selectionsColumn name="ids">
+            <settings>
+                <indexField>entity_id</indexField>
+            </settings>
+        </selectionsColumn>
+
+        <!-- entity_id -->
+        <column name="entity_id">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">ID</label>
+                <sorting>asc</sorting>
+            </settings>
+        </column>
+
+        <!-- sku -->
+        <column name="sku">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">SKU</label>
+            </settings>
+        </column>
+
+        <!-- name -->
+        <column name="name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Product Name</label>
+            </settings>
+        </column>
+
+        <!-- product_type -->
+        <column name="product_type" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <options class="Ahy\FlxPointApproval\Ui\Source\ProductType"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Type</label>
+            </settings>
+        </column>
+
+        <!-- attribute_set_code -->
+        <column name="attribute_set_code">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Attribute Set</label>
+            </settings>
+        </column>
+
+        <!-- price -->
+        <column name="price">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">Price</label>
+            </settings>
+        </column>
+
+        <!-- qty -->
+        <column name="qty">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">Qty</label>
+            </settings>
+        </column>
+
+        <!-- seller_id -->
+        <column name="seller_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Seller ID</label>
+            </settings>
+        </column>
+
+        <!-- status -->
+        <column name="status" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <options class="Ahy\FlxPointApproval\Ui\Source\ApprovalStatus"/>
+                <filter>select</filter>
+                <dataType>select</dataType>
+                <label translate="true">Status</label>
+            </settings>
+        </column>
+
+        <!-- created_at -->
+        <column name="created_at" class="Magento\Ui\Component\Listing\Columns\Date"
+                component="Magento_Ui/js/grid/columns/date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Staged At</label>
+            </settings>
+        </column>
+
+        <!-- Actions Column -->
+        <actionsColumn name="actions" class="Ahy\FlxPointApproval\Ui\Component\Listing\Column\ProductActions">
+            <settings>
+                <indexField>entity_id</indexField>
+                <label translate="true">Actions</label>
+            </settings>
+        </actionsColumn>
+    </columns>
+</listing>

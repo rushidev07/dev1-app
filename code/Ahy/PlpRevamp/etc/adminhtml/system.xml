@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="ahy_plprevamp" translate="label" type="text" sortOrder="400" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>AHY PLP Revamp</label>
+            <tab>catalog</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="featured_products" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Featured Products</label>
+                <field id="marketplace_seller_id" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Marketplace Seller ID</label>
+                    <comment>seller_id from marketplace_userdata table. Filters featured products fallback to this seller only. Leave empty to show all sellers.</comment>
+                </field>
+            </group>
+            <group id="all_brands" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>All Brands Page</label>
+                <field id="banner_image" translate="label comment" type="image" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Banner Image</label>
+                    <comment>Displayed as full-width background banner at the top of the All Brands page (/allbrands). Recommended: 1920×400px.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Image</backend_model>
+                    <upload_dir config="system/filesystem/media" scope_info="1">ahy_plprevamp/banner</upload_dir>
+                    <base_url type="media" scope_info="1">ahy_plprevamp/banner</base_url>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

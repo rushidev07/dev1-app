@@ -1,0 +1,46 @@
+<?php
+/**
+ * Visitor cookie script — sets _ahy_vid on every frontend page.
+ *
+ * _ahy_vid  : persistent UUID visitor ID (1 year), used to correlate:
+ *             - anonymous browsing → login → purchases
+ *             - search queries → PDP views → add-to-cart
+ *
+ * Best-practice notes:
+ *   - SameSite=Lax  : cookie sent on top-level navigation, blocked on cross-site POSTs
+ *   - NOT HttpOnly  : must be readable by the tracking JS
+ *   - First-party   : set on your own domain, not a third-party tracker
+ *   - crypto.getRandomValues : cryptographically secure UUID v4 (not Math.random)
+ */
+?>
+<script>
+(function () {
+    'use strict';
+
+    var COOKIE_NAME = '_ahy_vid';
+    var ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+    function getCookie(name) {
+        var match = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    function setCookie(name, value) {
+        var expires = new Date(Date.now() + ONE_YEAR_MS).toUTCString();
+        document.cookie = name + '=' + encodeURIComponent(value)
+            + '; path=/; expires=' + expires + '; SameSite=Lax';
+    }
+
+    function uuid4() {
+        // RFC 4122 version 4 UUID using crypto.getRandomValues
+        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
+            var r = crypto.getRandomValues(new Uint8Array(1))[0];
+            return (c ^ r & 15 >> c / 4).toString(16);
+        });
+    }
+
+    if (!getCookie(COOKIE_NAME)) {
+        setCookie(COOKIE_NAME, uuid4());
+    }
+}());
+</script>

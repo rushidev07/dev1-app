@@ -1,0 +1,28 @@
+<?php                                                                                                                                                                                             
+  declare(strict_types=1);                
+  use Magento\Framework\Escaper;                                                                                                                                                                    
+  use Magento\LayeredNavigation\Block\Navigation\State;                                                                                                                                             
+  /** @var State $block */                    
+  /** @var Escaper $escaper */                                                                                                                                                                      
+  $filters = $block->getActiveFilters();
+  ?>                                                                                                                                                                                                
+  <?php if (!empty($filters)): ?>         
+  <div style="margin-bottom:16px;">                                                                                                                                                                 
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">                                                                                                
+          <span style="font-size:0.75rem;font-weight:700;color:#0d2f47;text-transform:uppercase;letter-spacing:0.05em;">Filter By</span>
+          <?php if ($block->getLayer()->getState()->getFilters()): ?>                                                                                                                               
+              <a href="<?= $escaper->escapeUrl($block->getClearUrl()) ?>"
+                 style="font-size:0.75rem;font-weight:700;color:#0d2f47;text-decoration:none;">Clear all</a>                                                                                        
+          <?php endif; ?>                                                                                                                                                                           
+      </div>                                                                                                                                                                                        
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">                                                                                                                                            
+          <?php foreach ($filters as $filter): ?>                                                                                                                                                   
+              <a href="<?= $escaper->escapeUrl($filter->getRemoveUrl()) ?>"
+                 style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid #0d2f47;font-size:0.8rem;color:#0d2f47;text-decoration:none;border-radius:2px;">           
+                  <?= $escaper->escapeHtml($block->stripTags($filter->getLabel())) ?>                                                                                                               
+                  <span style="font-size:1rem;line-height:1;">×</span>
+              </a>                                                                                                                                                                                  
+          <?php endforeach; ?>                                                                                                                                                                      
+      </div>                                                                                                                                                                                        
+  </div>                                                                                                                                                                                            
+  <?php endif; ?>

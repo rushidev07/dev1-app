@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="1column"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="Ahy_PlpRevamp::css/catnav-styles.css"/>
+    </head>
+    <body>
+        <!-- Diagnostic marker: appears in page source only if this handle is really active. -->
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Text" name="ahy_marker_smartsearch_result_index">
+                <arguments>
+                    <argument name="text" xsi:type="string">&lt;script&gt;console.log('%c[AHY LAYOUT]%c handle fired: smartsearch_result_index','background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:700','');window.AHY_LAYOUT_HANDLES=(window.AHY_LAYOUT_HANDLES||[]).concat('smartsearch_result_index');&lt;/script&gt;&lt;!-- AHY-ACTIVE-HANDLE: smartsearch_result_index --&gt;</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+
+        <!-- Drop FalcoSense's grid where it is declared (no-op on handles where it isn't). -->
+        <referenceBlock name="ahy_smartsearch_search" remove="true"/>
+
+        <!-- PlpRevamp grid. Same FalcoSense block class, so the search engine/API/token are unchanged. -->
+        <referenceContainer name="content">
+            <block class="FalcoSense\Search\Block\Search"
+                   name="ahy_plprevamp_search_grid"
+                   template="Ahy_PlpRevamp::search/falco_search_grid.phtml"
+                   cacheable="false"
+                   before="-"/>
+        </referenceContainer>
+
+        <!--
+            FalcoSense intends this cleanup in its own fs_search_index.xml, but that filename maps
+            to a handle that never fires, so it never applied. Replicated here: keeps native search
+            blocks from loading Elasticsearch collections and removes the stray 2-column sidebar.
+        -->
+        <referenceBlock name="search.result"           remove="true"/>
+        <referenceBlock name="search_result_list"      remove="true"/>
+        <referenceBlock name="search.search_terms_log" remove="true"/>
+        <referenceBlock name="catalogsearch.leftnav"   remove="true"/>
+        <referenceBlock name="klevu_content_top"       remove="true"/>
+        <referenceBlock name="catalog.compare.sidebar" remove="true"/>
+        <referenceBlock name="mpassign.list"           remove="true"/>
+        <referenceContainer name="sidebar.main"        remove="true"/>
+        <referenceContainer name="sidebar.additional"  remove="true"/>
+    </body>
+</page>
