@@ -25,7 +25,7 @@
              action="calibernation/sellerpricing/index"
              resource="Ahy_CaliberNation::seller_pricing"/>
         <add id="Ahy_CaliberNation::price_rules"
-             title="Member Price Rules"
+             title="Category Level Discounts"
              translate="title"
              module="Ahy_CaliberNation"
              sortOrder="30"

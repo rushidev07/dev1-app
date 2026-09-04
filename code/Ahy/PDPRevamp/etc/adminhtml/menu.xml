@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+    Placed under Marketing > Promotions (Magento_CatalogRule::promo), the same
+    group Cart Price Rules sits in - these coupons all belong to one such rule, so
+    that is where an admin looking for them will start. Reports would be the wrong
+    home: the grid is operational (which codes exist, which converted, which
+    expired) rather than an aggregate.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Ahy_PDPRevamp::exit_coupon_claims"
+             title="PDP Exit Popup Claims"
+             module="Ahy_PDPRevamp"
+             sortOrder="100"
+             parent="Magento_CatalogRule::promo"
+             action="ahy_pdprevamp/exitcouponclaim/index"
+             resource="Ahy_PDPRevamp::exit_coupon_claims"/>
+    </menu>
+</config>

@@ -236,12 +236,25 @@ $viewModel  = $block->getData('view_model');
                     <?= $escaper->escapeHtml(__('Payment Method')) ?>
                 </dt>
                 <dd class="font-bold text-ahy-blue leading-snug">
-                    <?= $escaper->escapeHtml($viewModel->getPaymentMethodSummary()) ?>
-                    <?php $expiry = $viewModel->getPaymentMethodExpiry(); ?>
-                    <?php if ($expiry): ?>
-                        <span class="block text-xs font-normal text-gray-500 mt-0.5">
-                            <?= $escaper->escapeHtml(__('Exp.') . ' ' . $expiry) ?>
+                    <?php if ($viewModel->isRenewalCardExpired()): ?>
+                        <?php /* The bound card is past its expiry date. Without this the panel
+                                 showed "Not set", which reads as "you never added a card" and
+                                 hides the real problem: auto-renew cannot charge this card. */ ?>
+                        <span class="text-ahy-red"><?= $escaper->escapeHtml($viewModel->getExpiredCardSummary()) ?></span>
+                        <span class="block text-xs font-bold text-ahy-red mt-1">
+                            <?= $escaper->escapeHtml(__('Card expired %1', $viewModel->getExpiredCardExpiry())) ?>
                         </span>
+                        <span class="block text-xs font-normal text-gray-600 mt-1">
+                            <?= $escaper->escapeHtml(__('Add a new card to keep your membership renewing.')) ?>
+                        </span>
+                    <?php else: ?>
+                        <?= $escaper->escapeHtml($viewModel->getPaymentMethodSummary()) ?>
+                        <?php $expiry = $viewModel->getPaymentMethodExpiry(); ?>
+                        <?php if ($expiry): ?>
+                            <span class="block text-xs font-normal text-gray-500 mt-0.5">
+                                <?= $escaper->escapeHtml(__('Exp.') . ' ' . $expiry) ?>
+                            </span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </dd>
             </div>
@@ -264,7 +277,7 @@ $viewModel  = $block->getData('view_model');
     </div>
 </div>
 
-<?php elseif ($viewModel->isExpired() && !$viewModel->isRefundReviewed()): ?>
+<?php elseif ($viewModel->isExpired()): ?>
 <!-- ═══════════════════════════════════════════════════════════════════════
      STATE B — Expired / Renewal Pending
      ═══════════════════════════════════════════════════════════════════ -->

@@ -1,0 +1,40 @@
+<?php
+/**
+ * PDP "Video" tab content. See Block\Product\View\ProductVideo for where
+ * the video comes from (the product's own media gallery, attached via the
+ * standard admin Add Video dialog).
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\ProductVideo;
+use Magento\Framework\Escaper;
+
+/** @var ProductVideo $block */
+/** @var Escaper $escaper */
+
+$video = $block->getVideo();
+?>
+<?php if (!$video): ?>
+    <div class="text-sm" style="color:#6b7688;">
+        <?= __('Video coming soon.') ?>
+    </div>
+<?php else: ?>
+    <h3 class="font-bold text-ahy-blue text-lg mb-4"><?= __('Product Video') ?></h3>
+    <div class="rounded-lg overflow-hidden border border-gray-200" style="aspect-ratio:16/9;">
+        <iframe
+            src="<?= $escaper->escapeUrl($video['embedUrl']) ?>"
+            title="<?= $escaper->escapeHtmlAttr($video['title'] ?: __('Product video')) ?>"
+            class="w-full h-full"
+            style="border:0;"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            loading="lazy"
+        ></iframe>
+    </div>
+    <?php if ($video['description']): ?>
+        <p class="text-sm mt-3" style="color:#4a5a74;">
+            <?= $escaper->escapeHtml($video['description']) ?>
+        </p>
+    <?php endif; ?>
+<?php endif; ?>

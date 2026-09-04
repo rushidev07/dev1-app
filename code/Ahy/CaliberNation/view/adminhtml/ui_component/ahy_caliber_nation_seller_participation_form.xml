@@ -53,7 +53,8 @@
             <argument name="data" xsi:type="array">
                 <item name="options" xsi:type="object">Ahy\CaliberNation\Model\Seller\Options</item>
                 <item name="config" xsi:type="array">
-                    <item name="component" xsi:type="string">Magento_Ui/js/form/element/ui-select</item>
+                    <item name="component" xsi:type="string">Ahy_CaliberNation/js/form/element/disabled-ui-select</item>
+                    <item name="disabledMessage" xsi:type="string">"%1" is already participating. Please edit the existing record instead.</item>
                     <item name="elementTmpl" xsi:type="string">ui/grid/filters/elements/ui-select</item>
                     <item name="filterOptions" xsi:type="boolean">true</item>
                     <item name="multiple" xsi:type="boolean">false</item>
@@ -108,6 +109,22 @@
                     <rule name="validate-zero-or-greater" xsi:type="boolean">true</rule>
                 </validation>
             </settings>
+        </field>
+
+        <!-- ── Early Access ──────────────────────────────────────────────────── -->
+        <field name="is_early_access" formElement="select">
+            <settings>
+                <dataType>number</dataType>
+                <label translate="true">Early Access</label>
+                <notice translate="true">When Yes, all products from this seller are flagged for early access.</notice>
+            </settings>
+            <formElements>
+                <select>
+                    <settings>
+                        <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                    </settings>
+                </select>
+            </formElements>
         </field>
     </fieldset>
 </form>

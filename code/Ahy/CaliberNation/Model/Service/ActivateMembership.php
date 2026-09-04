@@ -58,7 +58,7 @@ class ActivateMembership
         ?int $orderId = null
     ): MembershipInterface {
         $now         = date('Y-m-d H:i:s');
-        $months      = $this->config->getMembershipDurationMonths();
+        $months      = $this->config->getSignupTermMonths();
         $renewalDate = date('Y-m-d H:i:s', strtotime("+{$months} months"));
 
         try {

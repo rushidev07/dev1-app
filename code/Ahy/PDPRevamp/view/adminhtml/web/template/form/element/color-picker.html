@@ -1,0 +1,42 @@
+<!--
+/**
+ * Colour column in the Configurations grid. When no explicit hex has been
+ * set for this variant, VariantColorColumn may pre-fill this with the
+ * Color option's own two-color pair (e.g. "#000000,#0000FF" for "Black &
+ * Blue") rather than a single hex - a native <input type="color"> can't
+ * display that at all, so the visible box below renders it as the same
+ * straight left/right split the storefront itself uses (see
+ * ahyBuildSwatchBackground() in product/color-swatch-resolver.phtml)
+ * instead of silently degrading to plain black. The real color input
+ * still sits invisibly on top and still
+ * opens the browser's native picker on click - picking a color there
+ * replaces the preview with that one explicit single hex for this variant,
+ * same as before.
+ *
+ * Empty value means no colour was ever set for this variant, in which case
+ * the storefront falls back to a plain text swatch instead of a circle.
+ */
+-->
+<!-- ko if: value() && value().indexOf(',') !== -1 -->
+<span style="display:inline-block;position:relative;width:44px;height:32px;border:1px solid #ccc;overflow:hidden;vertical-align:middle;" data-bind="
+    style: {
+        background: 'linear-gradient(90deg, ' + value().split(',')[0].trim() + ' 50%, ' + value().split(',')[1].trim() + ' 50%)'
+    }">
+    <input type="color" style="position:absolute;top:-4px;left:-4px;width:52px;height:40px;opacity:0;padding:0;border:0;cursor:pointer;" data-bind="
+        value: value,
+        attr: {
+            name: inputName,
+            id: uid,
+            disabled: disabled
+        }" />
+</span>
+<!-- /ko -->
+<!-- ko ifnot: value() && value().indexOf(',') !== -1 -->
+<input type="color" style="width:44px;height:32px;padding:0;border:1px solid #ccc;cursor:pointer;" data-bind="
+    value: value,
+    attr: {
+        name: inputName,
+        id: uid,
+        disabled: disabled
+    }" />
+<!-- /ko -->

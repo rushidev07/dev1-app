@@ -41,6 +41,22 @@ class Collection extends SearchResult
                 'customer_name'  => new \Zend_Db_Expr("TRIM(CONCAT(COALESCE(ce.firstname,''),' ',COALESCE(ce.lastname,'')))"),
             ]
         );
+        // Map filter fields to real expressions so WHERE clauses don't use SELECT aliases
+        $this->addFilterToMap('customer_email', 'ce.email');
+        $this->addFilterToMap('customer_name', new \Zend_Db_Expr("TRIM(CONCAT(COALESCE(ce.firstname,''),' ',COALESCE(ce.lastname,'')))"));
+        return $this;
+    }
+
+    public function addFullTextFilter(string $value): static
+    {
+        $conn = $this->getConnection();
+        $like  = '%' . $value . '%';
+        $this->getSelect()->where(implode(' OR ', [
+            $conn->quoteInto('ce.email LIKE ?', $like),
+            $conn->quoteInto("TRIM(CONCAT(COALESCE(ce.firstname,''),' ',COALESCE(ce.lastname,''))) LIKE ?", $like),
+            $conn->quoteInto('main_table.status LIKE ?', $like),
+            $conn->quoteInto('main_table.tier LIKE ?', $like),
+        ]));
         return $this;
     }
 }

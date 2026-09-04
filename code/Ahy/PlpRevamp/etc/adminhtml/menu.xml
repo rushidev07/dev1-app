@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <!--
+            Sits under the existing Ahy tab, declared as Ahy::top_level by Ahy_Ffl.
+            No module sequence is added for it deliberately: Magento merges menu.xml
+            from every enabled module regardless of load order, so if Ahy_Ffl were
+            ever disabled this entry simply would not render rather than breaking the
+            menu. Same reasoning as Ahy_DiscountAlert.
+        -->
+        <add id="Ahy_PlpRevamp::card_keywords_import"
+             title="PLP: Content Import"
+             translate="title"
+             module="Ahy_PlpRevamp"
+             sortOrder="30"
+             parent="Ahy::top_level"
+             action="ahy_plprevamp/keywordsimport/index"
+             resource="Ahy_PlpRevamp::card_keywords_import"/>
+    </menu>
+</config>

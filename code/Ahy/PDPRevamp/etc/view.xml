@@ -1,0 +1,10 @@
+<view xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Config/etc/view.xsd">
+    <media>
+        <images module="Ahy_PDPRevamp">
+            <image id="ahy_adventure_seekers_thumbnail" type="thumbnail">
+                <width>300</width>
+                <height>300</height>
+            </image>
+        </images>
+    </media>
+</view>

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!--
+        Global (not adminhtml-only) so categories created through the API, an
+        import or a data script get their Featured Products category too.
+    -->
+    <event name="catalog_category_save_after">
+        <observer name="ahy_plprevamp_create_featured_category"
+                  instance="Ahy\PlpRevamp\Observer\Category\CreateFeaturedCategoryOnSave"/>
+    </event>
+</config>

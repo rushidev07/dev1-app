@@ -82,6 +82,17 @@ class CreateSavedCard extends Action
 
         $redirect = $this->resultRedirectFactory->create()->setPath('customer/account');
 
+        // Opt-in: if the modal passed a same-origin referer, return there instead of
+        // the dashboard (e.g. the Caliber Nation membership page). Base64 + same-origin
+        // check guards against open redirects; absent/invalid → default dashboard.
+        $referer = (string) $this->getRequest()->getParam('referer', '');
+        if ($referer !== '') {
+            $decoded = base64_decode($referer, true);
+            if ($decoded !== false && str_starts_with($decoded, $this->_url->getBaseUrl())) {
+                $redirect->setUrl($decoded);
+            }
+        }
+
         if (!$this->formKeyValidator->validate($this->getRequest())) {
             $this->messageManager->addErrorMessage(__('Invalid form submission.'));
             return $redirect;

@@ -8,7 +8,6 @@ use Ahy\CaliberNation\Api\MembershipRepositoryInterface;
 use Ahy\CaliberNation\Model\Config;
 use Ahy\CaliberNation\Model\Service\MembershipManagementService;
 use Ahy\CaliberNation\Model\Service\MembershipSignupService;
-use Ahy\CaliberNation\Model\Service\RefundRequestService;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magewirephp\Magewire\Component;
@@ -28,16 +27,13 @@ class MembershipRejoin extends Component
     public string $paidThroughDate   = '';
     /** Whether a usable saved card is bound (decides if resuming restores auto-renew). */
     public bool   $hasRenewalCard    = false;
-    /** True when undo is blocked because the refund was already reviewed/processed. */
-    public bool   $refundProcessed   = false;
 
     public function __construct(
         private MembershipSignupService       $signupService,
         private MembershipManagementService   $managementService,
         private MembershipRepositoryInterface $membershipRepository,
         private CustomerSession               $customerSession,
-        private Config                        $config,
-        private RefundRequestService          $refundRequestService
+        private Config                        $config
     ) {}
 
     public function mount(): void
@@ -61,14 +57,6 @@ class MembershipRejoin extends Component
         $this->paidThroughDate   = date('F j, Y', strtotime((string) $renewal));
         $this->withinPaidThrough = $membership->getStatus() === MembershipInterface::STATUS_CANCELLED
             && strtotime((string) $renewal) > time();
-
-        // Refund reviewed — block undo whether the membership is expired OR still
-        // cancelled (expiry may have failed server-side; either way the admin decision
-        // stands and the member must re-purchase rather than undo).
-        if ($this->refundRequestService->isRefundReviewed((int) $membership->getEntityId())) {
-            $this->refundProcessed = true;
-            $this->errorMessage    = 'Your refund has already been processed.';
-        }
 
         if ($this->withinPaidThrough && $membership->getPaymentTokenId()) {
             $boundId = (int) $membership->getPaymentTokenId();
@@ -100,24 +88,7 @@ class MembershipRejoin extends Component
             return;
         }
 
-        // Always reload from DB — serialized properties ($refundProcessed, $withinPaidThrough)
-        // can be stale if the admin acted after this component was first rendered.
         $customerId = (int) $this->customerSession->getCustomerId();
-        try {
-            $membership = $this->membershipRepository->getByCustomerId($customerId);
-            if ($this->refundRequestService->isRefundReviewed((int) $membership->getEntityId())) {
-                $this->refundProcessed = true;
-                $this->errorMessage    = 'Your refund has already been processed.';
-                return;
-            }
-            // Refresh withinPaidThrough from live status too.
-            $renewal = $membership->getRenewalDate();
-            $this->withinPaidThrough = $membership->getStatus() === MembershipInterface::STATUS_CANCELLED
-                && $renewal
-                && strtotime((string) $renewal) > time();
-        } catch (NoSuchEntityException) {
-            // No membership — let the flow continue and fail naturally.
-        }
 
         if ($this->withinPaidThrough) {
             $result = $this->managementService->resumeMembership($customerId);
@@ -131,8 +102,7 @@ class MembershipRejoin extends Component
         }
 
         if (!$result['success']) {
-            $this->errorMessage    = $result['message'];
-            $this->refundProcessed = str_contains($result['message'], 'refund has already been processed');
+            $this->errorMessage = $result['message'];
             return;
         }
 

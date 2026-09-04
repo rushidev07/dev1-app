@@ -94,25 +94,16 @@ class Data extends AbstractHelper
 
     public function getEventsEndpointUrl(int|string|null $storeId = null): string
     {
-        return $this->buildPlatformUrl('/api/v1/events', $storeId);
-    }
-
-    /**
-     * Rebuilds the configured endpoint URL's scheme/host/port with a different path.
-     * Returns '' if no endpoint is configured.
-     */
-    public function buildPlatformUrl(string $path, int|string|null $storeId = null): string
-    {
-        $endpoint = $this->getEndpointUrl($storeId);
-        if (!$endpoint) {
+        $ingest = $this->getEndpointUrl($storeId);
+        if (!$ingest) {
             return '';
         }
-        $parts = parse_url($endpoint);
+        $parts = parse_url($ingest);
         $base  = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
         if (!empty($parts['port'])) {
             $base .= ':' . $parts['port'];
         }
-        return $base . $path;
+        return $base . '/api/v1/events';
     }
 
     public function getApiKey(int|string|null $storeId = null): string

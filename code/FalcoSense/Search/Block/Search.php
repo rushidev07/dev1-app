@@ -35,7 +35,7 @@ class Search extends Template
     public function getSearchApiUrl(): string
     {
         $url = $this->helper->getSearchUrl();
-        return $url ?: '';
+        return $url ?: 'http://localhost:8001/api/search.php';
     }
 
     public function getApiKey(): string
@@ -50,7 +50,16 @@ class Search extends Template
 
     public function getProductsApiUrl(): string
     {
-        return $this->helper->buildPlatformUrl('/api/v1/products');
+        $endpoint = $this->helper->getEndpointUrl();
+        if (!$endpoint) {
+            return 'http://localhost:8080/api/v1/products';
+        }
+        $parts = parse_url($endpoint);
+        $base  = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
+        if (!empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+        return $base . '/api/v1/products';
     }
 
     public function getPlatformStoreId(): int
@@ -60,12 +69,30 @@ class Search extends Template
 
     public function getSuggestUrl(): string
     {
-        return $this->helper->buildPlatformUrl('/api/v1/suggest');
+        $endpoint = $this->helper->getEndpointUrl();
+        if (!$endpoint) {
+            return 'http://localhost:8080/api/v1/suggest';
+        }
+        $parts = parse_url($endpoint);
+        $base  = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
+        if (!empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+        return $base . '/api/v1/suggest';
     }
 
     public function getSearchAnalyticsUrl(): string
     {
-        return $this->helper->buildPlatformUrl('/api/v1/analytics/search');
+        $endpoint = $this->helper->getEndpointUrl();
+        if (!$endpoint) {
+            return 'http://localhost:8080/api/v1/analytics/search';
+        }
+        $parts = parse_url($endpoint);
+        $base  = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
+        if (!empty($parts['port'])) {
+            $base .= ':' . $parts['port'];
+        }
+        return $base . '/api/v1/analytics/search';
     }
 
     public function getSearchQuery(): string

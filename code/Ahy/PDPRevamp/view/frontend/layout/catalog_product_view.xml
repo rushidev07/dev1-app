@@ -1,0 +1,141 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceBlock name="head.additional">
+            <block name="pdprevamp.header.style" template="Ahy_PDPRevamp::header-style.phtml"/>
+            <block class="Ahy\PDPRevamp\Block\Product\View\ColorSwatchResolver"
+                   name="pdprevamp.color.swatch.resolver" template="Ahy_PDPRevamp::product/color-swatch-resolver.phtml"/>
+            <block name="pdprevamp.buybox.style" template="Ahy_PDPRevamp::product/view/buy-box-style.phtml"/>
+            <block name="pdprevamp.product.info.style" template="Ahy_PDPRevamp::product/view/product-info-style.phtml"/>
+            <!-- Warms the paypal.com connection before the PDP PayPal button
+                 asks for its SDK - see product/view/paypal-shortcut.phtml. -->
+            <block name="pdprevamp.paypal.preconnect" template="Ahy_PDPRevamp::paypal-preconnect.phtml"/>
+        </referenceBlock>
+        <!-- The breadcrumb template is set by Ahy\PDPRevamp\Plugin\
+             BreadcrumbsTemplatePlugin, not from here: theme layout is merged
+             after module layout, so Hyva's product_breadcrumbs block would
+             overwrite any referenceBlock template change we made at this
+             point. Same reason GalleryTemplatePlugin exists. -->
+        <referenceBlock name="product.media" template="Ahy_PDPRevamp::product/view/gallery.phtml"/>
+        <referenceBlock name="product.info.details" remove="true"/>
+        <!-- Previously this block was removed and re-declared from scratch
+             against Magento\Catalog\Block\ShortcutButtons with an argument
+             named isCatalogProduct. That name is wrong (the real argument
+             is isInCatalogProduct), and the remove+recreate also discarded
+             any child button Magento_Paypal's own layout update adds to
+             this container - which is what was actually hiding the PayPal
+             button. Reference the existing block in place instead so
+             Paypal's injected child survives regardless of module load
+             order, and fix the argument name. -->
+        <referenceBlock name="addtocart.shortcut.buttons">
+            <arguments>
+                <argument name="isInCatalogProduct" xsi:type="boolean">true</argument>
+            </arguments>
+        </referenceBlock>
+        <referenceBlock name="product.info">
+             <block class="Ahy\PDPRevamp\Block\Product\View\CalibernationPrice"
+                   name="pdprevamp.calibernation.price"
+                   template="Ahy_PDPRevamp::product/view/calibernation-price.phtml">
+                <arguments>
+                    <argument name="caliber_member_price_view_model" xsi:type="object">Ahy\PDPRevamp\ViewModel\CaliberMemberPrice</argument>
+                </arguments>
+            </block>
+            <block name="pdprevamp.badges.placeholder"
+                   template="Ahy_PDPRevamp::product/view/badges-placeholder.phtml"/>
+            <block name="pdprevamp.shipping.returns"
+                   template="Ahy_PDPRevamp::product/view/shipping-returns.phtml"/>
+            <block class="Ahy\PDPRevamp\Block\Product\View\ReviewQuote"
+                   name="pdprevamp.review.quote"
+                   template="Ahy_PDPRevamp::product/view/review-quote.phtml"/>
+            <!-- Moved here from the theme's catalog_product_view.xml, which
+                 previously declared this block directly with this same
+                 custom class - the only place that declared it at all.
+                 Owning the sole declaration here means it survives even if
+                 the theme's layout XML ever drifts out of sync again. -->
+            <block class="Ahy\PDPRevamp\Block\Product\View\StockStatus"
+                   name="product.info.stockstatus"
+                   template="Ahy_PDPRevamp::product/view/stock-status.phtml"/>
+        </referenceBlock>
+        <referenceBlock name="product.detail.page">
+            <block name="pdprevamp.details.tabs"
+                   template="Ahy_PDPRevamp::product/view/details-tabs.phtml">
+                <!-- Module-owned copy of the theme's dynamic description
+                     renderer (see details-description.phtml) - same
+                     description-fetch/read-more logic, no dependency on the
+                     theme template. -->
+                <block class="Ahy\PDPRevamp\Block\Product\View\DetailsDescription"
+                       name="pdprevamp.details.description"
+                       template="Ahy_PDPRevamp::product/view/details-description.phtml"/>
+                <block class="Ahy\PDPRevamp\Block\Product\View\KeyFeatures"
+                       name="pdprevamp.details.key-features"
+                       template="Ahy_PDPRevamp::product/view/key-features.phtml"/>
+                <block class="Ahy\PDPRevamp\Block\Product\View\Specifications"
+                       name="pdprevamp.details.specifications"
+                       template="Ahy_PDPRevamp::product/view/specifications.phtml"/>
+                <block class="Ahy\PDPRevamp\Block\Product\View\ProductVideo"
+                       name="pdprevamp.details.video"
+                       template="Ahy_PDPRevamp::product/view/product-video.phtml"/>
+                <block class="Ahy\PDPRevamp\Block\Product\View\SellerInfo"
+                       name="pdprevamp.details.seller-info"
+                       template="Ahy_PDPRevamp::product/view/details-seller-info.phtml"/>
+            </block>
+            <block class="Ahy\PDPRevamp\Block\Product\View\FrequentlyBoughtTogether"
+                   name="pdprevamp.frequently.bought.together"
+                   template="Ahy_PDPRevamp::product/view/frequently-bought-together.phtml"/>
+              <block class="Ahy\PDPRevamp\Block\Product\View\AdventureSeekersAlsoViewed"
+                   name="pdprevamp.adventure.seekers.also.viewed"
+                   template="Ahy_PDPRevamp::product/view/adventure-seekers-also-viewed.phtml"/>
+              <block class="Ahy\PDPRevamp\Block\Product\View\CustomersAlsoBought"
+                   name="pdprevamp.customers.also.bought"
+                   template="Ahy_PDPRevamp::product/view/customers-also-bought.phtml"/>
+
+            <block name="pdprevamp.trust.row"
+                   template="Ahy_PDPRevamp::product/view/trust-row.phtml"/>
+            <block class="Ahy\PDPRevamp\Block\Product\View\Faq"
+                   name="pdprevamp.faq"
+                   template="Ahy_PDPRevamp::product/view/faq.phtml"/>
+            <!-- The theme's own declaration of this block is commented out
+                 (see Magento_Catalog/layout/catalog_product_view.xml) so we
+                 create it fresh here rather than overriding a nonexistent
+                 block - matches what's deployed on the server. -->
+            <block name="product.yotpo.review.details"
+                   template="Ahy_PDPRevamp::product/view/yotpo_reviews.phtml"/>
+            <block name="pdprevamp.pdp.mid.banner"
+                   template="Ahy_PDPRevamp::product/view/mid-banner.phtml"
+                   after="product.yotpo.review.details"/>
+            <block name="pdprevamp.pdp.give.back.banner"
+                   template="Ahy_PDPRevamp::home/give-back-banner.phtml"/>
+            <block class="Ahy\PDPRevamp\Block\Product\View\RecentlyViewed"
+                   name="pdprevamp.recently.viewed"
+                   template="Ahy_PDPRevamp::product/view/recently-viewed.phtml"/>
+            <block name="pdprevamp.pdp.outdoor.news"
+                   template="Ahy_PDPRevamp::home/outdoor-news.phtml"/>
+        </referenceBlock>
+                <!-- Amasty Mostviewed auto-injects its own unstyled Luma template for
+             the "Adventure Seekers Also Viewed" group (block_position =
+             product_content_bottom) into content.bottom. That group's data
+             is already rendered by pdprevamp.adventure.seekers.also.viewed
+             above, so suppress Amasty's duplicate here. -->
+        <referenceBlock name="amrelated_product_content_bottom" remove="true"/>
+
+        <referenceContainer name="page.top">
+            <block name="pdprevamp.calibernation.banner"
+                   template="Ahy_PDPRevamp::banner.phtml"
+                   after="-"/>
+        </referenceContainer>
+         <referenceContainer name="before.body.end">
+            <block class="Ahy\PDPRevamp\Block\Product\View\ExitIntentPopup"
+                   name="pdprevamp.exit.intent.popup"
+                   template="Ahy_PDPRevamp::product/view/exit-intent-popup.phtml"/>
+            <!-- Moved here from the theme's catalog_product_view.xml, which
+                 previously held this block's only declaration (no vendor
+                 layout declares this block name at all). Owning the sole
+                 declaration here means it survives even if the theme's
+                 layout XML ever drifts out of sync again. -->
+            <block name="product.yotpo.review.js" as="options_yotpo_review_js"
+                   template="Ahy_PDPRevamp::product/view/options/yotpo/yotpo_js.phtml"/>
+        </referenceContainer>
+    </body>
+
+    
+</page>

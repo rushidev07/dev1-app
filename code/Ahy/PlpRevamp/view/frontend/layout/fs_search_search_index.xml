@@ -5,19 +5,42 @@
         <css src="Ahy_PlpRevamp::css/catnav-styles.css"/>
     </head>
     <body>
-        <!-- Diagnostic marker: appears in page source only if this handle is really active. -->
+        <!--
+            Handle: fs_search_search_index
+            /fs/search/ when FalcoSense routes.xml has id="fs_search" (the version currently deployed).
+
+            FalcoSense derives this handle from its route id, and that id has changed
+            across versions (fssearch -> fs_search -> fs). Magento takes the layout
+            handle from the route ID, not the frontName, so the handle name moves with
+            it. Both spellings are shipped so this keeps working on either version;
+            only one ever fires, the other file is simply never read.
+        -->
         <referenceContainer name="content">
             <block class="Magento\Framework\View\Element\Text" name="ahy_marker_fs_search_search_index">
                 <arguments>
-                    <argument name="text" xsi:type="string">&lt;script&gt;console.log('%c[AHY LAYOUT]%c handle fired: fs_search_search_index','background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:700','');window.AHY_LAYOUT_HANDLES=(window.AHY_LAYOUT_HANDLES||[]).concat('fs_search_search_index');&lt;/script&gt;&lt;!-- AHY-ACTIVE-HANDLE: fs_search_search_index --&gt;</argument>
+                    <argument name="text" xsi:type="string">&lt;script&gt;console.log('%c[AHY LAYOUT]%c handle fired: fs_search_search_index','background:#7c3aed;color:#fff;padding:2px 6px;border-radius:3px;font-weight:700','');&lt;/script&gt;&lt;!-- AHY-ACTIVE-HANDLE: fs_search_search_index --&gt;</argument>
                 </arguments>
             </block>
         </referenceContainer>
 
-        <!-- Drop FalcoSense's grid where it is declared (no-op on handles where it isn't). -->
+        <!--
+            Remove FalcoSense's own grid. In the modular version this block owns five
+            child blocks (product_card_desktop/mobile, filters_desktop/mobile,
+            zero_results); removing the parent removes those children too, so none of
+            its card markup can render alongside ours.
+        -->
         <referenceBlock name="ahy_smartsearch_search" remove="true"/>
 
-        <!-- PlpRevamp grid. Same FalcoSense block class, so the search engine/API/token are unchanged. -->
+        <!--
+            PlpRevamp grid. Self-contained: it carries its own cards, filters,
+            CaliberNation pricing and Yotpo ratings, none of which exist in
+            FalcoSense's ahySearchResults component - which is why the child
+            templates cannot be overridden individually.
+
+            Class stays FalcoSense\Search\Block\Search so the search engine is
+            unchanged: same products API, search token, spell correction, geo
+            state and analytics.
+        -->
         <referenceContainer name="content">
             <block class="FalcoSense\Search\Block\Search"
                    name="ahy_plprevamp_search_grid"
@@ -27,9 +50,10 @@
         </referenceContainer>
 
         <!--
-            FalcoSense intends this cleanup in its own fs_search_index.xml, but that filename maps
-            to a handle that never fires, so it never applied. Replicated here: keeps native search
-            blocks from loading Elasticsearch collections and removes the stray 2-column sidebar.
+            FalcoSense performs this cleanup in its own layout file, but on any handle
+            where its filename does not match, that file never loads and none of it
+            applies - which is what left a stray 2-column sidebar on /fs/search/ and
+            let native search blocks keep querying Elasticsearch. Replicated here.
         -->
         <referenceBlock name="search.result"           remove="true"/>
         <referenceBlock name="search_result_list"      remove="true"/>

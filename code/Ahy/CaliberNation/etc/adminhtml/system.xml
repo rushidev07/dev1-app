@@ -5,7 +5,7 @@
         <!-- Nested under the shared "Ahy" tab (declared by other Ahy_* modules). -->
         <section id="caliber_nation" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
             <tab>ahy</tab>
-            <label>Caliber Nation Settings</label>
+            <label>Caliber Nation</label>
             <resource>Ahy_CaliberNation::config</resource>
 
             <!-- ── General (master switch) ────────────────────────────────────── -->
@@ -102,6 +102,7 @@
                     <validate>validate-number validate-zero-or-greater</validate>
                     <depends><field id="enabled">1</field></depends>
                 </field>
+
             </group>
 
             <!-- ── Win-back (lapsed-member re-engagement) ─────────────────────── -->
@@ -162,6 +163,32 @@
                 <field id="earlybird_message" translate="label comment" type="textarea" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Early-bird Messaging</label>
                     <comment>Copy for early-access / early-bird promotions (feature lands in a later phase).</comment>
+                </field>
+            </group>
+
+            <!-- ── Early Access / Early Bird ─────────────────────────────────────── -->
+            <group id="early_access" translate="label" sortOrder="26" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Early Access / Early Bird</label>
+
+                <field id="enabled" translate="label comment" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Early Access</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Master switch for the early-access / early-bird feature. When off, no badges are shown and no access restrictions apply.</comment>
+                </field>
+
+                <field id="member_badge_text" translate="label comment" type="textarea"
+                       sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Member Badge Text</label>
+                    <comment>Badge copy shown to active members on early-access products.</comment>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+
+                <field id="non_member_badge_text" translate="label comment" type="textarea"
+                       sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Non-Member Badge Text</label>
+                    <comment>Badge copy shown to guests and non-members on early-access products.</comment>
+                    <depends><field id="enabled">1</field></depends>
                 </field>
             </group>
 

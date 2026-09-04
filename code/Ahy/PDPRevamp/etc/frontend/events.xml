@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+    Backfills customer_id onto exit-popup claims made while logged out.
+
+    Both events are bound because either can be the first moment the claim's
+    email and an account id are known together: a guest who claims and then
+    registers, and a guest who claims and then signs in to an existing account.
+
+    Frontend-only on purpose - a customer created from the admin grid is not
+    someone who claimed a popup coupon, and firing there would attribute a claim
+    to an account whose owner never saw the popup.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="customer_register_success">
+        <observer name="ahy_pdprevamp_link_exit_claim_on_register"
+                  instance="Ahy\PDPRevamp\Observer\LinkExitCouponClaimToCustomer"/>
+    </event>
+    <event name="customer_login">
+        <observer name="ahy_pdprevamp_link_exit_claim_on_login"
+                  instance="Ahy\PDPRevamp\Observer\LinkExitCouponClaimToCustomer"/>
+    </event>
+</config>

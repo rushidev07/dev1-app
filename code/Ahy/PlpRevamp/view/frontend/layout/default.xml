@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <!--
+            Registers Alpine.store('yotpoReviews') on every page.
+
+            The product cards on the search results page and the header search overlay
+            read $store.yotpoReviews for their star ratings, but the store was only
+            loaded by ahy_subcategory_layout_enabled.xml — a category-only handle. On
+            every other surface the store did not exist, so the cards fell through to
+            "(0)" no matter how many reviews a product had. The overlay lives in the
+            header on all pages, so this has to be global rather than per-handle.
+        -->
+        <script src="Ahy_PlpRevamp::js/yotpo-store.js"/>
+    </head>
+</page>

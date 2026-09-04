@@ -1,0 +1,156 @@
+<?php
+/**
+ * PDP FAQ section. Data comes from Amasty's FAQ & Product Questions module
+ * (see Ahy\PDPRevamp\Block\Product\View\Faq) - questions assigned to this
+ * product (or its categories) in the Amasty admin grid. Tag titles double
+ * as the filter pills.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\Faq;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Magento\Framework\Escaper;
+
+/** @var Faq $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+$faqs = $block->getFaqs();
+if (!$faqs) {
+    return;
+}
+$categories = $block->getCategories($faqs);
+$faqCount = count($faqs);
+$productName = (string) $block->getProduct()->getName();
+?>
+<section class="pdp-faq-section py-8 px-5 md:px-6" style="background:#f5f3ee;" x-data="{ activeCategory: 'All', openFaqId: null }">
+    <div class="flex items-center gap-3 mb-4">
+        <span class="flex items-center justify-center rounded-full shrink-0" style="width:40px;height:40px;background:#e9e5da;">
+            <?= $heroicons->questionMarkCircleHtml('w-5 h-5', 20, 20, ['aria-hidden' => 'true', 'style' => 'color:#6b7688;']) ?>
+        </span>
+        <div>
+            <h2 class="font-extrabold text-ahy-blue text-xl leading-tight"><?= __('Frequently Asked Questions') ?></h2>
+            <p class="text-sm" style="color:#6b7688;">
+                <?php if ($productName !== ''): ?>
+                    <?= $escaper->escapeHtml(__('%1 questions answered about the %2', $faqCount, $productName)) ?>
+                <?php else: ?>
+                    <?= $escaper->escapeHtml(__('%1 questions answered', $faqCount)) ?>
+                <?php endif; ?>
+            </p>
+        </div>
+    </div>
+
+    <?php if (count($categories) > 1): ?>
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button
+                type="button"
+                @click="activeCategory = 'All'"
+                :class="activeCategory === 'All' ? 'text-white border-transparent' : 'bg-white text-ahy-blue border-gray-200'"
+                :style="activeCategory === 'All' ? 'background:#0d2f47;' : ''"
+                class="rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors"
+            >
+                <?= __('All') ?>
+            </button>
+            <?php foreach ($categories as $category): ?>
+                <button
+                    type="button"
+                    @click="activeCategory = '<?= $escaper->escapeJs($category) ?>'"
+                    :class="activeCategory === '<?= $escaper->escapeJs($category) ?>' ? 'text-white border-transparent' : 'bg-white text-ahy-blue border-gray-200'"
+                    :style="activeCategory === '<?= $escaper->escapeJs($category) ?>' ? 'background:#0d2f47;' : ''"
+                    class="rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors"
+                >
+                    <?= $escaper->escapeHtml($category) ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="flex flex-col gap-3">
+        <?php foreach ($faqs as $faq): ?>
+            <?php
+            $faqId = (int) $faq->getQuestionId();
+            $tagTitlesCsv = $block->getTagTitlesCsv($faq);
+            $primaryTag = $tagTitlesCsv !== '' ? explode(',', $tagTitlesCsv)[0] : '';
+            ?>
+            <div
+                class="bg-white rounded-lg border border-gray-200"
+                x-show="activeCategory === 'All' || '<?= $escaper->escapeJs($tagTitlesCsv) ?>'.split(',').includes(activeCategory)"
+            >
+                <button
+                    type="button"
+                    @click="openFaqId = (openFaqId === <?= $faqId ?>) ? null : <?= $faqId ?>"
+                    class="flex items-start justify-between w-full text-left px-5 py-4 gap-3"
+                >
+                    <span class="flex items-center flex-wrap gap-3">
+                        <?php if ($primaryTag !== ''): ?>
+                            <span
+                                class="uppercase tracking-wide text-xs font-bold px-2 py-1 rounded shrink-0"
+                                style="background:#f0eee9;color:#6b7688;"
+                            >
+                                <?= $escaper->escapeHtml($primaryTag) ?>
+                            </span>
+                        <?php endif; ?>
+                        <span class="font-bold text-ahy-blue text-sm md:text-base">
+                            <?= $escaper->escapeHtml($faq->getTitle()) ?>
+                        </span>
+                    </span>
+                    <span
+                        :class="{ 'rotate-180': openFaqId === <?= $faqId ?> }"
+                        class="transition-transform duration-200 shrink-0 mt-0.5"
+                        style="color:#9aa3b0;"
+                    >
+                        <?= $heroicons->chevronDownHtml('w-4 h-4', 16, 16, ['aria-hidden' => 'true']) ?>
+                    </span>
+                </button>
+                <div
+                    x-show="openFaqId === <?= $faqId ?>"
+                    x-cloak
+                    x-transition:enter="ahy-accordion-enter"
+                    x-transition:enter-start="ahy-accordion-enter-start"
+                    x-transition:enter-end="ahy-accordion-enter-end"
+                    x-transition:leave="ahy-accordion-leave"
+                    x-transition:leave-start="ahy-accordion-leave-start"
+                    x-transition:leave-end="ahy-accordion-leave-end"
+                    class="px-5 pb-5"
+                >
+                    <div class="pdp-faq-answer border-l-2 pl-6 text-sm leading-relaxed" style="border-color:#e4c8a8;color:#4a5a74;">
+                        <?= /* @noEscape */ $faq->getAnswer() ?>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="flex items-center justify-center gap-2 mt-3 rounded-lg border border-gray-200 px-5 py-4 text-sm text-center" style="color:#6b7688;">
+        <?= $heroicons->chatAltHtml('w-4 h-4 shrink-0', 16, 16, ['aria-hidden' => 'true']) ?>
+        <span>
+            <?= __('Still have questions?') ?>
+            <a href="/contact" class="font-bold hover:underline" style="color:#c0392b;"><?= __('Contact our gear experts') ?></a>
+            <?= __('or call') ?>
+            <a href="tel:1-866-806-0934" class="font-bold" style="color:#0d2f47;">1-866-806-0934</a>
+        </span>
+    </div>
+</section>
+<style>
+    .ahy-accordion-enter, .ahy-accordion-leave {
+        transition: opacity 200ms ease-out, transform 200ms ease-out;
+    }
+    .ahy-accordion-enter-start, .ahy-accordion-leave-end {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    .ahy-accordion-enter-end, .ahy-accordion-leave-start {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    /* Amasty answers are WYSIWYG HTML - keep the first/last block flush with
+       the accent rule so the answer lines up with the question above it. */
+    .pdp-faq-answer > *:first-child { margin-top: 0; }
+    .pdp-faq-answer > *:last-child { margin-bottom: 0; }
+    .pdp-faq-answer p { margin: 0 0 0.75rem; }
+</style>

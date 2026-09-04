@@ -1,0 +1,148 @@
+<?php
+/**
+ * Ahy_PDPRevamp - PDP-only override of Magento_Swatches::product/swatch-item.phtml
+ *
+ * Color attribute options render as a circular swatch using the admin-set
+ * exact hex for that variant (see color-swatch-resolver.phtml, backed by
+ * ahy_pdprevamp_variant_color / the Configurations grid's "Colour" column).
+ * If no admin hex is set, the option's own label is checked against known
+ * CSS color names (e.g. "Red", "Yellow") as a fallback. Only if neither
+ * matches does the option render as a plain text pill, same as Size.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use Magento\Swatches\ViewModel\Product\Renderer\Configurable as ConfigurableViewModel;
+
+// phpcs:disable Generic.Files.LineLength.TooLong
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ConfigurableViewModel $configurableViewModel */
+$configurableViewModel = $viewModels->require(ConfigurableViewModel::class);
+
+$productId = $block->getProductId();
+$attributeId = $block->getAttributeId();
+
+if (!$productId || !$attributeId) {
+    return '';
+}
+
+// Attribute ID 93 = Color. Only this attribute checks for an admin-set hex.
+$isColorAttribute = ((int) $attributeId === 93);
+?>
+
+<div style="overflow:visible; padding:0.5rem 0;">
+    <template x-if="optionIsEnabled(<?= (int) $attributeId ?>, item.id) && optionIsActive(<?= (int) $attributeId ?>, item.id)">
+        <label
+            :for="'attribute-option-<?= (int) $productId ?>-'+item.id"
+            class="swatch-option relative shadow-sm cursor-pointer select-none bg-container-lighter product-option-value-label"
+            <?php if ($isColorAttribute): ?>
+            :class="ahyGetSwatchStyle(item.id, item.label) ? {
+                'rounded-full w-10 h-10 border-2': true,
+                'ring-2 ring-offset-2': (selectedValues[<?= (int) $attributeId ?>] === item.id),
+                'ring-2 ring-offset-2 ring-gray-300': focusedLabel === item.id && selectedValues[<?= (int) $attributeId ?>] !== item.id
+            } : {
+                'rounded-lg': true,
+                'border-container-darker': (selectedValues[<?= (int) $attributeId ?>] !== item.id),
+                'border-container-lighter ring ring-primary/75' : focusedLabel === item.id && selectedValues[<?= (int) $attributeId ?>] !== item.id
+            }"
+            :style="ahyGetSwatchStyle(item.id, item.label)
+                ? ('border-color:#d8d4cc;' + ((selectedValues[<?= (int) $attributeId ?>] === item.id) ? 'box-shadow:0 0 0 2px #fff, 0 0 0 5px #e85d26;' : '') + ahyGetSwatchStyle(item.id, item.label))
+                : ((selectedValues[<?= (int) $attributeId ?>] === item.id) ? 'border-color:#e85d26;box-shadow:0 0 0 2px #fff, 0 0 0 5px #e85d26;' : '')"
+            <?php else: ?>
+            :class="{
+                'rounded-lg': true,
+                'border-container-darker': (selectedValues[<?= (int) $attributeId ?>] !== item.id),
+                'w-6 h-6' : !isTextSwatch(<?= (int) $attributeId ?>, item.id),
+                'border-container-lighter ring ring-primary/75' : focusedLabel === item.id && selectedValues[<?= (int) $attributeId ?>] !== item.id
+            }"
+            :style="((selectedValues[<?= (int) $attributeId ?>] === item.id) ? 'border-color:#e85d26;' : '') + getSwatchBackgroundStyle('<?= (int) $attributeId ?>',item.id)"
+            <?php endif; ?>
+            <?php if ($configurableViewModel->getShowSwatchTooltip()): ?>
+                @mouseenter.self="activeTooltipItem = {
+                    attribute: '<?= (int) $attributeId ?>',
+                    item: item.id,
+                    index
+                }; tooltipPositionElement = $event.target;"
+                @mouseleave.self="activeTooltipItem = false"
+            <?php endif; ?>
+        >
+            <input
+                :id="'attribute-option-<?= (int) $productId ?>-'+item.id"
+                :value="item.id"
+                name="super_attribute[<?= (int) $attributeId ?>]"
+                type="radio"
+                class="inline-block absolute p-0 border-0 focus:border-0 focus:ring-0 product-option-value-input"
+                style="z-index:-1"
+                x-on:focus="focusLabel(item.id)"
+                x-on:blur="blurLabel()"
+                x-on:change="changeOption(<?= (int) $attributeId ?>, $event.target.value)"
+                x-on:click="clearOptionIfActive(<?= (int) $attributeId ?>, item.id)"
+                x-model="selectedValues[<?= (int) $attributeId ?>]"
+                :required="getAllowedAttributeOptions(<?= (int) $attributeId ?>).filter(
+                                                                    attributeOption => selectedValues[attributeOption]
+                                                                ).length === 0"
+            >
+            <?php if ($isColorAttribute): ?>
+                <span
+                    :class="{ 'sr-only': ahyGetSwatchStyle(item.id, item.label) }"
+                    x-text="item.label"
+                    class="whitespace-nowrap"
+                ></span>
+            <?php else: ?>
+                <div x-html="getSwatchText(<?= (int) $attributeId ?>, item.id)"
+                     class="whitespace-nowrap"
+                     :class="{ 'sr-only' : !isTextSwatch(<?= (int) $attributeId ?>, item.id) }"
+                ></div>
+            <?php endif; ?>
+            <span
+                x-show="selectedValues[<?= (int) $attributeId ?>] === item.id"
+                x-cloak
+                class="absolute z-10 flex items-center justify-center rounded-full"
+                style="top:-6px;right:-6px;width:16px;height:16px;background:#e85d26;color:#fff;box-shadow:0 0 0 2px #fff;"
+            >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </span>
+        </label>
+    </template>
+
+    <template x-if="optionIsEnabled(<?= (int) $attributeId ?>, item.id) && !optionIsActive(<?= (int) $attributeId ?>, item.id)">
+        <div
+            class="relative shadow-sm opacity-50 cursor-pointer select-none swatch-option bg-container-lighter"
+            <?php if ($isColorAttribute): ?>
+            :class="ahyGetSwatchStyle(item.id, item.label) ? 'rounded-full w-10 h-10 border-2' : 'rounded-lg border-container-darker'"
+            :style="ahyGetSwatchStyle(item.id, item.label) ? ('border-color:#d8d4cc;' + ahyGetSwatchStyle(item.id, item.label)) : ''"
+            <?php else: ?>
+            :class="{
+                                                        'rounded-lg' : true,
+                                                        'w-6 h-6' : !isTextSwatch(<?= (int) $attributeId ?>, item.id),
+                                                    }"
+            :style="getSwatchBackgroundStyle('<?= (int) $attributeId ?>',item.id)"
+            <?php endif; ?>
+        >
+            <?php if ($isColorAttribute): ?>
+                <span
+                    :class="{ 'sr-only': ahyGetSwatchStyle(item.id, item.label) }"
+                    x-text="item.label"
+                    class="whitespace-nowrap"
+                ></span>
+            <?php else: ?>
+                <div x-html="getSwatchText(<?= (int) $attributeId ?>, item.id)"
+                     class="whitespace-nowrap"
+                     :class="{ 'sr-only' : !isTextSwatch(<?= (int) $attributeId ?>, item.id) }"
+                ></div>
+            <?php endif; ?>
+            <svg class="absolute inset-0 w-full h-full text-gray-500 bg-white/25"
+                <?php if ($isColorAttribute): ?>:class="{ 'rounded-full': ahyGetSwatchStyle(item.id, item.label) }"<?php endif; ?>
+            >
+                <line x1="0" y1="100%" x2="100%" y2="0" class="stroke-current stroke-1"></line>
+            </svg>
+        </div>
+    </template>
+</div>

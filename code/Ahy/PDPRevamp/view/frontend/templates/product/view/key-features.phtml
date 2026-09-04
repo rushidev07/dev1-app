@@ -1,0 +1,42 @@
+<?php
+/**
+ * PDP "Key Features" tile grid. Prefers admin-entered rows from the
+ * "Key Features" dynamic-rows grid on the product edit page (see
+ * Ahy\PDPRevamp\Model\Product\KeyFeaturesResolver and the "key_features"
+ * attribute) - real title + description tiles, unlimited count,
+ * admin-managed and untouched by FlxPoint's description sync. Falls back
+ * to the product description's own bullet list
+ * (title-only tiles) when no admin rows exist yet. Renders nothing when
+ * neither is available.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\KeyFeatures;
+use Magento\Framework\Escaper;
+
+/** @var KeyFeatures $block */
+/** @var Escaper $escaper */
+
+$product = $block->getProduct();
+$resolver = $block->getKeyFeaturesResolver();
+
+$tiles = $resolver->getTiles($product, (string) $product->getDescription());
+
+if (!$tiles) {
+    return;
+}
+?>
+<div class="pdp-key-features py-6">
+    <h3 class="text-lg font-bold text-ahy-blue uppercase tracking-wide mb-4"><?= __('Key Features') ?></h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <?php foreach ($tiles as $tile): ?>
+            <div class="rounded-xl p-4" style="background:#f8f6f3;border:1px solid #e7e4de;">
+                <p class="text-sm font-bold text-ahy-blue"><?= $escaper->escapeHtml($tile['title']) ?></p>
+                <?php if ($tile['description'] !== ''): ?>
+                    <p class="text-sm text-gray-600 mt-1"><?= $escaper->escapeHtml($tile['description']) ?></p>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>

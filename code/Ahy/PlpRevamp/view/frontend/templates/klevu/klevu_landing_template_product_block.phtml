@@ -266,7 +266,7 @@
                                 </svg>
                             </template>
                         </div>
-                        <span x-text="_r ? '(' + _r.count + ')' : ''" style="font-size:0.75rem;color:#6b7280;"></span>
+                        <span x-text="_r ? '(' + _r.count + ')' : '(0)'" style="font-size:0.75rem;color:#6b7280;"></span>
                     </div>
                 </div>
 
@@ -280,18 +280,20 @@
                     var nSavingsPct  = nHasDiscount ? Math.round(((nPrice - nSalePrice) / nPrice) * 100) : 0;
                     var nDisplayPrice = (nHasDiscount) ? dataLocal.salePrice : dataLocal.price;
                 %>
-                <div class="ahy-price-section ahy-plp-revamp-price-container">
-                    <div class="ahy-price-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="ahy-price-section ahy-plp-revamp-price-container"
+                     x-data="{ get _cp(){ return $store.ahyCaliberPrices ? $store.ahyCaliberPrices.data['<%=(dataLocal.itemGroupId ? dataLocal.itemGroupId : dataLocal.id)%>'] : null } }">
+                    <div class="ahy-price-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"
+                         :class="_cp ? '' : 'ahy-price-grid--single'">
 
-                        <!-- CaliberNation Price col (left) -->
-                        <div class="caliber-nation-price-col">
+                        <!-- CaliberNation Price col (left) — hidden when no member price is available -->
+                        <div class="caliber-nation-price-col" x-show="_cp">
                             <div class="calibernation-price-title">CaliberNation Price</div>
-                            <div class="ahy-plp-calibernation-price-value">$0.00</div>
+                            <div class="ahy-plp-calibernation-price-value" x-text="_cp ? _cp.formattedMember : ''"></div>
                             <div class="ahy-plp-member-save-container">
                                <div class="ahy-plp-member-save-icon">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;transform:scaleX(-1);"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                 </div>
-                                <div class="ahy-plp-members-save-container"><span class="ahy-plp-member-save-title">MEMBERS SAVE $0.00<br></span><span class="ahy-plp-member-save-msrp-title">0% OFF MSRP</span></div>
+                                <div class="ahy-plp-members-save-container"><span class="ahy-plp-member-save-title" x-text="_cp ? 'MEMBERS SAVE ' + _cp.formattedSavings : ''"></span><span class="ahy-plp-member-save-msrp-title" x-text="_cp ? Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : ''"></span></div>
                             </div>
                             <a href="/caliber-nation" class="ahy-plp-join-caliber">
                                 JOIN CALIBER >
@@ -374,11 +376,59 @@
 
 <?php
 /** @var \Magento\Framework\Escaper $escaper */
-$klevuYotpoEndpoint = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$klevuYotpoEndpoint   = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$klevuCaliberEndpoint = $escaper->escapeUrl($block->getUrl('caliber-nation/pricing/memberprice'));
 ?>
 <script>
 (function() {
-    var YOTPO_ENDPOINT = '<?= $klevuYotpoEndpoint ?>';
+    var YOTPO_ENDPOINT   = '<?= $klevuYotpoEndpoint ?>';
+    var CALIBER_ENDPOINT = '<?= $klevuCaliberEndpoint ?>';
+
+    /*
+     * CaliberNation member prices for Klevu-rendered cards.
+     *
+     * Klevu builds its cards client-side, so there is no PHP render pass to price
+     * them in. The store holds only the products the endpoint actually returned a
+     * member price for — a missing key is the "no member price" signal the card
+     * markup uses (x-show="_cp") to hide the CaliberNation column entirely.
+     *
+     * Registered inline rather than via a layout <script src> because the Klevu
+     * handles do not load yotpo-store.js, which is why $store.yotpoReviews is
+     * absent on these pages. Keeping this self-contained avoids that trap.
+     */
+    function registerCaliberStore() {
+        if (!window.Alpine || Alpine.store('ahyCaliberPrices')) return;
+        Alpine.store('ahyCaliberPrices', {
+            data: {},
+            requested: {},
+            enabled: false,
+            isMember: false,
+            fetch: async function(ids) {
+                var self = this;
+                var newIds = (ids || []).filter(function(id) { return id && !(String(id) in self.requested); });
+                if (!newIds.length) return;
+                newIds.forEach(function(id) { self.requested[String(id)] = true; });
+                // The endpoint caps a request at 50 ids; send in chunks so a long
+                // page never silently loses the tail of its grid.
+                for (var i = 0; i < newIds.length; i += 50) {
+                    var chunk = newIds.slice(i, i + 50);
+                    try {
+                        var r = await fetch(CALIBER_ENDPOINT + '?ids=' + chunk.join(','), { credentials: 'include' });
+                        if (!r.ok) continue;
+                        var json = await r.json();
+                        if (!json.pricing_enabled) return;
+                        self.enabled  = true;
+                        self.isMember = !!json.is_member;
+                        self.data = Object.assign({}, self.data, json.prices || {});
+                    } catch (e) {
+                        console.error('[CaliberNation] price fetch error', e);
+                    }
+                }
+            }
+        });
+    }
+    if (window.Alpine) { registerCaliberStore(); }
+    document.addEventListener('alpine:init', registerCaliberStore);
 
     // MutationObserver: detect when Klevu renders product cards, then batch-fetch Yotpo
     var fetchTimer = null;
@@ -393,6 +443,9 @@ $klevuYotpoEndpoint = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bo
             });
             if (ids.length && window.Alpine && Alpine.store('yotpoReviews')) {
                 Alpine.store('yotpoReviews').fetch(ids, YOTPO_ENDPOINT);
+            }
+            if (ids.length && window.Alpine && Alpine.store('ahyCaliberPrices')) {
+                Alpine.store('ahyCaliberPrices').fetch(ids);
             }
         }, 200);
     });

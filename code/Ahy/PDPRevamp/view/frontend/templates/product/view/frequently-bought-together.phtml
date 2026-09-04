@@ -1,0 +1,580 @@
+<?php
+/**
+ * PDP "Frequently Bought Together" section. Suggestions are algorithmic
+ * (same category as the current product - see
+ * Ahy\PDPRevamp\Block\Product\View\FrequentlyBoughtTogether), distinct from
+ * the merchant-curated Amasty bundle-pack widget shown elsewhere on this
+ * page. Renders nothing if the current product has no category or no
+ * other products share it.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\FrequentlyBoughtTogether;
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Type as ProductTypeModel;
+use Magento\Framework\Escaper;
+
+/** @var FrequentlyBoughtTogether $block */
+/** @var Escaper $escaper */
+if (!$block->isEnabled()) {
+    return;
+}
+
+$items = $block->getBundleItems();
+if (count($items) < 2) {
+    return;
+}
+
+$imageHelper = $block->getImageHelper();
+$priceHelper = $block->getPriceHelper();
+$sellerHelper = $this->helper('Webkul\Marketplace\Helper\Data');
+
+$discountPercent = $block->getBundleDiscountPercent();
+
+$itemsData = [];
+foreach ($items as $item) {
+    /** @var Product $item */
+    $finalPrice = $block->getItemFinalPrice($item);
+    $regularPrice = $block->getItemRegularPrice($item);
+
+    $vendorName = '';
+    $sellerData = $sellerHelper->getSellerProductDataByProductId($item->getId());
+    if (isset($sellerData->getData()[0]) && $sellerData->getData()[0]) {
+        $sellerObj = $sellerData->getData()[0];
+        $sellerDataObj = $sellerHelper->getSellerDataBySellerId($sellerObj['seller_id']);
+        $sellerInfo = $sellerDataObj->getData()[0] ?? null;
+        if ($sellerInfo) {
+            $vendorName = $sellerInfo['shop_title'] ?: ($sellerInfo['name'] ?? '');
+        }
+    }
+
+    $itemsData[] = [
+        'id' => (int) $item->getId(),
+        'name' => $item->getName(),
+        'vendor' => $vendorName,
+        'image' => $imageHelper->init($item, 'ahy_fbt_thumbnail')->setImageFile($item->getData('small_image'))->getUrl(),
+        'finalPrice' => round($finalPrice, 2),
+        'regularPrice' => round($regularPrice, 2),
+        'hasDiscount' => $regularPrice > $finalPrice,
+        // Suggestions are simple-only (see the block), so this is only ever
+        // true for the current product - a configurable PDP still needs the
+        // shopper's chosen swatch posted alongside product/qty.
+        'requiresOptions' => $item->getTypeId() !== ProductTypeModel::TYPE_SIMPLE,
+    ];
+}
+?>
+<h2 class="font-bold text-ahy-blue text-xl mb-4"><?= $escaper->escapeHtml($block->getHeading()) ?></h2>
+<div
+    class="pdp-frequently-bought-together bg-white rounded-lg border border-gray-200 p-5 w-full flex flex-col justify-between"
+    x-data="ahyFrequentlyBoughtTogether(<?= $escaper->escapeHtmlAttr(json_encode($itemsData)) ?>, <?= (int) $discountPercent ?>)"
+>
+    <div class="pdp-fbt-row">
+        <template x-for="(item, index) in items" :key="item.id">
+            <div class="relative w-full min-w-0">
+                <label
+                    class="pdp-fbt-card relative flex flex-col rounded-lg border-2 overflow-hidden cursor-pointer w-full min-w-0 h-full"
+                    :class="checked.includes(item.id) ? '' : 'opacity-50'"
+                    style="border-color:#e85d26;"
+                >
+                    <span
+                        x-show="index === 0"
+                        class="absolute top-2 left-2 z-10 rounded-[4px] px-2 py-0.5 font-bold text-white uppercase"
+                        style="background:#e85d26;font-size:8px;"
+                    ><?= __('This Item') ?></span>
+                    <span
+                        class="absolute top-2 right-2 z-10 w-5 h-5 rounded-full flex items-center justify-center text-white"
+                        :style="checked.includes(item.id) ? 'background:#e85d26;' : 'background:#d1d5db;'"
+                    >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>
+                    </span>
+                    <input
+                        type="checkbox"
+                        class="sr-only"
+                        :checked="checked.includes(item.id)"
+                        @change="toggleItem(item.id)"
+                        :disabled="index === 0"
+                    >
+                    <div style="aspect-ratio:1/1;overflow:hidden;">
+                        <img :src="item.image" :alt="item.name" class="w-full h-full min-w-0 object-contain bg-white">
+                    </div>
+                    <div class="pdp-fbt-item-detail border-t border-gray-100 flex flex-col flex-1">
+                        <p class="pdp-fbt-item-name text-xs font-bold text-ahy-blue leading-tight" x-text="item.name"></p>
+                        <p class="text-xs text-gray-500 truncate" x-text="item.vendor"></p>
+                        <?php /* Price and its struck-through original wrap onto
+                               separate lines when the card is too narrow to hold
+                               both, instead of overflowing - matches the 375px
+                               reference where "$47.60" sits above "$59.50". */ ?>
+                        <p class="pdp-fbt-item-price mt-auto pt-1 flex flex-wrap items-baseline gap-x-1">
+                            <span class="font-bold text-ahy-blue" x-text="'$' + item.finalPrice.toFixed(2)"></span>
+                            <span x-show="item.hasDiscount" class="text-xs text-gray-400 line-through" x-text="'$' + item.regularPrice.toFixed(2)"></span>
+                        </p>
+                    </div>
+                </label>
+                <span x-show="index < items.length - 1" class="pdp-fbt-plus text-sm">+</span>
+            </div>
+        </template>
+    </div>
+
+    <?php /* The summary is its own rounded panel inset from the card edge, as in
+           the reference - previously it was a full-bleed strip separated only by
+           a top border, and at tablet width the "Save $x" text wrapped under the
+           price instead of staying on the line. */ ?>
+    <?php /* Side-by-side from md (768px), not sm (640px). Between 640 and
+           767 the container is still capped at 640px, which leaves ~520px inside
+           this panel - about 14px short of the ~534px the two columns need (a
+           ~234px CTA, the 12px gap, and a 288px price group). Because every one
+           of those children is whitespace-nowrap, the shortfall could not
+           reflow: the price group overflowed its own column and ran underneath
+           the button. Staying stacked until the container actually grows keeps
+           them apart; at 768px there is 648px available and it fits with room to
+           spare. */ ?>
+    <div class="pdp-fbt-summary flex flex-col md:flex-row md:flex-nowrap lg:flex-col lg:flex-wrap xl:flex-row xl:flex-nowrap items-center justify-between gap-3 mt-4">
+        <div class="pdp-fbt-summary-info flex items-center justify-center md:justify-start lg:justify-center xl:justify-start flex-wrap min-w-0 text-center md:text-left lg:text-center xl:text-left">
+            <span class="text-xs text-ahy-blue whitespace-nowrap" x-text="checked.length + ' items selected'"></span>
+            <template x-if="showBundleDiscount">
+                <span class="inline-flex items-center rounded-full px-3 py-1 font-bold whitespace-nowrap" style="background:#f0fdf4;color:#15803d;font-size:11px;" x-text="'Bundle & Save ' + discountPercent + '%'"></span>
+            </template>
+            <?php /* Prices grouped so the three figures stay together on one line
+                   and wrap as a unit, rather than "Save $x" breaking away. */ ?>
+            <span class="pdp-fbt-summary-prices inline-flex items-baseline gap-2 whitespace-nowrap">
+                <template x-if="hasSavings">
+                    <span class="text-sm text-gray-400 line-through" x-text="'$' + listTotal().toFixed(2)"></span>
+                </template>
+                <span class="text-xl font-extrabold text-ahy-blue" x-text="'$' + payableTotal().toFixed(2)"></span>
+                <template x-if="hasSavings">
+                    <span class="font-semibold" style="color:#15803d;font-size:11px;" x-text="'Save $' + savings().toFixed(2)"></span>
+                </template>
+            </span>
+        </div>
+        <div class="pdp-fbt-cta w-full md:w-auto lg:w-full xl:w-auto shrink-0">
+            <button
+                type="button"
+                class="pdp-fbt-cta-button btn flex items-center justify-center gap-2 w-full whitespace-nowrap rounded-xl text-sm text-white font-bold px-3 py-2"
+                style="background:#e85d26;"
+                onmouseover="this.style.background='#d14e1c'"
+                onmouseout="this.style.background='#e85d26'"
+                :disabled="submitting"
+                @click="addBundleToCart()"
+            >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>
+                <span x-text="submitting
+                    ? '<?= $escaper->escapeJs(__('Adding...')) ?>'
+                    : (showBundleDiscount
+                        ? '<?= $escaper->escapeJs(__('Add Bundle to Cart')) ?>'
+                        : '<?= $escaper->escapeJs(__('Add Selected to Cart')) ?>')"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Three across at every width, matching the reference design: the bundle
+       reads as "A + B + C", and stacking the cards into one column below 640px
+       broke that - it turned into a vertical list with "+" signs floating
+       between rows, which no longer looks like a bundle at all. The cards just
+       get narrower instead, which is what the reference does down to 375px. */
+    .pdp-fbt-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.5rem;
+    }
+    /* Plain CSS instead of Tailwind's bg-[#FAFAF8] arbitrary value - same
+       reason as the rest of this file's custom classes. Rounded and padded as
+       its own panel, matching the reference, rather than a full-bleed strip. */
+    .pdp-fbt-summary {
+        background-color: #FAFAF8;
+        border-radius: 0.5rem;
+        padding: 0.875rem 1rem;
+    }
+    /* Plain CSS rather than Tailwind's gap-x-3/gap-y-1: neither is used
+       elsewhere in this theme, so they are absent from the compiled
+       styles.css and would silently no-op without a Tailwind rebuild. */
+    .pdp-fbt-summary-info {
+        column-gap: 0.75rem;
+        row-gap: 0.25rem;
+    }
+    /* The grid already equalises the three cards' heights (stretch is the
+       default align-items), so the name/vendor/price block does not need a
+       min-height of its own. The old 7rem/2rem floors were what opened the
+       big empty gap between the vendor name and the price on short names -
+       the reference sits those three lines directly under one another. */
+    .pdp-fbt-item-detail {
+        padding: 0.625rem;
+        gap: 0.125rem;
+        overflow: hidden;
+        min-width: 0;
+
+    }
+    /* Names wrap to two lines rather than truncating mid-word, which is what
+       the reference shows at narrow widths ("Kids Hydration Bladder 1.5L"). */
+    /* line-clamp alone is not enough: -webkit-box sizes itself to the full text
+       and relies on overflow:hidden to cut the rest, so with a fractional
+       line-height the clip lands mid-glyph and the top of the third line stays
+       visible under the ellipsis. Pinning line-height and capping max-height to
+       exactly two lines makes the cut fall on a clean line boundary. */
+    .pdp-fbt-item-name {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.25;
+        max-height: 3.75em;
+    }
+    /* Absolutely positioned at every width now that the cards are always three
+       across - it floats in the gap between two cards, vertically centred on
+       the image rather than the whole card, so it sits level with the products
+       the way the reference shows it. */
+    .pdp-fbt-plus {
+        position: absolute;
+        top: 50%;
+        left: calc(100% + 0.75rem);
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 9999px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        font-size: 1.1rem;
+        line-height: 1;
+        font-weight: 400;
+        color: #9ca3af;
+        transform: translate(-50%, -50%);
+    }
+    /* A money figure must never break across lines. The parent <p> is
+       flex-wrap so the two prices can stack, but without nowrap on the spans
+       themselves the digits wrapped too - "$12345.00" came out as "$123 / 45. /
+       00" once the card got narrow enough. */
+    .pdp-fbt-item-price > span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+
+    }
+
+    /* Keeps the CTA from being squeezed narrow when the summary text
+       (price/savings) runs long beside it. Only applied at breakpoints where
+       the two actually sit side by side: md–lg (full-width FBT panel) and xl+
+       (half-width panel has ~564px available, enough for both). Excluded at lg
+       (1024–1279px) because the FBT sits in a half-width column (~436px) and
+       the summary re-stacks to avoid overflow - a min-width there would widen
+       the button beyond the panel. */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .pdp-fbt-cta {
+            min-width: 200px;
+        }
+    }
+    @media (min-width: 1280px) {
+        .pdp-fbt-cta {
+            min-width: 200px;
+        }
+    }
+    /*
+       Below 480px there is no room for three cards abreast.
+
+       The arithmetic: a 341px viewport leaves ~269px inside this panel (341
+       minus ~32 of page gutter minus the 40 of p-5). Take two 1.75rem gaps off
+       that and each card gets ~71px, against the ~120px the content needs for a
+       square image, a two-line name and a price with its struck-through
+       original. Three-across stops fitting at roughly
+       3x120 + 2x16 + 40 + 32 = 464px, which is why the switch happens here.
+       Before this, names were cut to "Sur...", prices broke mid-number
+       ("$123 / 45. / 00") and the "THIS ITEM" badge was wider than its own card.
+
+       The cards keep their shape - image on top, text beneath - and simply go
+       one per row at full width, with the "+" as a centred chip between them.
+       A horizontal row card (small image left, text right) was tried first and
+       rejected on review: at full width the tall card reads better and the
+       badge, image and price all sit where they do at wider breakpoints, so
+       nothing about the card has to be re-learned between sizes.
+    */
+    @media (max-width: 480px) {
+        .pdp-fbt-row {
+            grid-template-columns: minmax(0, 1fr);
+            /* The "+" chip supplies the spacing between cards now. */
+            gap: 0;
+        }
+        /*
+           Scoped through the root class deliberately. These two declarations
+           each contend with a single-class Tailwind utility on the same element
+           (h-full, and border-t further down), and an unscoped .pdp-fbt-card
+           rule ties with them on specificity - which leaves stylesheet order to
+           decide, and that race was being lost in practice. Root + class wins
+           outright, whatever order the sheets land in.
+        */
+        .pdp-frequently-bought-together .pdp-fbt-card {
+            /* Explicit rather than inherited from the flex-col utility, so the
+               card's direction is stated where the layout is decided. */
+            flex-direction: column;
+            /*
+               h-full exists to equalise the three cards' heights across the
+               grid. In a single column there is nothing to equalise against,
+               and because the label's parent is only as tall as its own
+               contents, height: 100% can push the label over the "+" chip
+               sitting below it - which is what put the chip on the card border.
+            */
+            height: auto;
+        }
+        /* A little more room than the three-across value, now that width is not
+           scarce. */
+        .pdp-fbt-item-detail {
+            padding: 0.625rem 0.75rem;
+        }
+        /* Full card width, so names can afford a third line before clamping. */
+        .pdp-fbt-item-name {
+            -webkit-line-clamp: 3;
+            line-clamp: 3;
+            max-height: 3.75em;
+        }
+        /*
+           In-flow chip centred between two stacked cards. It was absolutely
+           positioned into a grid gap with "left: calc(100% + 0.875rem)" - magic
+           offsets that only held while the cards were three across, so in one
+           column the chips landed off to the side of the card instead of
+           between them.
+        */
+        .pdp-fbt-plus {
+            position: static;
+            transform: none;
+            margin: 0.625rem auto;
+            width: 1.75rem;
+            height: 1.75rem;
+            font-size: 1rem;
+        }
+        .pdp-fbt-summary {
+            padding: 0.75rem;
+        }
+        /* This group is one nowrap unit wider than the panel at this width, so
+           it overflowed off both edges instead of wrapping - that is the
+           "cted ... Sc" clipping. */
+        .pdp-fbt-summary-prices {
+            flex-wrap: wrap;
+            justify-content: center;
+            white-space: normal;
+        }
+        .pdp-fbt-summary-info > * {
+            max-width: 100%;
+        }
+        /*
+           The CTA carries whitespace-nowrap so "Add Bundle to Cart" stays on one
+           line beside the summary text at desktop widths. Stacked and narrow
+           that guarantee turns into an overflow: at 320px the panel leaves about
+           224px inside it (320 minus ~32 of gutter, 40 of p-5 and 24 of the
+           summary's own padding), while the button needs roughly 225px for
+           48px of px-6, the 18px icon, its gap and the label. So the label ran
+           out past the panel edge.
+
+           Allowed to wrap instead of shortening the label or inventing another
+           breakpoint - it is self-adjusting, because the text only ever takes a
+           second line on the widths that cannot fit one.
+
+           Scoped through the root class: white-space here contends with the
+           whitespace-nowrap utility on the same element, and an unscoped rule
+           only ties with it on specificity.
+        */
+        .pdp-frequently-bought-together .pdp-fbt-cta-button {
+            white-space: normal;
+            text-align: center;
+            /*
+               px-6 is 48px of the ~224px available, which is what forced the
+               label to break into three lines ("Add / Bundle to / Cart") once
+               wrapping was allowed. Trimming it costs nothing visually: the
+               button is w-full with justify-center, so the content stays centred
+               wherever the padding sits - the padding only ever inflated the
+               button's minimum width. With 24px instead of 48 the label fits on
+               one line again, and wrapping stays enabled as the fallback for
+               anything narrower.
+            */
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            /*
+               The .btn class lands font-size: 1rem (three .btn rules exist in
+               the compiled stylesheet; the last one wins), and font-bold takes
+               it to 700 weight - about 160px for "Add Bundle to Cart". Against
+               174px of text room that was close enough to break to a second
+               line. 0.675rem is the usual mobile CTA size and brings the label
+               to roughly 137px, which clears the 178px now available with real
+               margin rather than by a pixel.
+
+               Both declarations are needed: font-size contends with .btn, and
+               leaving line-height at .btn's 1.5rem would keep the old vertical
+               rhythm on smaller text.
+            */
+            font-size: 0.675rem; 
+            line-height: 1.25rem;
+            /* gap-2's 8px is generous once the type is smaller. */
+            gap: 0.375rem;
+        }
+        /* The cart icon must not be squeezed when the label takes two lines. */
+        .pdp-fbt-cta-button svg {
+            flex-shrink: 0;
+            /* Scaled with the label; the 18x18 attributes on the element are
+               presentational and CSS overrides them. */
+            width: 16px;
+            height: 16px;
+        }
+        /* min-width: auto on a flex item refuses to go below its content width,
+           which would re-introduce the overflow one level up. */
+        .pdp-fbt-cta {
+            min-width: 0;
+        }
+    }
+    
+</style>
+<script>
+    function ahyFrequentlyBoughtTogether(items, discountPercent) {
+        return {
+            items: items,
+            discountPercent: discountPercent,
+            checked: items.map(item => item.id),
+            submitting: false,
+            toggleItem(itemId) {
+                const index = this.checked.indexOf(itemId);
+                if (index === -1) {
+                    this.checked.push(itemId);
+                } else {
+                    this.checked.splice(index, 1);
+                }
+            },
+
+            listTotal() {
+                return this.selectedItems()
+                    .reduce((sum, item) => sum + item.regularPrice, 0);
+            },
+            /** Sum actually charged before the bundle percent. */
+            payableSubtotal() {
+                return this.selectedItems()
+                    .reduce((sum, item) => sum + item.finalPrice, 0);
+            },
+            selectedItems() {
+                return this.items.filter(item => this.checked.includes(item.id));
+            },
+            get showBundleDiscount() {
+                return this.discountPercent > 0;
+            },
+            payableTotal() {
+                return this.payableSubtotal() * (1 - this.discountPercent / 100);
+            },
+            savings() {
+                return this.listTotal() - this.payableTotal();
+            },
+            get hasSavings() {
+                return this.savings() > 0.005;
+            },
+            currentProductOptions() {
+                const form = document.getElementById('product_addtocart_form');
+                if (!form) {
+                    return null;
+                }
+                const fields = form.querySelectorAll('[name^="super_attribute"]');
+                if (!fields.length) {
+                    return null;
+                }
+                const picked = [];
+                for (const field of fields) {
+                    if (!field.value) {
+                        return null;
+                    }
+                    picked.push([field.name, field.value]);
+                }
+                return picked;
+            },
+            notify(type, text) {
+                typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages(
+                    [{ type: type, text: text }], 5000
+                );
+            },
+            async addBundleToCart() {
+                if (this.submitting || this.checked.length === 0) {
+                    return;
+                }
+                this.submitting = true;
+
+                const formKey = hyva.getFormKey();
+                const uenc = hyva.getUenc();
+                let failures = 0;
+                const bundleId = this.items[0].id;
+                const bundleSize = this.checked.length;
+                const isBundle = bundleSize >= 2;
+
+                try {
+                    for (const productId of this.checked) {
+                        const item = this.items.find(candidate => candidate.id === productId);
+
+                        const body = new URLSearchParams();
+                        body.set('product', productId);
+                        body.set('qty', '1');
+                        body.set('form_key', formKey);
+                        body.set('uenc', uenc);
+
+                        if (isBundle) {
+                            body.set('ahy_fbt_bundle_id', bundleId);
+                            body.set('ahy_fbt_bundle_size', bundleSize);
+                        }
+
+                        if (item && item.requiresOptions) {
+                            const options = this.currentProductOptions();
+                            if (!options) {
+                                this.notify('warning', 'Please choose the options for ' + item.name + ' first.');
+                                failures++;
+                                continue;
+                            }
+                            options.forEach(([name, value]) => body.set(name, value));
+                        }
+
+                        try {
+                            const response = await fetch(BASE_URL + 'checkout/cart/add/', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                body: body.toString(),
+                                credentials: 'same-origin',
+                            });
+                            // A rejected add still 302s, so only a hard HTTP
+                            // error is provably ours to report here; anything
+                            // Magento refused comes back as a flash message.
+                            if (!response.ok && !response.redirected) {
+                                failures++;
+                            }
+                        } catch (error) {
+                            failures++;
+                            console.error(error);
+                        }
+                    }
+                } finally {
+                    this.submitting = false;
+                }
+                window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+
+                const addedCount = this.checked.length - failures;
+
+                if (addedCount > 0) {
+                    this.notify(
+                        'success',
+                        addedCount === 1
+                            ? '1 item was added to your cart.'
+                            : addedCount + ' items were added to your cart.'
+                    );
+                }
+
+                if (failures > 0) {
+                    this.notify(
+                        failures === this.checked.length ? 'error' : 'warning',
+                        failures === this.checked.length
+                            ? 'Nothing could be added to your cart. Please try again.'
+                            : 'Some items could not be added to your cart.'
+                    );
+                }
+            },
+        };
+    }
+</script>

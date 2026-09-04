@@ -1,0 +1,93 @@
+<?php
+/**
+ * PDP "Details" tab section: tab strip (Details / Specifications / Video /
+ * Seller Info) wrapping the product's existing dynamic description
+ * (rendered by pdprevamp.details.description, unchanged - same
+ * fetch/read-more/Alpine cleanup logic as before). Whatever content is
+ * authored into the product's description (including any "Key Features"
+ * grid or promo cards) comes through as-is; only the tab UI and responsive
+ * layout around it are new.
+ *
+ * The two promo cards (right column) are NOT tab content - they stay
+ * visible next to whichever tab is active, so they live here rather than
+ * inside any single tab's template.
+ *
+ * "Specifications" is still a placeholder reserved for later.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+
+$tabs = [
+    'details' => __('Details'),
+    'specifications' => __('Specifications'),
+    'video' => __('Video'),
+    'seller-info' => __('Seller Info'),
+];
+?>
+<section class="pdp-details-tabs container pt-8 pb-8" x-data="{ tab: 'details' }">
+    <div class="flex gap-8 border-b border-gray-200 overflow-x-auto pdp-tabs-scroll" role="tablist">
+        <?php foreach ($tabs as $tabId => $tabLabel): ?>
+            <a
+                href="#"
+                role="tab"
+                @click.prevent="tab = '<?= /* @noEscape */ $tabId ?>'"
+                :class="tab === '<?= /* @noEscape */ $tabId ?>' ? 'pdp-details-tab pdp-details-tab--active' : 'pdp-details-tab'"
+                class="whitespace-nowrap"
+            >
+                <?= $block->escapeHtml($tabLabel) ?>
+            </a>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start pt-6">
+        <div class="lg:col-span-2">
+            <div x-show="tab === 'details'">
+                <?= $block->getChildHtml('pdprevamp.details.description') ?>
+                <?= $block->getChildHtml('pdprevamp.details.key-features') ?>
+            </div>
+
+            <div class="text-sm" style="color:#6b7688;" x-show="tab === 'specifications'" x-cloak>
+                <?= __('Specifications coming soon.') ?>
+            </div>
+            <div x-show="tab === 'video'" x-cloak>
+                <?= $block->getChildHtml('pdprevamp.details.video') ?>
+            </div>
+            <div x-show="tab === 'seller-info'" x-cloak>
+                <?= $block->getChildHtml('pdprevamp.details.seller-info') ?>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 flex flex-col gap-6 pt-6 lg:pt-0">
+            <?= $this->getLayout()
+                ->createBlock('Magento\Cms\Block\Block')
+                ->setBlockId(\Ahy\PDPRevamp\Setup\Patch\Data\CreateSellerInfoPrimaryPromoBlock::BLOCK_IDENTIFIER)
+                ->toHtml() ?>
+            <?= $this->getLayout()
+                ->createBlock('Magento\Cms\Block\Block')
+                ->setBlockId(\Ahy\PDPRevamp\Setup\Patch\Data\CreateSellerInfoSecondaryPromoBlock::BLOCK_IDENTIFIER)
+                ->toHtml() ?>
+        </div>
+    </div>
+</section>
+<style>
+    .pdp-details-tab {
+        display: inline-block;
+        padding: 0.75rem 0.25rem 1rem;
+        margin-bottom: -1px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #6b7688;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+    }
+    .pdp-details-tab--active {
+        color: #c0392b;
+        border-bottom-color: #c0392b;
+    }
+    .pdp-tabs-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+    .pdp-tabs-scroll::-webkit-scrollbar { display: none; }
+</style>

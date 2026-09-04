@@ -1,0 +1,990 @@
+<?php
+/**
+ * Hyvä Themes - https://hyva.io
+ * Copyright © Hyvä Themes 2020-present. All rights reserved.
+ * This product is licensed per Magento install
+ * See https://hyva.io/license
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ProductAttributes;
+use Hyva\Theme\ViewModel\ProductCompare;
+use Hyva\Theme\ViewModel\ProductPage;
+use Hyva\Theme\ViewModel\Wishlist;
+use Magento\Catalog\Model\Product;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Hyva\Theme\ViewModel\HeroiconsSolid;
+
+/** @var HeroiconsOutline $heroicons */
+/** @var HeroiconsSolid $heroiconsSolid */
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+/** @var ProductAttributes $attributesViewModel */
+$attributesViewModel = $viewModels->require(ProductAttributes::class);
+/** @var Product $product */
+$product    = $productViewModel->getProduct();
+$_helper    = $this->helper('Webkul\Marketplace\Helper\Data');
+$ahyHelper  = $this->helper('Ahy\ThemeCustomization\Helper\Data');
+$seller     = $_helper->getSellerProductDataByProductId($product->getId());
+$sellerId   = 0;
+$freeShippingFromSeller = false;
+$shopTitle      = '';
+if(isset($seller->getData()[0]) && $seller->getData()[0]){
+    $sellerObj      = $seller->getData()[0];
+    $sellerId       = $sellerObj['seller_id'];
+    $sellerDataObj  = $_helper->getSellerDataBySellerId($sellerId);
+    $shippingRate   = $ahyHelper->getCustomerShippingRates($sellerId);
+    $sellerData     = $sellerDataObj->getData()[0];
+    $shopTitle      = ($sellerData['shop_title'] !== null && $sellerData['shop_title'] !== '') ? $sellerData['shop_title'] : (($sellerData['name'] !== null && $sellerData['name'] !== '') ? $sellerData['name'] : null);
+    $freeShippingFromSeller = (($shippingRate['mpshipping_fixrate']) === "0") && (($shippingRate['mpshipping_fixrate_upto']) === "0");
+}
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+$heroiconsSolid = $viewModels->require(HeroiconsSolid::class);
+$restrictedProductsAttributeFfl = $product->hasData('ffl_selection_required') ? $product->getData('ffl_selection_required') : null;
+$restrictedProductsAttributeAge = $product->hasData('age_verification_required') ? $product->getData('age_verification_required') : null;
+$productName = html_entity_decode($escaper->escapeHtmlAttr(__($product->getData('name'))));
+$productMainImage = $product->getImage();
+$productShortDescription = trim((string) $product->getShortDescription());
+$productShortDescription = strip_tags($productShortDescription);
+$shortDescWords = preg_split('/\s+/', $productShortDescription, -1, PREG_SPLIT_NO_EMPTY);
+$productShortDescription = implode(' ', array_slice($shortDescWords, 0, 10));
+$productDescriptors = trim((string) $product->getData('pdp_descriptors'));
+$productDescriptorText = $productDescriptors !== '' ? $productDescriptors : $productShortDescription;
+?>
+<div class="order-2 w-full md:pb-6 md:pt-2 lg:pt-0">
+
+    <section class="flex-col gap-2 hidden md:flex">
+        <?php if(isset($seller->getData()[0]) && $seller->getData()[0] && $shopTitle !== '' && $shopTitle !== null): ?>
+            <div class="seller-details text-sm" x-data="">
+                <span class="capitalize">
+                    Sold and Shipped by <a href="#seller-tab" class="font-bold hover:underline underline-offset-6" style="color:#0D2E47 !important;" @click.prevent="goToSellerTab()"> <?= __($shopTitle) ?> </a>
+                </span>
+            </div>
+        <?php endif; ?> 
+        <h1 class="text-ahy-blue page-title !font-extrabold title-font uppercase text-3xl lg:text-4xl">
+            <span class="base" data-ui-id="page-title-wrapper" itemprop="name">
+                <?= $productName ?>
+            </span>
+        </h1>
+        <?php if ($productDescriptorText !== ''): ?>
+            <p class="pdp-short-description">
+                <?= $escaper->escapeHtml($productDescriptorText) ?>
+            </p>
+        <?php endif; ?>
+        <style>
+            .yotpo-review-stars::before{
+                font-size: .625rem;
+            }
+        </style>
+    </section>
+    <style>
+        .pdp-rating-review-link:hover {
+            color: #e85d26 !important;
+        }
+    </style>
+    <div class="product.reviews flex gap-2 pb-1 items-center mt-1 min-h-[33px]" style="min-height:33px;" x-data="yotpoReview()" x-init="initReview()" x-show="getAverageReviewScore() > 0">
+        <template x-if="getAverageReviewScore() > 0">
+            <div class="flex items-center gap-2">
+                <span class="flex items-center" style="gap:2px;">
+                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                        <span
+                            class="pdp-rating-star"
+                            x-bind:class="{ 'pdp-rating-star--filled': <?= $i ?> <= Math.round(getAverageReviewScore()) }"
+                        ><?= $heroiconsSolid->starHtml('', 18, 18, ['aria-hidden' => 'true']) ?></span>
+                    <?php endfor; ?>
+                </span>
+                <span class="font-semibold text-ahy-blue" style="font-size:14px;" x-text="getAverageReviewScore()"></span>
+                <a href="#reviews" class="pdp-rating-review-link text-xs text-ahy-blue hover:underline underline-offset-6 cursor-pointer" @click.prevent="goToReview()" x-show="totalReviewCount > 0">
+                    (<span x-text="totalReviewCount"></span> <span x-text="totalReviewCount === 1 ? '<?= $escaper->escapeJs(__('review')) ?>' : '<?= $escaper->escapeJs(__('reviews')) ?>'"></span>)
+                </a>
+            </div>
+        </template>
+    </div>
+    <?= $block->getChildHtml('pdprevamp.review.quote') ?>
+    <?php if ($product->getNoLongerAvailable() !== NULL && $product->getNoLongerAvailable()): ?>
+        <?= $block->getChildHtml("no_longer_available") ?>
+        <?= $block->getChildHtml("no_longer_available_related") ?>
+    <?php else: ?>
+        <div
+            x-data="productStickyCart('<?= $escaper->escapeJs('$' . number_format((float)$product->getFinalPrice(), 2)) ?>')"
+            @scroll.window.throttle.20ms="showStickyCart()"
+
+        >
+                <div
+                    x-show="showStickyButton"
+                    class="md:hidden product-sticky-mini-cart"
+                    style="position:fixed;left:0;right:0;bottom:0;z-index:999;background:#fff;border-top:1px solid #e5e7eb;box-shadow:0 -2px 16px rgba(0,0,0,0.12);overflow:hidden;"
+                    x-cloak
+                >
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;box-sizing:border-box;width:100%;overflow:hidden;">
+                        <!-- Thumbnail -->
+                        <img :src="productMainImage"
+                            style="width:44px;height:44px;min-width:44px;flex-shrink:0;border-radius:4px;border:1px solid #f3f4f6;object-fit:contain;"
+                            alt="">
+                        <!-- Right: name+price top, qty+ATC bottom -->
+                        <div style="flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:4px;">
+                            <div style="overflow:hidden;">
+                                <p style="font-size:11px;font-weight:700;color:#0d2f47;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0;" x-text="productName"></p>
+                                <span style="font-size:12px;font-weight:700;color:#2E7D32;" x-text="stickyPrice"></span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;overflow:hidden;min-width:0;">
+                                <!-- Qty -->
+                                <div style="display:flex;align-items:center;border:2px solid #0d2f47;border-radius:999px;overflow:hidden;height:30px;flex-shrink:0;">
+                                    <button type="button" @click="stickyQty = Math.max(1, stickyQty - 1)"
+                                        style="width:26px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#0d2f47;background:none;border:none;cursor:pointer;">−</button>
+                                    <span style="width:20px;text-align:center;font-size:12px;font-weight:600;color:#0d2f47;" x-text="stickyQty"></span>
+                                    <button type="button" @click="stickyQty++"
+                                        style="width:26px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#0d2f47;background:none;border:none;cursor:pointer;">+</button>
+                                </div>
+                                <!-- ATC -->
+                                <button type="button"
+                                    @click="submitStickyCart()"
+                                    :disabled="addToCartButtonDisabled || stickyLoading"
+                                    style="flex:1;min-width:0;max-width:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:5px;background:#2E7D32;color:#fff;border:none;border-radius:999px;height:32px;font-size:12px;font-weight:700;cursor:pointer;padding:0 10px;">
+                                    <svg x-show="stickyLoading" class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;"><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                                    <svg x-show="!stickyLoading" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="stickyLoading ? 'Adding...' : 'Add to Cart'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <script>
+            function productStickyCart(stickyPrice) {
+                return {
+                    showStickyButton: false,
+                    stickyQty: 1,
+                    stickyPrice: stickyPrice || '',
+                    productName: `<?= $productName ?>`,
+                    productMainImage: '',
+                    addToCartButtonDisabled: true,
+                    stickyLoading: false,
+                    init() {
+                        this.productMainImage = "/media/catalog/product/<?= $escaper->escapeUrl($productMainImage) ?>";
+                        if (this.productMainImage.includes("//")) {
+                            this.productMainImage = this.productMainImage.replace(/\/{2,}/g, '/');
+                        }
+                        this.showStickyCart();
+                        window.addEventListener('product-addtocart-success', () => { this.stickyLoading = false; });
+                        window.addEventListener('product-addtocart-error', () => { this.stickyLoading = false; });
+                    },
+                    showStickyCart() {
+                        let addToCartButton = document.querySelector('#addToCartActions');
+                        let addToCartButtonEl = document.querySelector('#addToCartActions #product-addtocart-button');
+                        if (addToCartButton) {
+                            let elementRect = addToCartButton.getBoundingClientRect();
+                            this.showStickyButton = elementRect.top < -70;
+                            if (addToCartButtonEl) {
+                                this.addToCartButtonDisabled = addToCartButtonEl.disabled;
+                            }
+                        }
+                    },
+                    submitStickyCart() {
+                        this.stickyLoading = true;
+                        const qtyInput = document.querySelector('#product_addtocart_form input[name="qty"]');
+                        if (qtyInput) {
+                            qtyInput.value = this.stickyQty;
+                            qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        const atcBtn = document.querySelector('#addToCartActions #product-addtocart-button');
+                        if (atcBtn) atcBtn.click();
+                    },
+                }
+            }
+        </script>
+        <?php if ($restrictedProductsAttributeFfl || $restrictedProductsAttributeAge): ?>
+            <section class="relative pb-4 border-y border-gray-300 md:py-3 w-full"
+            x-data="{
+                    open: false,
+                }"
+            >
+            <div class="flex gap-4 cursor-pointer" @click="open = true">
+                <img src="/media/icons/warning-ahy.svg" alt="restricted icon" width="20" height="20" loading="lazy">
+                <p class="font-bold uppercase text-lg leading-6 !text-ahy-red flex py-4 w-full flex justify-between items-center underline underline-offset-6" >
+                    Restrictions Apply
+                </p>
+            </div>
+            <?php if ($restrictedProductsAttributeFfl ): ?>
+                <template x-if="true">
+                    <div role="dialog"
+                        aria-labelledby="ffl-restriction-title"
+                        aria-modal="true"
+                        class="fixed inset-y-0 right-0 z-[500] flex max-w-full"
+                    >
+                        <div class="backdrop"
+                            x-show="open"
+                            x-transition:enter="ease-in-out duration-500"
+                            x-transition:enter-start="opacity-0"
+                            x-transition:enter-end="opacity-100"
+                            x-transition:leave="ease-in-out duration-500"
+                            x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            @click="open=false"
+                            aria-label="Close panel"
+                        >
+                        </div>
+                        <div class="relative w-screen max-w-lg shadow-2xl"
+                            x-show="open"
+                            x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                            x-transition:enter-start="translate-x-full"
+                            x-transition:enter-end="translate-x-0"
+                            x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                            x-transition:leave-start="translate-x-0"
+                            x-transition:leave-end="translate-x-full"
+                        >
+                            <div
+                                x-show="open"
+                                x-transition:enter="ease-in-out duration-500"
+                                x-transition:enter-start="opacity-0"
+                                x-transition:enter-end="opacity-100"
+                                x-transition:leave="ease-in-out duration-500"
+                                x-transition:leave-start="opacity-100"
+                                x-transition:leave-end="opacity-0" class="absolute top-0 right-0 flex p-2 mt-2"
+                            >
+                                <button @click="open=false" aria-label="Close panel"
+                                        class="p-2 card rounded-full text-ahy-blue transition duration-150 ease-in-out hover:text-black">
+                                    <?= $heroicons->xHtml(); ?>
+                                </button>
+                            </div>
+                            <div class="flex flex-col h-full pt-6 bg-white shadow-xl">
+                                <header class="px-4 sm:px-6">
+                                    <h2 id="cart-drawer-title" class="capitalize pb-4 border-b border-ahy-blue font-extrabold leading-7 text-ahy-blue">
+                                        restrictions apply
+                                    </h2>
+                                </header>
+                                <div class="relative flex flex-col items-center justify-center gap-6 px-4 py-6 overflow-y-auto text-ahy-blue bg-white sm:gap-8 sm:px-6">
+                                    <p class="">
+                                        To complete the purchase of long guns, you must be 18 years or older, and for handguns, you must be 21 years or older. Some States now require customers to be 21 years of age to purchase long guns. It is important to adhere to Federal, State, and Local Laws during the ordering and ownership transfer process.
+                                    </p>
+
+                                    <p class="">
+                                        According to Federal Law, guns can only be shipped to a Federal Firearms Licensed (FFL) dealer. Before finalizing the transfer of the gun, the dealer will verify that you meet all the legal requirements set by Federal, State, and Local Laws. Please note that most dealers charge a separate fee for this service, which is not included in your purchase transaction on <a href="https://www.Everest.com">https://www.Everest.com</a> Marketplace. This fee should be paid directly to the FFL dealer at the time of transfer. During the checkout process, you will have the option to select the FFL dealer closest to your location.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            <?php elseif ($restrictedProductsAttributeAge && !$restrictedProductsAttributeFfl): ?>
+                <template x-if="true">
+                    <div role="dialog"
+                        aria-labelledby="age-restriction-title"
+                        aria-modal="true"
+                        class="fixed inset-y-0 right-0 z-[500] flex max-w-full"
+                    >
+                        <div class="backdrop"
+                            x-show="open"
+                            x-transition:enter="ease-in-out duration-500"
+                            x-transition:enter-start="opacity-0"
+                            x-transition:enter-end="opacity-100"
+                            x-transition:leave="ease-in-out duration-500"
+                            x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            @click="open=false"
+                            aria-label="Close panel"
+                        >
+                        </div>
+                        <div class="relative w-screen max-w-lg shadow-2xl"
+                            x-show="open"
+                            x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+                            x-transition:enter-start="translate-x-full"
+                            x-transition:enter-end="translate-x-0"
+                            x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+                            x-transition:leave-start="translate-x-0"
+                            x-transition:leave-end="translate-x-full"
+                        >
+                            <div
+                                x-show="open"
+                                x-transition:enter="ease-in-out duration-500"
+                                x-transition:enter-start="opacity-0"
+                                x-transition:enter-end="opacity-100"
+                                x-transition:leave="ease-in-out duration-500"
+                                x-transition:leave-start="opacity-100"
+                                x-transition:leave-end="opacity-0" class="absolute top-0 right-0 flex p-2 mt-2"
+                            >
+                                <button @click="open=false" aria-label="Close panel"
+                                        class="p-2 card rounded-full text-ahy-blue transition duration-150 ease-in-out hover:text-black">
+                                    <?= $heroicons->xHtml(); ?>
+                                </button>
+                            </div>
+                            <div class="flex flex-col h-full pt-6 bg-white shadow-xl">
+                                <header class="px-4 sm:px-6">
+                                    <h2 id="cart-drawer-title" class="capitalize pb-4 border-b border-ahy-blue font-extrabold leading-7 text-ahy-blue">
+                                        restrictions apply
+                                    </h2>
+                                </header>
+                                <div class="relative flex flex-col items-center justify-center gap-6 px-4 py-6 text-ahy-blue overflow-y-auto bg-white sm:gap-8 sm:px-6">
+                                    <p class="">
+                                        Due to your local, state and federal laws shipping and age restrictions may be applied at checkout. During the checkout process you will be asked to verify your age and address. Based on your location or your age, some changes may be made to your order. If you have any questions please contact us at <a class="text-ahy-blue-light hover:text-ahy-blue" href="tel:+1-866-806-0934">1-866-806-0934</a> or <a class="text-ahy-blue-light hover:text-ahy-blue" href="mailto:info@everest.com">info@everest.com</a>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            <?php endif ?>
+            </section>
+        <?php endif ?>
+        
+        <div class="bundle-summary">
+            <?= $block->getChildHtml("bundle.summary.ahy") ?>
+        </div>
+        
+        <div class="product-info-bundle-options">
+            <?= $block->getChildHtml("product.info.bundle.options.ahy") ?>
+        </div>
+        <?= $block->getChildHtml('product.info.form') ?>
+        <?= $block->getChildHtml('pdprevamp.calibernation.price') ?>
+        <?php /* Caliber Nation member price + "Join Caliber Nation" teaser. This template
+                 overrides the theme's product-info.phtml, which called this block at its
+                 own line 184 — without this call the member price silently disappears
+                 whenever Ahy_PDPRevamp is enabled. The block itself is declared by
+                 Ahy_CaliberNation as a child of product.info, so nothing else is needed.
+                 (pdprevamp.calibernation.price above is the non-member/MSRP box; its
+                 member-price section was stripped when CN pricing was still a stub.) */ ?>
+        <?= $block->getChildHtml('caliber_nation.member_price') ?>
+        <?= $block->getChildHtml('caliber_nation.early_access_badge') ?>
+
+        <div class="flex gap-2 my-1 items-center flex-wrap">
+            <?= $block->getChildHtml("product.info.stockstatus") ?>
+        </div>
+
+        <?= $block->getChildHtml('pdprevamp.badges.placeholder') ?>
+
+        <?= $block->getChildHtml('pdprevamp.shipping.returns') ?>
+
+        <?php $normalizedTitle = strtolower(trim($shopTitle ?? '')); ?>
+        <?php if ($normalizedTitle !== 'star-batt'): ?>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-y-2 pt-4 pb-0 md:py-4 text-sm justify-items-center">
+            <?php if($freeShippingFromSeller == true): ?>
+                <span class="capitalize text-ahy-blue font-bold flex items-center gap-1.5 min-w-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>
+                        Quick Shipping
+                </span>
+            <?php else: ?>
+                <span class="capitalize text-ahy-blue font-bold flex items-center gap-1.5 min-w-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>
+                        Quick Shipping
+                </span>
+            <?php endif; ?>
+            <span class="capitalize text-ahy-blue font-bold flex items-center gap-1.5 min-w-0">
+                <?php if (isset($shopTitle) && strtolower(trim($shopTitle)) == 'off the grid surplus' || strtolower(trim($shopTitle)) == 'off the grid'): ?>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                    FREE Exchanges
+                <?php else: ?>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                    EZ Returns
+                <?php endif; ?>
+            </span>
+            <span class="capitalize text-ahy-blue font-bold flex items-center gap-1.5 min-w-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    Price Matched
+            </span>
+            <span class="capitalize text-ahy-blue font-bold flex items-center gap-1.5 min-w-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+                    Warranty
+            </span>
+        </div>
+        <?php endif; ?>
+        <div class="flex flex-col md:items-center lg:items-start my-4 gap-3">
+            <div class="flex flex-col mt-2 md:mt-0 gap-3 w-full hello test">
+
+                <?php if (isset($shopTitle) && strtolower(trim($shopTitle)) == 'off the grid surplus' || strtolower(trim($shopTitle)) == 'off the grid'): ?>
+                
+                    <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                        <div>
+                            <div class="text-md"><p><strong>Buy 2 - GET 20% OFF</strong> - USE CODE OTGBUY2<br><strong>Buy 3 - GET 25% OFF</strong> - USE CODE OTGBUY3<br><strong>Buy 4+ - GET 30% OFF</strong> - USE CODE OTGBUY4</p>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                    <?php if ($product->getSku() === 'sta-SBC-01-1'): ?>
+
+                        <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                            <div>
+                                <div class="text-md">
+                                    <p><strong>Lead Time: 1 - 5 days</strong>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+
+                    <?php if ($product->getSku() === 'sta-SB-LINQ-01-1'): ?>
+
+                        <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                            <div>
+                                <div class="text-md">
+                                    <p><strong>Lead Time: 1 - 5 days</strong>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($product->getSku() === 'sta-SB-SUX-1'): ?>
+
+                        <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                            <div>
+                                <div class="text-md">
+                                    <p><strong>Lead Time: 1 - 5 days</strong>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($product->getSku() === 'SBM-02-1'): ?>
+
+                        <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                            <div>
+                                <div class="text-md">
+
+                                    <p><strong>Lead Time: 7 - 14 days</strong>
+
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($product->getSku() === 'sta-SBS-03-1'): ?>
+
+                        <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                            <div>
+                                <div class="text-md">
+
+                                    <p><strong>Lead Time: 1 - 5 days</strong>
+
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($product->getSku() === 'SBP-01-1'): ?>
+
+                        <div class="bg-[#00f05c] border border-ahy-blue-light rounded-lg p-4">
+                            <div>
+                                <div class="text-md">
+
+                                    <p><strong>Lead Time: 14 - 21 days</strong>
+
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php if ($product->isSaleable()): ?>
+                    <div class="flex items-center gap-2 sm:gap-3" id="addToCartActions">
+                        <?= $block->getChildHtml("product.info.quantity") ?>
+                        <div class="flex-1 min-w-0 flex ahy-atc-slot">
+                            <?= $block->getChildHtml("product.info.addtocart") ?>
+                        </div>
+                        <?= $block->getChildHtml("product.info.addtowishlist") ?>
+                    </div>
+                    <?php $paypalShortcutHtml = $block->getChildHtml('addtocart.shortcut.buttons'); ?>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <div class="ahy-buy-now flex-1" x-data="ahyBuyNow()">
+                            <button
+                                class="btn bg-ahy-blue ahy-buy-now-button hover:bg-ahy-blue-light font-bold rounded-lg w-full h-11 flex justify-center items-center focus:ring-transparent text-sm"
+                                @click="window.setAjaxBuyNow()"
+                                id="ahy-buy-now-button"
+                                @click.prevent="$event.preventDefault();"
+                                type="submit"
+                            >
+                                <?= __('Buy Now') ?>
+                            </button>
+                        </div>
+                        <?php if (trim($paypalShortcutHtml) !== ''): ?>
+                        <div class="flex justify-center flex-1 min-w-0 h-11 rounded-lg overflow-hidden [&_.paypal.checkout]:!w-full [&_.paypal.checkout]:!h-full [&_iframe]:!w-full [&_iframe]:!h-full">
+                            <?= $paypalShortcutHtml ?>
+                        </div>
+                        <?php endif; ?>
+                        <?php /* EverestPay is not live yet. The button used to carry
+                               "disabled" with a title tooltip, which meant it fired no
+                               click event at all and the tooltip never appeared on
+                               touch devices - so on mobile it read as simply broken.
+                               It is now a real button that explains itself in a
+                               dialog. Deliberately not aria-disabled either: it does
+                               something when pressed, so announcing it as disabled
+                               would be wrong. */ ?>
+                        <div class="flex flex-1 items-center" x-data="ahyEverestPayComingSoon()">
+                            <button
+                                type="button"
+                                x-ref="everestPayTrigger"
+                                aria-haspopup="dialog"
+                                :aria-expanded="open ? 'true' : 'false'"
+                                @click="show()"
+                                class="btn font-bold rounded-lg w-full h-11 flex justify-center items-center gap-1.5 text-sm"
+                                style="background:#c0392b;color:#fff;"
+                            >
+                                <svg width="20" height="16" viewBox="0 0 32 24" fill="white" aria-hidden="true"><polygon points="20,2 32,22 14,22"></polygon><polygon points="10,8 20,22 0,22"></polygon></svg>
+                                <?= __('EverestPay') ?>
+                            </button>
+
+                            <?php /* Teleported to <body>. position: fixed is resolved
+                                   against the nearest ancestor that establishes a
+                                   containing block, and this button sits deep inside
+                                   the buy box - any transform, filter or will-change
+                                   introduced on an ancestor later would silently trap
+                                   the overlay inside the column instead of centring it
+                                   on the viewport. Teleporting keeps it immune to that
+                                   while preserving this component's Alpine scope. */ ?>
+                            <template x-teleport="body">
+                                <div
+                                    x-show="open"
+                                    x-cloak
+                                    x-transition.opacity
+                                    class="ahy-coming-soon-overlay"
+                                    role="dialog"
+                                    aria-modal="true"
+                                    aria-labelledby="ahy-coming-soon-title"
+                                    @click.self="hide()"
+                                    @keydown.escape.window="hide()"
+                                >
+                                    <div x-show="open" x-transition.scale.origin.center class="ahy-coming-soon-card">
+                                        <button
+                                            type="button"
+                                            x-ref="everestPayClose"
+                                            class="ahy-coming-soon-close"
+                                            @click="hide()"
+                                            aria-label="<?= $escaper->escapeHtmlAttr(__('Close')) ?>"
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                                        </button>
+
+                                        <div class="ahy-coming-soon-body">
+                                            <span class="ahy-coming-soon-icon">
+                                                <svg width="26" height="21" viewBox="0 0 32 24" fill="currentColor" aria-hidden="true"><polygon points="20,2 32,22 14,22"></polygon><polygon points="10,8 20,22 0,22"></polygon></svg>
+                                            </span>
+                                            <h2 id="ahy-coming-soon-title" class="ahy-coming-soon-title">
+                                                <?= $escaper->escapeHtml(__('EverestPay is coming soon')) ?>
+                                            </h2>
+                                            <p class="ahy-coming-soon-text">
+                                                <?= $escaper->escapeHtml(__('We are putting the finishing touches on EverestPay. For now you can check out with card, PayPal or Buy Now.')) ?>
+                                            </p>
+                                            <button type="button" class="ahy-coming-soon-ok" @click="hide()">
+                                                <?= $escaper->escapeHtml(__('Got it')) ?>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <script>
+                            function ahyEverestPayComingSoon() {
+                                return {
+                                    open: false,
+                                    show() {
+                                        this.open = true;
+                                        // Same scroll lock the quickview carousels in
+                                        // this module use, so the page behind cannot
+                                        // be scrolled while the dialog is up.
+                                        document.documentElement.classList.add('overflow-hidden');
+                                        this.$nextTick(() => {
+                                            this.$refs.everestPayClose && this.$refs.everestPayClose.focus();
+                                        });
+                                    },
+                                    hide() {
+                                        // Guarded because the escape handler is bound to
+                                        // window and fires whether or not this dialog is
+                                        // the thing on screen - without this it would
+                                        // steal focus back to the button on every Esc
+                                        // pressed anywhere on the page.
+                                        if (!this.open) {
+                                            return;
+                                        }
+                                        this.open = false;
+                                        document.documentElement.classList.remove('overflow-hidden');
+                                        this.$refs.everestPayTrigger && this.$refs.everestPayTrigger.focus();
+                                    }
+                                }
+                            }
+                        </script>
+                    </div>
+                    <div class="flex items-start gap-3 rounded-xl p-4" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+                        <span class="flex items-center justify-center rounded-full shrink-0 mt-0.5" style="width:32px;height:32px;background:#dcfce7;color:#15803d;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold !p-0" style="color:#166534;"><?= __('Every Purchase Gives Back') ?></p>
+                            <p class="text-xs !p-0" style="color:#15803d; letter-spacing:-0.5px">
+                                <?= __('A portion of this sale supports outdoor conservation through the Everest Give Back Fund.') ?>
+                            </p>
+                        </div>
+                    </div>
+                    <script>
+                        function ahyBuyNow(){
+                            return {
+                                buyNowProduct(){
+                                    // Trigger click event on the add-to-cart button
+                                    window.setAjaxBuyNow();
+                                },
+                            }
+                        }
+                    </script>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if ($tierPriceBlock = $block->getChildHtml("product.price.tier")): ?>
+            <div class="py-4 my-2 tier-price-container">
+                <?= /** @noEscape */ $tierPriceBlock ?>
+            </div>
+        <?php endif; ?>
+
+            <?= $block->getChildHtml("product.info.additional") ?>
+        <?php endif; ?>
+        
+        <!-- short description is shown as the tagline excerpt under the
+             product title instead (see $productShortDescription near the
+             top of this file) - not duplicated here. -->
+    
+
+    
+</div>
+
+
+<style>
+    p{
+        padding:0.25rem;
+    }
+
+    section.meet-seller-tabs.text-ahy-blue .prose * {
+        text-align: left !important;
+    }
+    .catalog-product-view .prose :where(li):not(:where([class~=not-prose] *)) {
+        margin-bottom: 1.25rem;
+    }
+    .catalog-product-view .more-items-to-explore form.item.product.product-item.product_addtocart_form.card.card-interactive.flex.flex-col.w-full, 
+    .catalog-product-view .more-items-to-explore .item.product.product-item.card.card-interactive.flex.flex-col.w-full {
+        flex-direction: row !important;
+        align-items: center;
+        padding: 1rem 0.25rem;
+    }
+    .catalog-product-view .more-items-to-explore form.item.product.product-item.product_addtocart_form.card.card-interactive.flex.flex-col.w-full .mt-auto.pt-3.flex.flex-wrap.justify-center.items-center {
+        display: none;
+    }
+    .catalog-product-view .more-items-to-explore a.product.photo.product-item-photo.block.mx-auto.mb-3 {
+        width: 90px;
+        margin: 0;
+    }
+    .catalog-product-view .more-items-to-explore .card-interactive:hover {
+        background-color: white;
+    }
+    .catalog-product-view .more-items-to-explore img.hover\:shadow-sm.object-contain.product-image-photo {
+        box-shadow: none;
+        min-width: 90px;
+        height: 5rem;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .py-1.mx-auto {
+        order: 1;
+        margin: 0;
+        padding: 0;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .mt-2.mb-1.items-center.justify-center.text-primary.font-semibold.text-lg {
+        order: 2;
+        text-align: start;
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        margin: 0;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .pt-1.text-gray-900 {
+        order: 3;
+        padding: 0;
+    }
+    .catalog-product-view .more-items-to-explore .product-info {
+        justify-content: center;
+        height: 100%;
+    }
+    .catalog-product-view .more-items-to-explore .product-info .py-1.mx-auto{
+        height: 14px;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .py-1.mx-auto .rating-summary svg{
+        width: 0.85rem;
+        height: 0.85rem;
+    }
+    .catalog-product-view .more-items-to-explore .product-info button.rounded-full.w-9.h-9.bg-gray-200.p-0.border-0.inline-flex.shrink-0.items-center.justify-center.text-gray-500,
+    .catalog-product-view .more-items-to-explore .product-info .swatch-attribute.border-t.last\:border-b.border-container,
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price span.price-label {
+        display: none;
+    }
+    .catalog-product-view .more-items-to-explore .lg\:grid-cols-4 {
+        grid-template-columns: repeat(3,minmax(0,1fr));
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .product-item-link{
+        text-overflow: ellipsis;
+    } 
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price span[data-price-type="oldPrice"] .price{
+        font-size: 13px;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price span[data-price-type="oldPrice"] {
+        text-decoration: line-through;
+        font-size: 13px;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price span.price-wrapper {
+    margin-right: 0.25rem;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price {
+        display: flex;
+        align-items: center;
+        justify-content: start;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .product-item-link{
+        font-size: 14px;
+    } 
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price .price {
+        font-size: 16px;
+    }
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .product-item-link, 
+    .catalog-product-view .more-items-to-explore .product-info.flex.flex-col.grow .price-box.price-final_price .price {
+        color: #0d2f47;
+        font-weight: 700;
+    }
+
+    @media screen and (max-width: 1023px) {
+        .catalog-product-view .more-items-to-explore .mx-auto.grid.gap-4.sm\:grid-cols-2.lg\:grid-cols-4{
+            display: flex;
+            width: 100vw;
+            margin-left: -50vw;
+            margin-right: -50vw;
+            right: 50%;
+            left: 50%;
+            position: relative;
+            overflow: scroll;
+            padding: 2rem 1.5rem;
+            background: #efeadd;
+        }
+        .catalog-product-view .more-items-to-explore .mx-auto.grid.gap-4.sm\:grid-cols-2.lg\:grid-cols-4::-webkit-scrollbar {
+            width: 1px;
+            background-color: #ccc;
+            border-radius: 17px;
+        }
+        .catalog-product-view .more-items-to-explore .mx-auto.grid.gap-4.sm\:grid-cols-2.lg\:grid-cols-4::-webkit-scrollbar-thumb {
+            background-color: #064f84;
+            border-radius: 17px;
+        }
+        .catalog-product-view .more-items-to-explore img.hover\:shadow-sm.object-contain.product-image-photo {
+            width: 5rem;
+            height: 5rem;
+        }
+        .catalog-product-view .more-items-to-explore .product-info{
+            min-width: 220px;
+        }
+    }
+
+    @media screen and (max-width: 363px) {
+        .catalog-product-view .more-items-to-explore .product-info{
+            min-width: 190px;
+        }
+    }
+    @media screen and (min-width: 1024px) {
+        .catalog-product-view .more-items-to-explore img.hover\:shadow-sm.object-contain.product-image-photo{
+            object-fit: contain;
+        }
+    }
+    @media screen and (min-width: 430px){
+        .catalog-product-view .more-items-to-explore .product-info{
+            /* height: 80% */
+        }
+    }
+
+    .ahy-tooltip {
+        position: relative;
+        display: inline-block;
+    }
+
+    .ahy-tooltip:hover img.img-info-up {
+        display: none;
+    }
+
+    .ahy-tooltip:hover img.hidden {
+        display: block;
+    }
+
+    .ahy-tooltip .ahy-tooltip-text {
+        display:none;
+        width: 300px;
+        position: absolute;
+        z-index: 50;
+        bottom: 149%;
+        left: 50%;
+        margin-left: -149px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .ahy-tooltip .ahy-tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -15px;
+        border-width: 15px;
+        border-style: solid;
+        border-color: #0d2f47 transparent transparent transparent;
+    }
+
+    div#product_list,
+    div#wk_list_header,
+    div.wk-ap-price-block {
+        display: none;
+    }
+
+    .ahy-tooltip:hover .ahy-tooltip-text {
+        display:flex;
+        opacity: 1;
+        border-bottom: 5px solid;
+    }
+
+    .ahy-tooltip-button button:hover{
+        box-shadow: #0d2f47 0px 0px 0px 1px inset;
+    }
+
+    .sticky-header-price .price-label,
+    .sticky-header-price .event-sale-label,
+    .sticky-header-price .ahy-discount-container
+    {
+        display: none !important;
+
+    }
+    .sticky-header-price span.price-wrapper.title-font.font-extrabold.text-4xl{
+        font-size: 1rem;
+        line-height: 1;
+    }
+    .sticky-header-price span.price-wrapper.title-font.font-bold.line-through.text-ahy-blue {
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .sticky-header-price .flex.items-start.justify-between.flex-col.md\:flex-row.pb-4{
+        padding: 0;
+    }
+
+    /* Right-col tooltip (price match): opens leftward at ALL screen sizes.
+       right: -8px centers the 30px arrow over the 14px ? icon:
+       arrow center = -8 + 15 = 7px from panel right = center of ? */
+    .ahy-tooltip-right-col .ahy-tooltip-text {
+        left: auto;
+        right: 0;
+        margin-left: 0;
+    }
+    .ahy-tooltip-right-col .ahy-tooltip-text::after {
+        left: auto;
+        right: -8px;
+        margin-left: 0;
+    }
+
+    /* Mobile trust-row tooltip positioning (< 500px) */
+    @media screen and (max-width: 499px) {
+        /* Left col (give back fund): center tooltip above ? */
+        .ahy-tooltip-left-col .ahy-tooltip-text {
+            left: 50%;
+            transform: translateX(-50%);
+            margin-left: 0;
+            width: min(260px, calc(100vw - 32px));
+        }
+        .ahy-tooltip-left-col .ahy-tooltip-text::after {
+            left: 50%;
+            margin-left: -15px;
+        }
+        /* Right col (price match): clamp width for small screens */
+        .ahy-tooltip-right-col .ahy-tooltip-text {
+            width: min(260px, calc(100vw - 32px));
+        }
+        .ahy-tooltip-right-col .ahy-tooltip-text::after {
+            left: auto;
+            right: -8px;
+            margin-left: 0;
+        }
+    }
+
+    @media screen and (max-width: 400px) {
+        #addToCartActions .flex.items-center.border-2.rounded-full button[type="button"] {
+            width: 34px !important;
+            height: 36px !important;
+            min-width: 0 !important;
+        }
+        #addToCartActions .flex.items-center.border-2.rounded-full input {
+            width: 26px !important;
+            height: 36px !important;
+        }
+    }
+
+    /*
+       Narrow phones only: let the quantity stepper fill the row.
+
+       Below 375px, buy-box-style.phtml pulls Add to Cart out onto its own line,
+       which frees up the whole first row for the stepper and the heart. Without
+       this the stepper keeps the compressed 34px/26px sizing set immediately
+       above (meant for the three-in-a-row layout) and leaves a dead gap between
+       itself and the heart.
+
+       Deliberately placed here rather than in buy-box-style.phtml: the rules
+       above use !important, and buy-box-style.phtml loads in <head> while this
+       block is inline in <body>. Same specificity + same importance means
+       document order decides, so anything overriding them has to live after
+       them - i.e. here.
+
+       375px is inside the 400px query above, so both apply and these win.
+    */
+    @media screen and (max-width: 375px) {
+        /*
+           The stepper's own wrapper is .shrink-0, so it needs an explicit grow
+           to take up the freed space. The ID keeps this above that utility.
+
+           Targeted by class, NOT by :first-child - quantity.phtml emits a
+           <script> block before the stepper div, so the container's first child
+           is that script element. :first-child matched it (structural selectors
+           ignore display: none) and silently styled nothing, which is why the
+           heart kept wrapping.
+
+           flex-basis MUST be 0, not auto. With flex-wrap on, the browser decides
+           line breaks from each item's hypothetical size - its basis - before any
+           growing happens. On "auto" that basis is the stepper's content width,
+           which is wide enough that the heart no longer fits beside it and wraps
+           onto a line of its own. A basis of 0 means the stepper claims no space
+           up front, so the heart always shares the row, and the stepper then
+           grows into whatever is left.
+        */
+        #addToCartActions .ahy-qty-slot {
+            flex: 1 1 0%;
+            min-width: 0;
+        }
+        /*
+           No width: 100% here. The pill is a plain block div inside the wrapper,
+           so it already fills it - and a percentage width would feed back into
+           the wrapper's content size, which is what pushed the heart onto its
+           own row.
+        */
+        #addToCartActions .flex.items-center.border-2.rounded-full {
+            justify-content: space-between;
+        }
+        /* Bigger tap targets, now that there is room for them. */
+        #addToCartActions .flex.items-center.border-2.rounded-full button[type="button"] {
+            width: 44px !important;
+        }
+        /* Takes whatever is left between the two buttons, keeping the number
+           centred instead of pinned to a fixed 26px box. */
+        #addToCartActions .flex.items-center.border-2.rounded-full input {
+            flex: 1 1 auto;
+            width: auto !important;
+            min-width: 0;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .page-wrapper {
+            overflow-x: hidden;
+        }
+    }
+
+</style>

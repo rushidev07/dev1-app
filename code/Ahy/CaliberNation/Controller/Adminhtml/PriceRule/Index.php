@@ -26,7 +26,7 @@ class Index extends Action
     {
         $result = $this->resultPageFactory->create();
         $result->setActiveMenu('Ahy_CaliberNation::price_rules');
-        $result->getConfig()->getTitle()->prepend(__('Caliber Nation - Member Price Rules'));
+        $result->getConfig()->getTitle()->prepend(__('Caliber Nation - Category Level Discounts'));
         return $result;
     }
 }

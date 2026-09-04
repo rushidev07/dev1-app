@@ -1,0 +1,88 @@
+<?php
+/**
+ * Early-access / early-bird badge for PDP.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Ahy\CaliberNation\ViewModel\EarlyAccessBadge $vm
+ * @var \Magento\Catalog\Api\Data\ProductInterface $product
+ */
+declare(strict_types=1);
+
+/** @var \Ahy\CaliberNation\ViewModel\EarlyAccessBadge $vm */
+$vm      = $block->getData('view_model');
+$product = $block->getData('product') ?? ($block->getLayout()->getBlock('product.info') ? $block->getLayout()->getBlock('product.info')->getProduct() : null);
+
+if (!$vm || !$product) {
+    return;
+}
+if (!$vm->isEnabled()) {
+    return;
+}
+
+$badge = $vm->resolve($product);
+if (!$badge) {
+    return;
+}
+
+$memberBadge    = $block->escapeHtml($badge['member_badge']);
+$nonMemberBadge = $block->escapeHtml($badge['non_member_badge']);
+$joinUrl        = $block->escapeUrl($block->getUrl('caliber-nation'));
+?>
+<style>
+@keyframes cn-pulse-ring {
+    0%   { box-shadow: 0 0 0 0 rgba(22,163,74,0.45); }
+    70%  { box-shadow: 0 0 0 8px rgba(22,163,74,0); }
+    100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+}
+.cn-ea-member-wrap  { animation: cn-pulse-ring 2.2s ease-out infinite; }
+</style>
+
+<div class="caliber-nation-early-access-badge my-4 w-full"
+     x-data="{ member: false }"
+     @private-content-loaded.window="
+         if ($event.detail && $event.detail.data && $event.detail.data['caliber-nation-savings']) {
+             member = !!$event.detail.data['caliber-nation-savings'].member;
+         }
+     ">
+
+    <!-- ── Member view ── -->
+    <template x-if="member">
+        <div class="cn-ea-member-wrap flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full rounded-xl bg-green-600 text-white px-5 py-4 shadow-lg">
+            <div class="flex items-center gap-3 sm:contents">
+            <span class="shrink-0 flex items-center justify-center w-11 h-11 rounded-full bg-white/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+            </span>
+            <div class="flex flex-col gap-0.5">
+                <p class="text-base font-bold leading-snug"><?= /* @noEscape */ $memberBadge ?></p>
+            </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- ── Non-member view: conversion hook ── -->
+    <template x-if="!member">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 w-full rounded-xl border-2 border-ahy-red bg-red-50 px-5 py-4 shadow-sm">
+            <div class="flex items-center gap-3">
+                <!-- Icon -->
+                <span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-ahy-red text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                    </svg>
+                </span>
+                <div class="flex flex-col gap-0.5">
+                    <p class="text-sm font-semibold text-ahy-blue leading-snug"><?= /* @noEscape */ $nonMemberBadge ?></p>
+                </div>
+            </div>
+            <a href="<?= $joinUrl ?>"
+               class="w-full lg:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 bg-ahy-red hover:bg-ahy-red-light text-white text-sm font-bold rounded-full px-5 h-10 transition-colors whitespace-nowrap">
+                <?= $block->escapeHtml(__('Join to Unlock')) ?>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+            </a>
+        </div>
+    </template>
+
+</div>

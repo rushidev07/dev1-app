@@ -11,19 +11,6 @@ use Ahy\CaliberNation\Model\Config;
 use Ahy\CaliberNation\Model\Config\Source\DiscountType;
 use Magento\Catalog\Api\Data\ProductInterface;
 
-/**
- * THE member-pricing engine (Phase 3, single source of truth).
- *
- * Model (locked P0 decisions — see docs/Phase3-Plan.md §1):
- *   - ADDITIVE stack of layers: membership base + seller + category(+) + product.
- *   - Each layer is percent (off the ORIGINAL price) or fixed (flat amount off).
- *   - Order is irrelevant (commutative): total discount = Σ layers.
- *   - Global cap clamps the TOTAL member discount (percent of original, or fixed).
- *   - Result never below 0. Coupons/cart rules stack on top later (handled by Magento).
- *
- * This resolver does NOT decide whether the customer is a member — callers apply
- * the member price only for active members (display shows it to everyone as a teaser).
- */
 class MemberPriceResolver
 {
     public function __construct(
@@ -38,7 +25,7 @@ class MemberPriceResolver
      */
     public function resolveForProduct(ProductInterface $product, ?float $regularPrice = null): PriceResult
     {
-        $regular    = $regularPrice ?? (float) $product->getPrice();
+        $regular    = $regularPrice ?? $this->derivePrice($product);
         $productId  = (int) $product->getId();
         $categoryIds = method_exists($product, 'getCategoryIds')
             ? array_map('intval', (array) $product->getCategoryIds())
@@ -46,6 +33,32 @@ class MemberPriceResolver
         $sellerId = $this->sellerResolver->getSellerId($productId);
 
         return $this->resolve($regular, $productId, $categoryIds, $sellerId, $this->extractProductDiscount($product));
+    }
+
+    /**
+     * The product's own price, with a fallback for configurables.
+     */
+    private function derivePrice(ProductInterface $product): float
+    {
+        $price = (float) $product->getPrice();
+        if ($price > 0 || $product->getTypeId() !== 'configurable') {
+            return $price;
+        }
+
+        try {
+            $childPrices = [];
+            foreach ($product->getTypeInstance()->getUsedProducts($product) as $child) {
+                $childPrice = (float) $child->getPrice();
+                if ($childPrice > 0) {
+                    $childPrices[] = $childPrice;
+                }
+            }
+        } catch (\Throwable) {
+            // Unreadable configurable — fall through to "no price", i.e. no discount.
+            return 0.0;
+        }
+
+        return $childPrices ? min($childPrices) : 0.0;
     }
 
     /**

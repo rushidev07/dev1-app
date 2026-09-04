@@ -18,7 +18,8 @@ $productIds = [];
 foreach ($products as $_p) {
     $productIds[] = (int)$_p->getId();
 }
-$yotpoEndpoint = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$yotpoEndpoint   = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$caliberEndpoint = $escaper->escapeUrl($block->getUrl('caliber-nation/pricing/memberprice'));
 
 $sortOptions = [                                                                                                                                                                                  
       'position'   => 'Relevance',                                                                                                                                                                  
@@ -86,10 +87,51 @@ $sortOptions = [
 })();
 </script>
 
+<script>
+/*
+ * CaliberNation member prices for the PHP PLP.
+ *
+ * Fetched client-side rather than rendered in PHP so full page cache can keep
+ * serving this grid. Only products that resolve a member discount come back, so
+ * a missing key is the "no member price" signal the cards use (x-show="_cp") to
+ * hide the CaliberNation column.
+ */
+document.addEventListener('alpine:init', function() {
+    if (Alpine.store('ahyCaliberPrices')) return;
+    Alpine.store('ahyCaliberPrices', {
+        data: {},
+        enabled: false,
+        isMember: false,
+        fetch: async function(ids, baseUrl) {
+            if (!ids || !ids.length) return;
+            var self = this;
+            self.data = {};
+            // The endpoint caps a request at 50 ids; chunk so a long page never
+            // silently loses the tail of its grid.
+            for (var i = 0; i < ids.length; i += 50) {
+                var chunk = ids.slice(i, i + 50);
+                try {
+                    var r = await fetch(baseUrl + '?ids=' + chunk.join(','), { credentials: 'include' });
+                    if (!r.ok) continue;
+                    var json = await r.json();
+                    if (!json.pricing_enabled) return;
+                    self.enabled  = true;
+                    self.isMember = !!json.is_member;
+                    self.data = Object.assign({}, self.data, json.prices || {});
+                } catch (e) {
+                    console.error('[CaliberNation] price fetch error', e);
+                }
+            }
+        }
+    });
+});
+</script>
+
 <!-- PHP Product Grid — mirrors Klevu card design exactly -->
 <div id="ahy-php-plp-container" class="ahy-php-plp kuSearchResultsPageContainer"
      x-data="{}"
-     x-init="$store.yotpoReviews.fetch(<?= /* @noEscape */ json_encode($productIds) ?>, '<?= $yotpoEndpoint ?>')"
+     x-init="$store.yotpoReviews.fetch(<?= /* @noEscape */ json_encode($productIds) ?>, '<?= $yotpoEndpoint ?>');
+             $store.ahyCaliberPrices && $store.ahyCaliberPrices.fetch(<?= /* @noEscape */ json_encode($productIds) ?>, '<?= $caliberEndpoint ?>')"
      style="margin-top:32px;display:flex;gap:30px;align-items:flex-start;">
 
     <!-- Left: Filter sidebar — width mirrors Klevu: 25% max 276px + 30px gap = same as Klevu table-cell -->
@@ -246,21 +288,23 @@ $sortOptions = [
                                             </svg>
                                         </template>
                                     </div>
-                                    <span x-text="_r ? '(' + _r.count + ')' : ''" style="font-size:0.75rem;color:#6b7280;"></span>
+                                    <span x-text="_r ? '(' + _r.count + ')' : '(0)'" style="font-size:0.75rem;color:#6b7280;"></span>
                                 </div>
                             </div>
 
                             <!-- Pricing: CaliberNation left, normal price right -->
-                            <div class="ahy-price-section ahy-plp-revamp-price-container">
-                                <div class="ahy-price-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="ahy-price-section ahy-plp-revamp-price-container"
+                                 x-data="{ get _cp(){ return $store.ahyCaliberPrices ? $store.ahyCaliberPrices.data['<?= $productId ?>'] : null } }">
+                                <div class="ahy-price-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"
+                                     :class="_cp ? '' : 'ahy-price-grid--single'">
 
-                                    <!-- CaliberNation col -->
-                                    <div class="caliber-nation-price-col">
+                                    <!-- CaliberNation col — hidden when no member price is available -->
+                                    <div class="caliber-nation-price-col" x-show="_cp">
                                         <div class="calibernation-price-title">CaliberNation Price</div>
-                                        <div style="font-size:1.8rem;font-weight:700;color:#dc2626;">$0.00</div>
+                                        <div style="font-size:1.8rem;font-weight:700;color:#dc2626;" x-text="_cp ? _cp.formattedMember : ''"></div>
                                         <div class="ahy-plp-member-save-container">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                                            <div class="ahy-plp-members-save-container"><span class="ahy-plp-member-save-title">MEMBERS SAVE $0.00<br></span><span class="ahy-plp-member-save-msrp-title">0% OFF MSRP</span></div>
+                                            <div class="ahy-plp-members-save-container"><span class="ahy-plp-member-save-title" x-text="_cp ? 'MEMBERS SAVE ' + _cp.formattedSavings : ''"></span><span class="ahy-plp-member-save-msrp-title" x-text="_cp ? Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : ''"></span></div>
                                         </div>
                                         <a href="/caliber-nation" class="ahy-plp-join-caliber">
                                             JOIN CALIBER >

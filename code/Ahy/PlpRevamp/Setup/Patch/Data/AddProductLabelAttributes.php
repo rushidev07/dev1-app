@@ -33,6 +33,10 @@ class AddProductLabelAttributes implements DataPatchInterface
                 'visible_on_front'        => false,
                 'group'                   => 'General',
                 'visible'                 => true,
+                // EavSetup defaults this to 0, which makes Magento treat the attribute
+                // as a system attribute and disable its Manage Options grid once a
+                // source model is assigned. See MakeProductLabelAttributesUserDefined.
+                'user_defined'            => true,
                 'default'                 => '',
                 'note'                    => 'Badge text shown on product card (e.g. Best Seller, Free Shipping). Leave empty for no badge.',
             ]);
@@ -50,6 +54,10 @@ class AddProductLabelAttributes implements DataPatchInterface
                 'visible_on_front'        => false,
                 'group'                   => 'General',
                 'visible'                 => true,
+                // EavSetup defaults this to 0, which makes Magento treat the attribute
+                // as a system attribute and disable its Manage Options grid once a
+                // source model is assigned. See MakeProductLabelAttributesUserDefined.
+                'user_defined'            => true,
                 'default'                 => 'green',
                 'option'                  => [
                     'values' => [

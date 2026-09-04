@@ -73,11 +73,15 @@
             "is_enabled": true,
             "discount_type": true,
             "discount_value": true,
+            "is_early_access": true,
+            "early_access_member_start_at": true,
+            "early_access_public_start_at": true,
             "created_at": true,
             "updated_at": true
         },
         "index": {
-            "AHY_CALIBER_NATION_SELLER_PARTICIPATION_IS_ENABLED": true
+            "AHY_CALIBER_NATION_SELLER_PARTICIPATION_IS_ENABLED": true,
+            "AHY_CLBR_NTN_SELLER_PARTICIPATION_IS_EARLY_ACCESS": true
         },
         "constraint": {
             "PRIMARY": true,

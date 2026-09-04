@@ -1,0 +1,38 @@
+<?php
+declare(strict_types=1);
+
+// PDP-only header restyle for the revamp design.
+// Loaded exclusively via catalog_product_view.xml, so no other page is affected.
+?>
+<style>
+    .ahy-header .pre-header {
+        background-color: rgb(200, 230, 74) !important;
+        color: rgb(13, 47, 71) !important;
+        font-weight: 600;
+    }
+    /* Recolour the marquee copy only. The Caliber Nation savings pill sits inside
+       .pre-header with its own white-on-red styling, so it is excluded here: a
+       blanket "*" rule repainted its text dark navy on red and made it unreadable. */
+    .ahy-header .pre-header *:not(.cn-savings-pill):not(.cn-savings-pill *) {
+        color: rgb(13, 47, 71) !important;
+    }
+    /* Reference design uses a slim marquee-style bar; the theme's own "py-3"/"p-3"
+       classes on the inner span make it noticeably taller.
+       Scoped to the direct-child marquee span, excluding the pill — the previous
+       "display:block; width:100%" applied to every span, which stretched the pill
+       across the whole bar instead of leaving it a compact badge on the right, and
+       flattened its nested inline-flex spans onto separate lines. */
+    .ahy-header .pre-header > span:not(.cn-savings-pill) {
+        display: block !important;
+        width: 100% !important;
+        padding: 8px 16px !important;
+        font-size: 14px !important;
+        line-height: 20px !important;
+        box-sizing: border-box !important;
+    }
+    /* Keep the pill legible against the lime PDP bar. */
+    .ahy-header .pre-header .cn-savings-pill,
+    .ahy-header .pre-header .cn-savings-pill * {
+        color: #fff !important;
+    }
+</style>

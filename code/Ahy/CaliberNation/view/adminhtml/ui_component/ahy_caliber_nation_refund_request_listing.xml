@@ -31,6 +31,7 @@
     <listingToolbar name="listing_top">
         <bookmark name="bookmarks"/>
         <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
         <filters name="listing_filters"/>
         <paging name="listing_paging"/>
     </listingToolbar>
@@ -69,27 +70,6 @@
                 <label translate="true">Cancelled Date</label>
             </settings>
         </column>
-        <column name="status" class="Ahy\CaliberNation\Ui\Component\Listing\Column\RefundRequestStatus">
-            <argument name="data" xsi:type="array">
-                <item name="config" xsi:type="array">
-                    <item name="bodyTmpl" xsi:type="string">ui/grid/cells/html</item>
-                </item>
-            </argument>
-            <settings>
-                <label translate="true">Status</label>
-            </settings>
-        </column>
-        <column name="reviewed_by_name">
-            <settings>
-                <label translate="true">Reviewed By</label>
-            </settings>
-        </column>
-        <column name="reviewed_at" class="Magento\Ui\Component\Listing\Columns\Date">
-            <settings>
-                <filter>dateRange</filter>
-                <dataType>date</dataType>
-                <label translate="true">Reviewed At</label>
-            </settings>
-        </column>
+
     </columns>
 </listing>

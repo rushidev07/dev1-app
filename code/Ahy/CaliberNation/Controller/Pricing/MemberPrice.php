@@ -75,20 +75,17 @@ class MemberPrice implements HttpGetActionInterface
         // preventing the "No linked stock found" exception on this local dump.
         $collection->setFlag('has_stock_status_filter', true);
         $collection
-            ->addAttributeToSelect(['price', 'caliber_member_discount_enabled', 'caliber_member_discount_type', 'caliber_member_discount_value'])
+            ->addAttributeToSelect([
+                'price',
+                'caliber_member_discount_enabled',
+                'caliber_member_discount_type',
+                'caliber_member_discount_value',
+            ])
             ->addIdFilter($ids);
 
         $prices = [];
         foreach ($collection as $product) {
-            // Configurable products return price=0 from collection — use min child price
-            $regularPrice = (float) $product->getPrice();
-            if ($regularPrice <= 0 && $product->getTypeId() === 'configurable') {
-                $children = $product->getTypeInstance()->getUsedProducts($product);
-                $childPrices = array_filter(array_map(fn($c) => (float) $c->getPrice(), $children));
-                $regularPrice = $childPrices ? min($childPrices) : 0.0;
-            }
-
-            $priceResult = $this->resolver->resolveForProduct($product, $regularPrice ?: null);
+            $priceResult = $this->resolver->resolveForProduct($product);
             if (!$priceResult->hasDiscount()) {
                 continue;
             }

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Catalog\Controller\Adminhtml\Product\Initialization\Helper">
+        <plugin name="ahyPdpRevampSaveVariantColorHex"
+                type="Ahy\PDPRevamp\Plugin\Catalog\Controller\Adminhtml\Product\Initialization\Helper\SaveVariantColorHex"
+                sortOrder="70"/>
+    </type>
+    <type name="Magento\Catalog\Model\Product\Attribute\DataProvider">
+        <plugin name="ahyPdpRevampAddTwoColorSwatchData"
+                type="Ahy\PDPRevamp\Plugin\Catalog\Model\Product\Attribute\DataProvider\AddTwoColorSwatchData"/>
+    </type>
+    <type name="Magento\Catalog\Controller\Adminhtml\Product\Attribute\Save">
+        <plugin name="ahyPdpRevampSaveTwoColorSwatch"
+                type="Ahy\PDPRevamp\Plugin\Catalog\Controller\Adminhtml\Product\Attribute\Save\SaveTwoColorSwatch"/>
+    </type>
+    <virtualType name="Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Pool">
+        <arguments>
+            <argument name="modifiers" xsi:type="array">
+                <item name="ahyVariantColorColumn" xsi:type="array">
+                    <item name="class" xsi:type="string">Ahy\PDPRevamp\Ui\DataProvider\Product\Form\Modifier\VariantColorColumn</item>
+                    <item name="sortOrder" xsi:type="number">150</item>
+                </item>
+                <item name="ahyKeyFeatures" xsi:type="array">
+                    <item name="class" xsi:type="string">Ahy\PDPRevamp\Ui\DataProvider\Product\Form\Modifier\KeyFeatures</item>
+                    <item name="sortOrder" xsi:type="number">160</item>
+                </item>
+                <!-- Overrides core Magento's own "related" entry (same key) with a
+                     subclass that adds three more product-picker grids to the same
+                     section - see Ui\DataProvider\Product\Form\Modifier\ManualCarousels. -->
+                <item name="related" xsi:type="array">
+                    <item name="class" xsi:type="string">Ahy\PDPRevamp\Ui\DataProvider\Product\Form\Modifier\ManualCarousels</item>
+                    <item name="sortOrder" xsi:type="number">110</item>
+                </item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <!-- Thumbnail Caption on the admin Image Detail panel -->
+    <type name="Magento\Catalog\Block\Adminhtml\Product\Helper\Form\Gallery\Content">
+        <plugin name="ahyPdpRevampAdminGalleryTemplate"
+                type="Ahy\PDPRevamp\Plugin\Gallery\AdminGalleryTemplatePlugin"/>
+    </type>
+    <type name="Magento\Catalog\Model\Product\Gallery\CreateHandler">
+        <plugin name="ahyPdpRevampSaveThumbCaption"
+                type="Ahy\PDPRevamp\Plugin\Gallery\SaveThumbCaption"/>
+    </type>
+</config>

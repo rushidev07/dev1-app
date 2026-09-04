@@ -45,6 +45,8 @@ $step = $stockItemViewModel->getQtyIncrements($product)
 $item = $block->getItem();
 $product = $item->getProduct();
 $isFreeGift = false;
+$caliberConfig = \Magento\Framework\App\ObjectManager::getInstance()->get(\Ahy\CaliberNation\Model\Config::class);
+$isMembershipProduct = $product->getSku() === $caliberConfig->getMembershipSku();
 $ahyHelper = $this->helper('Ahy\ThemeCustomization\Helper\Data');
 $isFflRequired = $ahyHelper->getProductAttribute($product->getId(), 'ffl_selection_required');
 $isAgeVerificationRequired = $ahyHelper->getProductAttribute($product->getId(), 'age_verification_required');
@@ -213,7 +215,16 @@ if (isset($seller->getData()[0]) && $seller->getData()[0]) {
                 <?php endif; ?>
         </div>
             <div class="flex justify-end items-start flex-col sm:flex-row sm:items-center gap-4 p-4 pt-2">
-                <?php if (!$isFreeGift): ?>
+                <?php if ($isMembershipProduct): ?>
+                    <?php $cartHelper = $this->helper(\Magento\Checkout\Helper\Cart::class); ?>
+                    <a href="#"
+                       title="<?= $escaper->escapeHtml(__('Remove item')) ?>"
+                       class="action action-delete"
+                       x-data="{}"
+                       @click.prevent='hyva.postForm(<?= /* @noEscape */ $cartHelper->getDeletePostJson($item) ?>)'
+                    ><span><?= $escaper->escapeHtml(__('Remove')) ?></span></a>
+                <?php endif; ?>
+                <?php if (!$isFreeGift && !$isMembershipProduct): ?>
                     <div class="flex gap-2 items-center"><?= /* @noEscape */ $block->getActions($item) ?></div>
                     <div class="w-full sm:w-auto">
                         <span class="lg:hidden font-bold">

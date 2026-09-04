@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Ahy_PDPRevamp">
+        <sequence>
+            <module name="Magento_Catalog"/>
+            <module name="Magento_Swatches"/>
+            <module name="Hyva_Theme"/>
+            <module name="Ahy_ThemeCustomization"/>
+            <module name="Ahy_BuyBox"/>
+            <module name="Ahy_Caliber"/>
+            <module name="Yotpo_Yotpo"/>
+            <module name="Amasty_Faq"/>
+            <module name="Magento_Newsletter"/>
+            <module name="Magento_Paypal"/>
+
+        </sequence>
+    </module>
+</config>

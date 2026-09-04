@@ -10,9 +10,9 @@
             </argument>
             <settings>
                 <dataType>boolean</dataType>
-                <label translate="true">Enable Subcategory(s)</label>
+                <label translate="true">Enable Subcategory Layout</label>
                 <dataScope>ahy_use_subcategory_layout</dataScope>
-                <notice translate="true">Show subcategories, featured products and featured brands on this category page.</notice>
+                <notice translate="true">Use the custom subcategory layout on this category page. The three switches below choose which sections it renders.</notice>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
             </settings>
             <formElements>
@@ -28,7 +28,37 @@
             </formElements>
         </field>
 
-        <field name="ahy_subcategory_cards_count" sortOrder="201" formElement="input">
+
+        <field name="ahy_show_subcategory_cards" sortOrder="201" formElement="checkbox">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                    <item name="component" xsi:type="string">Ahy_PlpRevamp/js/form/element/section-toggle</item>
+                </item>
+            </argument>
+            <settings>
+                <imports>
+                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                </imports>
+                <dataType>boolean</dataType>
+                <label translate="true">Enable Subcategory Cards</label>
+                <dataScope>ahy_show_subcategory_cards</dataScope>
+                <notice translate="true">Show the subcategory card grid. Needs at least one child category.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="number">0</map>
+                            <map name="true" xsi:type="number">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+        <field name="ahy_subcategory_cards_count" sortOrder="202" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -38,19 +68,50 @@
                 <dataType>text</dataType>
                 <label translate="true">Number of Subcategories to Display</label>
                 <dataScope>ahy_subcategory_cards_count</dataScope>
-                <notice translate="true">Leave empty for the default: 8. Enter 0 to show all.</notice>
+                <notice translate="true">Leave empty for the default: 8. Maximum: 10.</notice>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
                 <validation>
                     <rule name="validate-digits" xsi:type="boolean">true</rule>
+                    <rule name="validate-digits-range" xsi:type="string">1-10</rule>
                 </validation>
                 <!-- Only relevant while the subcategory layout is enabled -->
                 <imports>
-                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                    <link name="visible">${ $.parentName }.ahy_show_subcategory_cards:effectiveChecked</link>
                 </imports>
             </settings>
         </field>
 
-        <field name="ahy_featured_source_id" sortOrder="202" formElement="input">
+
+        <field name="ahy_show_featured_products" sortOrder="204" formElement="checkbox">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                    <item name="component" xsi:type="string">Ahy_PlpRevamp/js/form/element/section-toggle</item>
+                </item>
+            </argument>
+            <settings>
+                <imports>
+                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                </imports>
+                <dataType>boolean</dataType>
+                <label translate="true">Enable Featured Products</label>
+                <dataScope>ahy_show_featured_products</dataScope>
+                <notice translate="true">Show the Featured Products section.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="number">0</map>
+                            <map name="true" xsi:type="number">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+        <field name="ahy_featured_source_id" sortOrder="205" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -63,12 +124,11 @@
                 <notice translate="true">ID of the category whose products fill the Featured Products section. That category is hidden from the subcategories.</notice>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
                 <imports>
-                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                    <link name="visible">${ $.parentName }.ahy_show_featured_products:effectiveChecked</link>
                 </imports>
             </settings>
         </field>
-
-        <field name="ahy_featured_title" sortOrder="203" formElement="input">
+        <field name="ahy_featured_title" sortOrder="206" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -81,12 +141,11 @@
                 <notice translate="true">Leave empty for the default: Featured Products.</notice>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
                 <imports>
-                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                    <link name="visible">${ $.parentName }.ahy_show_featured_products:effectiveChecked</link>
                 </imports>
             </settings>
         </field>
-
-        <field name="ahy_featured_subtitle" sortOrder="204" formElement="input">
+        <field name="ahy_featured_subtitle" sortOrder="207" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -99,12 +158,11 @@
                 <notice translate="true">Leave empty for the default: Handpicked products from our collection.</notice>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
                 <imports>
-                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                    <link name="visible">${ $.parentName }.ahy_show_featured_products:effectiveChecked</link>
                 </imports>
             </settings>
         </field>
-
-        <field name="ahy_featured_products_count" sortOrder="205" formElement="input">
+        <field name="ahy_featured_products_count" sortOrder="208" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -114,15 +172,66 @@
                 <dataType>text</dataType>
                 <label translate="true">Number of Featured Products to Display</label>
                 <dataScope>ahy_featured_products_count</dataScope>
-                <notice translate="true">Leave empty for the default: 8.</notice>
+                <notice translate="true">Maximum 8. Leave empty for the default: 8. Any additional products in the source category remain reachable via the &quot;See All&quot; link.</notice>
+                <validation>
+                    <rule name="validate-digits" xsi:type="boolean">true</rule>
+                    <rule name="validate-digits-range" xsi:type="string">digits-range-1-8</rule>
+                </validation>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
                 <imports>
-                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                    <link name="visible">${ $.parentName }.ahy_show_featured_products:effectiveChecked</link>
+                </imports>
+            </settings>
+        </field>
+        <field name="ahy_featured_description" sortOrder="209" formElement="textarea">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                </item>
+            </argument>
+            <settings>
+                <dataType>text</dataType>
+                <label translate="true">Featured Products Description</label>
+                <dataScope>ahy_featured_description</dataScope>
+                <notice translate="true">Paragraph shown under the Featured Products grid, with a green See more link. Leave empty to hide it.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+                <imports>
+                    <link name="visible">${ $.parentName }.ahy_show_featured_products:effectiveChecked</link>
                 </imports>
             </settings>
         </field>
 
-        <field name="ahy_featured_brands_title" sortOrder="206" formElement="input">
+
+        <field name="ahy_show_featured_brands" sortOrder="210" formElement="checkbox">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="source" xsi:type="string">category</item>
+                    <item name="component" xsi:type="string">Ahy_PlpRevamp/js/form/element/section-toggle</item>
+                </item>
+            </argument>
+            <settings>
+                <imports>
+                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                </imports>
+                <dataType>boolean</dataType>
+                <label translate="true">Enable Featured Brands</label>
+                <dataScope>ahy_show_featured_brands</dataScope>
+                <notice translate="true">Show the Featured Brands section.</notice>
+                <scopeLabel>[STORE VIEW]</scopeLabel>
+            </settings>
+            <formElements>
+                <checkbox>
+                    <settings>
+                        <valueMap>
+                            <map name="false" xsi:type="number">0</map>
+                            <map name="true" xsi:type="number">1</map>
+                        </valueMap>
+                        <prefer>toggle</prefer>
+                    </settings>
+                </checkbox>
+            </formElements>
+        </field>
+        <field name="ahy_featured_brands_title" sortOrder="211" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -135,19 +244,18 @@
                 <notice translate="true">Leave empty for the default: Featured Brands. Hidden when no brands are added below.</notice>
                 <scopeLabel>[STORE VIEW]</scopeLabel>
                 <imports>
-                    <link name="visible">${ $.parentName }.ahy_use_subcategory_layout:checked</link>
+                    <link name="visible">${ $.parentName }.ahy_show_featured_brands:effectiveChecked</link>
                 </imports>
             </settings>
         </field>
-
-        <dynamicRows name="ahy_featured_brands" sortOrder="207">
+        <dynamicRows name="ahy_featured_brands" sortOrder="212">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="componentType" xsi:type="string">dynamicRows</item>
                     <item name="source" xsi:type="string">category</item>
                     <!-- Only relevant while the subcategory layout is enabled -->
                     <item name="imports" xsi:type="array">
-                        <item name="visible" xsi:type="string">${ $.parentName }.ahy_use_subcategory_layout:checked</item>
+                        <item name="visible" xsi:type="string">${ $.parentName }.ahy_show_featured_brands:effectiveChecked</item>
                     </item>
                 </item>
             </argument>
@@ -215,6 +323,20 @@
                         </fileUploader>
                     </formElements>
                 </field>
+                <!--
+                    Carries the drag-and-drop order. dnd.js writes `position` onto the
+                    record context and record.js binds it through positionProvider
+                    (default 'position'), so without a field of that name the new order
+                    is computed on drag and then discarded on save. Hidden: it is
+                    bookkeeping, not something an admin types.
+                -->
+                <field name="position" formElement="input" sortOrder="35">
+                    <settings>
+                        <dataType>text</dataType>
+                        <dataScope>position</dataScope>
+                        <visible>false</visible>
+                    </settings>
+                </field>
                 <actionDelete template="Magento_Backend/dynamic-rows/cells/action-delete" sortOrder="40">
                     <settings>
                         <dataType>text</dataType>
@@ -224,7 +346,7 @@
             </container>
         </dynamicRows>
 
-        <field name="ahy_card_keywords" sortOrder="208" formElement="input">
+        <field name="ahy_card_keywords" sortOrder="213" formElement="input">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>
@@ -243,7 +365,7 @@
             </settings>
         </field>
 
-        <field name="ahy_card_image" sortOrder="209" formElement="fileUploader">
+        <field name="ahy_card_image" sortOrder="214" formElement="fileUploader">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="source" xsi:type="string">category</item>

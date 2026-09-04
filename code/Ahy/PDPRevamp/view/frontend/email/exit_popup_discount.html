@@ -1,0 +1,37 @@
+<!--@subject {{trans "Your discount code inside"}} @-->
+<!--@vars {
+"var coupon_code":"Coupon Code",
+"var discount_percent":"Discount Percent",
+"var expires_at":"Expiry (pre-formatted in the store's timezone)",
+"var product_name":"Product the code applies to"
+} @-->
+
+{{template config_path="design/email/header_template"}}
+
+<table><tr><td>
+    <p>{{trans "Thanks for signing up!"}}</p>
+    <p style="color:#666; font-size:13px;">
+        {{trans "You'll need to be signed in to your account to use this code at checkout."}}
+    </p>
+
+    {{if product_name}}
+    <p>
+        {{trans "Here's your exclusive"}} <strong>{{var discount_percent}}%</strong>
+        {{trans "off code for"}} <strong>{{var product_name}}</strong>:</p>
+    {{else}}
+    <p>{{trans "Here's your exclusive"}} <strong>{{var discount_percent}}%</strong> {{trans "off code:"}}</p>
+    {{/if}}
+
+    <p style="font-size:22px; font-weight:bold; letter-spacing:2px; text-align:center; padding:16px; border:2px dashed #e85d26; margin:16px 0;">
+        {{var coupon_code}}
+    </p>
+    <p>{{trans "Enter this code at checkout to redeem your discount."}}</p>
+
+    {{depend expires_at}}
+    <p style="color:#666; font-size:13px;">
+        {{trans "This code expires on %date" date=$expires_at}}
+    </p>
+    {{/depend}}
+</td></tr></table>
+
+{{template config_path="design/email/footer_template"}}

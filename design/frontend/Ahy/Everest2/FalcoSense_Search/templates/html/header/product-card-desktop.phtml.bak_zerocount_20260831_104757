@@ -1,0 +1,163 @@
+<?php
+/**
+ * Desktop product card — PlpRevamp category-page design, ported for the
+ * header quick-search overlay. Looped client-side by x-for in search-form.phtml.
+ * Modal event renamed to ahy-cfg-modal-open to match FalcoSense_Search::modal/config-modal.phtml.
+ */
+?>
+                    <li class="plp-card"
+                        x-data="{
+                            get hasDiscount() { return product.special_price && parseFloat(product.special_price) < parseFloat(product.price) },
+                            get savingsPct() { return this.hasDiscount ? Math.round(((product.price - product.special_price) / product.price) * 100) : 0 },
+                            get displayPrice() { return this.hasDiscount ? product.special_price : product.price }
+                        }">
+
+                        <!-- Stock badge -->
+                        <div class="plp-stock-badge-wrap"
+                             x-show="product.variants && product.variants.length <= 10 && product.variants.length > 0">
+                            <span class="plp-stock-badge"
+                                  x-text="(product.variants || []).length + ' left'"></span>
+                        </div>
+
+                        <div class="plp-card-wrap">
+                            <!-- Image -->
+                            <div class="plp-card-image">
+                                <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'">
+                                    <img :src="imgUrl(product.image)"
+                                         :alt="product.name"
+                                         width="244" height="244"
+                                         class="plp-card-img"
+                                         :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                         loading="eager"
+                                         fetchpriority="high"
+                                         @error="handleImgError($event)"
+                                         :data-original-src="product.image"/>
+                                </a>
+                                <!-- Mobile-only color count -->
+                                <div class="plp-colors-mobile">
+                                    <template x-if="product.variants && product.variants.length > 0">
+                                        <span x-text="product.variants.length + ' colors'"></span>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Wishlist button -->
+                            <button class="plp-wishlist-btn"
+                                    @click.prevent="addToWishlist(product.product_id)"
+                                    :disabled="wishLoading[product.product_id] === true"
+                                    aria-label="Add to Wish List" type="button">
+                                <template x-if="wishLoading[product.product_id] === true">
+                                    <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                </template>
+                                <template x-if="wishLoading[product.product_id] !== true">
+                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20" fill="currentColor">
+                                        <path d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                    </svg>
+                                </template>
+                            </button>
+
+                            <!-- Content footer -->
+                            <div class="plp-card-content">
+                                <!-- Product name -->
+                                <div class="plp-card-name">
+                                    <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                                       :title="cleanName(product.name)"
+                                       x-text="cleanName(product.name)"></a>
+                                </div>
+
+                                <!-- Seller line -->
+                                <div class="plp-card-seller"
+                                     x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+
+                                <!-- Yotpo stars -->
+                                <div class="plp-rating"
+                                     x-data="{ get _r(){ return $store.yotpoReviews ? $store.yotpoReviews.data[String(product.product_id)] : null } }">
+                                    <div class="plp-rating-stars">
+                                        <template x-for="i in [1,2,3,4,5]" :key="i">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                                 :fill="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                                 :stroke="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                                 stroke-width="1">
+                                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                                            </svg>
+                                        </template>
+                                    </div>
+                                    <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : ''"></span>
+                                </div>
+
+                                <!-- 2-column price grid -->
+                                <div class="plp-price-section"
+                                     x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                    <div class="plp-price-grid" :class="_cp ? '' : 'plp-price-grid--single'">
+                                        <!-- Left: CaliberNation (hidden when no member price is available) -->
+                                        <div class="plp-caliber-col" x-show="_cp">
+                                            <div class="plp-caliber-title">CaliberNation Price</div>
+                                            <div class="plp-caliber-value" x-text="_cp ? _cp.formattedMember : ''"></div>
+                                            <div class="plp-caliber-save">
+                                                <span class="plp-caliber-save-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                                                </span>
+                                                <div class="plp-caliber-save-text">
+                                                    <span x-text="_cp ? 'MEMBERS SAVE ' + _cp.formattedSavings : ''"></span>
+                                                    <span x-text="_cp ? Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : ''"></span>
+                                                </div>
+                                            </div>
+                                            <a class="plp-caliber-join" href="/caliber-nation">JOIN CALIBER ></a>
+                                        </div>
+
+                                        <!-- Right: Normal price -->
+                                        <div class="plp-normal-col">
+                                            <template x-if="hasDiscount">
+                                                <div>
+                                                    <div class="plp-normal-title">Sale Price</div>
+                                                    <div class="plp-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
+                                                    <div class="plp-nonmember-wrap">
+                                                        <span class="plp-nonmember-text">NON-MEMBERS SAVE <span class="plp-pct-inline" x-text="savingsPct + '%'"></span></span>
+                                                        <span class="plp-nonmember-msrp"><span class="plp-pct-block" x-text="savingsPct + '% '"></span>OFF MSRP</span>
+                                                    </div>
+                                                    <div class="plp-msrp-line">
+                                                        MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="!hasDiscount && product.price">
+                                                <div>
+                                                    <div class="plp-normal-title">Price</div>
+                                                    <div class="plp-normal-value" x-html="hyva.formatPrice(product.price)"></div>
+                                                </div>
+                                            </template>
+                                            <template x-if="!product.price">
+                                                <div>
+                                                    <span class="plp-see-options-btn">See Options</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Add to cart / Options button -->
+                                <div class="plp-atc-wrap">
+                                    <!-- FREE Shipping hidden — matches old Klevu behaviour. To re-enable: uncomment below -->
+                                    <!-- <p class="plp-free-shipping" :class="isFreeShipping(product) ? '' : 'plp-invisible'">FREE Shipping</p> -->
+                                    <div class="plp-atc-btn-wrap">
+                                        <template x-if="product.type !== 'configurable'">
+                                            <button class="plp-atc-btn"
+                                                    @click.prevent="addSimpleToCart(product)"
+                                                    :class="cartLoading[product.product_id] === true ? 'plp-btn-loading' : ''">
+                                                <svg x-show="cartLoading[product.product_id] === true" class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                                <svg x-show="cartLoading[product.product_id] !== true" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                                <span class="md:hidden lg:block" x-text="cartLoading[product.product_id] === true ? 'Adding...' : 'Add to Cart'"></span>
+                                                <span class="hidden md:block lg:hidden" x-text="cartLoading[product.product_id] === true ? '...' : 'Add to Cart'"></span>
+                                            </button>
+                                        </template>
+                                        <template x-if="product.type === 'configurable'">
+                                            <button class="plp-atc-btn"
+                                                    @click.prevent="$dispatch('ahy-cfg-modal-open', product)">
+                                                <span>Options</span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>

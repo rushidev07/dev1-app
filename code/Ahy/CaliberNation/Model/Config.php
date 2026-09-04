@@ -31,6 +31,12 @@ class Config
     public const SIGNUP_SCROLL_PARAM = 'scrollTo';
     public const SIGNUP_SCROLL_VALUE = 'signup';
 
+    /**
+     * Standard paid membership term, in months. A renewal payment always buys exactly
+     * this — signup bonus months are added on top at activation only.
+     */
+    public const BASE_TERM_MONTHS = 12;
+
     // ── XML paths ─────────────────────────────────────────────────────────────
     private const XML_ENABLED            = 'caliber_nation/general/enabled';
     private const XML_MEMBERSHIP_PRICE   = 'caliber_nation/membership/price';
@@ -43,8 +49,8 @@ class Config
     private const XML_PRICING_ENABLED    = 'caliber_nation/pricing/enabled';
     private const XML_PRICING_BASE_TYPE  = 'caliber_nation/pricing/base_discount_type';
     private const XML_PRICING_BASE_VALUE = 'caliber_nation/pricing/base_discount_value';
-    private const XML_PRICING_CAP_TYPE   = 'caliber_nation/pricing/cap_type';
-    private const XML_PRICING_CAP_VALUE  = 'caliber_nation/pricing/cap_value';
+    private const XML_PRICING_CAP_TYPE            = 'caliber_nation/pricing/cap_type';
+    private const XML_PRICING_CAP_VALUE           = 'caliber_nation/pricing/cap_value';
     private const XML_WINBACK_ENABLED    = 'caliber_nation/winback/enabled';
     private const XML_WINBACK_DAYS       = 'caliber_nation/winback/days_threshold';
     private const XML_WINBACK_TYPE       = 'caliber_nation/winback/discount_type';
@@ -66,6 +72,9 @@ class Config
     private const XML_EMAIL_WINBACK              = 'caliber_nation/emails/winback_enabled';
     private const XML_EARLY_CANCEL_ENABLED       = 'caliber_nation/early_cancellation/enabled';
     private const XML_EARLY_CANCEL_WINDOW_DAYS   = 'caliber_nation/early_cancellation/refund_window_days';
+    private const XML_EARLY_ACCESS_ENABLED          = 'caliber_nation/early_access/enabled';
+    private const XML_EARLY_ACCESS_MEMBER_BADGE     = 'caliber_nation/early_access/member_badge_text';
+    private const XML_EARLY_ACCESS_NON_MEMBER_BADGE = 'caliber_nation/early_access/non_member_badge_text';
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig
@@ -135,18 +144,42 @@ class Config
     }
 
     /**
-     * Total membership duration in months: 12 standard + bonus months if enabled.
-     * Use this when setting the renewal_date on a new membership record.
+     * The standard paid term, in months. This is what one renewal payment buys, and
+     * it never includes signup bonus months — those are a one-time incentive.
      */
-    public function getMembershipDurationMonths(?string $storeCode = null): int
+    public function getBaseTermMonths(): int
     {
-        $months = 12;
+        return self::BASE_TERM_MONTHS;
+    }
+
+    /**
+     * Term granted when a membership is ACTIVATED: base term + bonus months when the
+     * bonus is enabled. Use this for a new signup's renewal_date.
+     */
+    public function getSignupTermMonths(?string $storeCode = null): int
+    {
+        $months = $this->getBaseTermMonths();
 
         if ($this->isTrialEnabled($storeCode)) {
             $months += $this->getTrialMonths($storeCode);
         }
 
         return $months;
+    }
+
+    /**
+     * Total membership duration in months: 12 standard + bonus months if enabled.
+     *
+     * @deprecated Ambiguous — it returned the bonus-inclusive term to BOTH signup and
+     * renewal, so an enabled bonus was re-granted on every renewal (13 months of access
+     * for a 12-month payment, every year). Use getSignupTermMonths() for activation and
+     * getBaseTermMonths() for renewal.
+     * @see getSignupTermMonths()
+     * @see getBaseTermMonths()
+     */
+    public function getMembershipDurationMonths(?string $storeCode = null): int
+    {
+        return $this->getSignupTermMonths($storeCode);
     }
 
     /**
@@ -377,6 +410,26 @@ class Config
     public function isWinbackEmailEnabled(?string $storeCode = null): bool
     {
         return $this->scopeConfig->isSetFlag(self::XML_EMAIL_WINBACK, ScopeInterface::SCOPE_STORE, $storeCode);
+    }
+
+    // ── Early Access / Early Bird ────────────────────────────────────────────────
+
+    /** Master switch for the early-access / early-bird feature. */
+    public function isEarlyAccessEnabled(?string $storeCode = null): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML_EARLY_ACCESS_ENABLED, ScopeInterface::SCOPE_STORE, $storeCode);
+    }
+
+    /** Badge copy shown to active members on early-access products. */
+    public function getEarlyAccessMemberBadgeText(?string $storeCode = null): string
+    {
+        return (string) $this->scopeConfig->getValue(self::XML_EARLY_ACCESS_MEMBER_BADGE, ScopeInterface::SCOPE_STORE, $storeCode);
+    }
+
+    /** Badge copy shown to guests and non-members on early-access products. */
+    public function getEarlyAccessNonMemberBadgeText(?string $storeCode = null): string
+    {
+        return (string) $this->scopeConfig->getValue(self::XML_EARLY_ACCESS_NON_MEMBER_BADGE, ScopeInterface::SCOPE_STORE, $storeCode);
     }
 
     /** Whether early cancellation tracking is enabled. */

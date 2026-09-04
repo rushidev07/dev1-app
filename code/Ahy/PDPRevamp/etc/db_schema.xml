@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="ahy_pdprevamp_faq" resource="default" engine="innodb" comment="PDP FAQ">
+        <column xsi:type="int" name="faq_id" unsigned="true" nullable="false" identity="true" comment="FAQ ID"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="true" comment="Product ID - null means generic, shown on any product with no FAQs of its own"/>
+        <column xsi:type="varchar" name="category" nullable="false" length="64" default="General" comment="Category label, e.g. Sizing, Materials, Safety, Features, Policy"/>
+        <column xsi:type="text" name="question" nullable="false" comment="Question"/>
+        <column xsi:type="text" name="answer" nullable="false" comment="Answer"/>
+        <column xsi:type="smallint" name="sort_order" unsigned="true" nullable="false" default="0" comment="Sort Order"/>
+        <column xsi:type="smallint" name="is_active" unsigned="true" nullable="false" default="1" comment="Is Active"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="faq_id"/>
+        </constraint>
+        <index referenceId="AHY_PDPREVAMP_FAQ_PRODUCT_ID" indexType="btree">
+            <column name="product_id"/>
+        </index>
+    </table>
+    <table name="ahy_pdprevamp_variant_color" resource="default" engine="innodb" comment="Admin-set exact swatch hex color per simple product variant">
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="false" comment="Simple Product Entity ID"/>
+        <column xsi:type="varchar" name="hex" nullable="false" length="9" comment="Hex color value, e.g. #161616"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="product_id"/>
+        </constraint>
+    </table>
+    <table name="ahy_pdprevamp_review_tags" resource="default" engine="innodb" comment="AI-generated highlight tags per review (Yotpo or native), cached so Gemini is only called once per review">
+        <column xsi:type="varchar" name="review_id" nullable="false" length="64" comment="Yotpo review id, or native_&lt;review_id&gt; for Magento's own native review fallback"/>
+        <column xsi:type="varchar" name="tags" nullable="false" length="255" comment="Comma-separated AI-generated tags - empty string means Gemini found nothing confident to tag"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="review_id"/>
+        </constraint>
+    </table>
+    <!--
+        Records which customer already voted on which review, and in which
+        direction, so a vote survives a page reload and cannot be repeated.
+
+        Needed because Yotpo cannot deduplicate for us: the vote request carries
+        only the review id and direction - no customer identifier - and Yotpo
+        answers 200 OK to everything, including nonexistent review ids and
+        invalid vote types. So it can neither attribute a vote to a shopper nor
+        report whether one was accepted. Yotpo still owns the vote *counts*
+        (votes_up / votes_down come back from its API); this table only records
+        *who*, which is what lets the controller refuse a second vote.
+    -->
+    <table name="ahy_pdprevamp_review_vote" resource="default" engine="innodb" comment="Which customer voted on which review, so a vote cannot be repeated">
+        <column xsi:type="int" name="vote_id" unsigned="true" nullable="false" identity="true" comment="Vote ID"/>
+        <column xsi:type="varchar" name="review_id" nullable="false" length="64" comment="Yotpo review id, or native_&lt;review_id&gt; for Magento's own native review fallback"/>
+        <column xsi:type="int" name="customer_id" unsigned="true" nullable="false" comment="Customer who cast the vote - voting requires being logged in"/>
+        <column xsi:type="varchar" name="vote_type" nullable="false" length="4" comment="up|down - stored rather than a boolean so the UI can highlight the right icon after a reload"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="vote_id"/>
+        </constraint>
+        <!--
+            One vote per customer per review, enforced by the database rather
+            than by application logic: two simultaneous requests cannot both
+            pass a SELECT-then-INSERT check, whereas the second will fail on
+            this constraint and be handled as "already voted".
+
+            Keyed on the pair and NOT on vote_type, so switching direction
+            replaces the existing vote instead of allowing a simultaneous up
+            and down vote on the same review.
+        -->
+        <constraint xsi:type="unique" referenceId="AHY_PDPREVAMP_REVIEW_VOTE_REVIEW_ID_CUSTOMER_ID">
+            <column name="review_id"/>
+            <column name="customer_id"/>
+        </constraint>
+        <index referenceId="AHY_PDPREVAMP_REVIEW_VOTE_CUSTOMER_ID" indexType="btree">
+            <column name="customer_id"/>
+        </index>
+        <constraint xsi:type="foreign" referenceId="AHY_PDPREVAMP_REVIEW_VOTE_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="ahy_pdprevamp_review_vote" column="customer_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id" onDelete="CASCADE"/>
+    </table>
+    <!--
+        Exit intent
+    -->
+    <table name="ahy_pdprevamp_exit_coupon" resource="default" engine="innodb" comment="Exit-intent popup coupon claims">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Claim ID"/>
+        <column xsi:type="varchar" name="email" nullable="false" length="255" comment="Email the code was issued to"/>
+        <column xsi:type="varchar" name="coupon_code" nullable="false" length="64" comment="Generated single-use coupon code"/>
+        <column xsi:type="int" name="customer_id" unsigned="true" nullable="true" comment="Null when claimed as a guest - backfilled on register/login so the one-per-customer limit recognises them"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="true" comment="Product whose PDP the popup was shown on - recorded for reporting; the discount itself is not bound to it"/>
+        <column xsi:type="smallint" name="is_redeemed" unsigned="true" nullable="false" default="0" comment="1 once the code has been used, so the grid can show claimed vs redeemed"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Claimed At"/>
+        <column xsi:type="timestamp" name="expires_at" nullable="true" comment="Mirror of the coupon's own expiry, so the grid can show it without joining salesrule_coupon"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="AHY_PDPREVAMP_EXIT_COUPON_EMAIL">
+            <column name="email"/>
+        </constraint>
+        <index referenceId="AHY_PDPREVAMP_EXIT_COUPON_CUSTOMER_ID" indexType="btree">
+            <column name="customer_id"/>
+        </index>
+        <index referenceId="AHY_PDPREVAMP_EXIT_COUPON_COUPON_CODE" indexType="btree">
+            <column name="coupon_code"/>
+        </index>
+    </table>
+    <!-- pdp thumbnail caption -->
+    <table name="catalog_product_entity_media_gallery" resource="default">
+        <column xsi:type="varchar" name="ahy_thumb_caption" length="255" nullable="true"
+                comment="Caption shown over the PDP gallery thumbnail"/>
+    </table>
+</schema>

@@ -8,6 +8,12 @@ $isLoggedInUser = $viewModel->isLoggedIn();
 $configProvider = $block->getData('configProvider');
 $isSavedCCEnabled = $configProvider->isEnabled();
 
+// Optional (present only when Ahy_CaliberNation is installed): when the membership
+// product is in the cart, the saved card also powers annual auto-renewal, so the
+// save-card checkbox copy is extended to say so.
+$membershipCart = $block->getData('membershipCart');
+$isMembershipInCart = $membershipCart && $membershipCart->isInCart();
+
 ?>
 
 <div class="">
@@ -205,7 +211,11 @@ $isSavedCCEnabled = $configProvider->isEnabled();
                 @change="$wire.set('checkboxChecked', saveCard)"
                 class="h-5 w-5 rounded border-gray-300 text-ahy-blue focus:ring-ahy-blue" />
             <span class="text-sm text-ahy-blue">
-                Save this card securely for future purchases
+                <?php if ($isMembershipInCart): ?>
+                    Save this card securely for future purchases and annual membership auto-renewal
+                <?php else: ?>
+                    Save this card securely for future purchases
+                <?php endif; ?>
             </span>
         </label>
 
@@ -214,7 +224,11 @@ $isSavedCCEnabled = $configProvider->isEnabled();
             <label class="block text-sm">
                 <sup class="text-red-500">*</sup>
                 <span class="italic text-red-500">
-                    This card will be securely saved to your account after payment completion for future use.
+                    <?php if ($isMembershipInCart): ?>
+                        This card will be securely saved to your account and used to auto-renew your Caliber Nation membership each year. Manage auto-renew anytime from your account.
+                    <?php else: ?>
+                        This card will be securely saved to your account after payment completion for future use.
+                    <?php endif; ?>
                 </span>
             </label>
         </div>

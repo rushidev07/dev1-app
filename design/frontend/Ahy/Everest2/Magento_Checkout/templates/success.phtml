@@ -13,6 +13,11 @@ use Magento\Checkout\Block\Onepage\Success;
 
 /** @var Success $block */
 /** @var Escaper $escaper */
+
+// Caliber Nation: did this order include the membership product? (viewmodel wired via
+// Ahy_CaliberNation checkout_onepage_success.xml)
+$cnSuccess  = $block->getData('cn_success');
+$cnIsMember = $cnSuccess && $cnSuccess->justBecameMember();
 ?>
 <div class="checkout-success container flex flex-col justify-center items-center py-4 px-6">
     <?php if ($block->getOrderId()): ?>
@@ -48,6 +53,21 @@ use Magento\Checkout\Block\Onepage\Success;
                 __('We\'ll email you an order confirmation with details and tracking info.')
             ) ?>
         </p>
+
+        <?php if ($cnIsMember): ?>
+            <div class="mt-6 text-center max-w-xl">
+                <p class="text-ahy-blue text-xl md:text-2xl font-extrabold uppercase">
+                    <?= $escaper->escapeHtml(__('You are now a Caliber Nation Member!')) ?>
+                </p>
+                <p class="text-center mt-2 text-ahy-blue">
+                    <?= $escaper->escapeHtml(__('Enjoy your perks — exclusive member pricing, member-only spotlight deals, and early-bird access to sales.')) ?>
+                </p>
+                <a href="<?= $escaper->escapeUrl($block->getUrl('caliber-nation/account')) ?>"
+                   class="inline-flex items-center justify-center mt-5 bg-ahy-red hover:bg-ahy-red-light text-white font-bold rounded-full px-8 h-12 transition-colors">
+                    <?= $escaper->escapeHtml(__('View My Membership')) ?>
+                </a>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 
     <?= $block->getAdditionalInfoHtml() ?>

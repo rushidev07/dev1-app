@@ -11,8 +11,8 @@ use Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult;
 use Psr\Log\LoggerInterface;
 
 /**
- * Grid collection for the admin refund requests listing.
- * Joins customer_entity (email/name) and admin_user (reviewer name).
+ * Grid collection for the admin early cancellations listing.
+ * Joins customer_entity to show email/name and supports fulltext search.
  */
 class Collection extends SearchResult
 {
@@ -40,14 +40,20 @@ class Collection extends SearchResult
             ]
         );
 
-        $this->getSelect()->joinLeft(
-            ['au' => $this->getTable('admin_user')],
-            'main_table.reviewed_by = au.user_id',
-            [
-                'reviewed_by_name' => new \Zend_Db_Expr("TRIM(CONCAT(COALESCE(au.firstname,''),' ',COALESCE(au.lastname,'')))"),
-            ]
-        );
+        $this->addFilterToMap('customer_email', 'ce.email');
+        $this->addFilterToMap('customer_name', new \Zend_Db_Expr("TRIM(CONCAT(COALESCE(ce.firstname,''),' ',COALESCE(ce.lastname,'')))"));
 
+        return $this;
+    }
+
+    public function addFullTextFilter(string $value): static
+    {
+        $conn = $this->getConnection();
+        $like = '%' . $value . '%';
+        $this->getSelect()->where(implode(' OR ', [
+            $conn->quoteInto('ce.email LIKE ?', $like),
+            $conn->quoteInto("TRIM(CONCAT(COALESCE(ce.firstname,''),' ',COALESCE(ce.lastname,''))) LIKE ?", $like),
+        ]));
         return $this;
     }
 }

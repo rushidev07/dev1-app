@@ -64,7 +64,6 @@ body.ahy-search-open { background:#efeadd !important; }
 .pop-nav-btn-prev{left:12px;}
 .pop-nav-btn-next{right:12px;}
 .ahy-filters{width: 285px !important;}
-.
 .popular-searches-row{display:flex;flex-wrap:wrap;gap:10px;}
 @media(max-width:767px){.pop-cards-row{scroll-snap-type:x mandatory;}}
 @media(min-width:640px){.pop-card{width:calc(48% - 6px);}}
@@ -95,6 +94,8 @@ body.ahy-search-open { background:#efeadd !important; }
         justify-content: center;
         background-color: #efeadd;
     }
+.customer-account-index.page-layout-2columns-left  .columns{grid-template-columns: repeat(4,minmax(0,1fr)) !important;}
+
 </style>
 
 <!-- ── Search form ───────────────────────────────────────── -->
@@ -223,18 +224,15 @@ function initMiniSearch() {
  */
 window.ahyTokenRefresh = window.ahyTokenRefresh || (function () {
     const tokenUrl = <?= json_encode($tokenRefreshUrl) ?>;
-    const REFRESH_BEFORE_MS = 60000; // proactively refetch up to 1 min before real expiry
     let cached = null;
-    let expiresAt = 0; // epoch ms in this browser's own clock — set from the server's ttl_seconds
     let inflight = null;
 
-    async function fetchLive() {
+    async function fetchLive(force) {
         try {
-            const resp = await fetch(tokenUrl, { credentials: 'include', cache: 'no-store' });
+            const url = force ? (tokenUrl + (tokenUrl.includes('?') ? '&' : '?') + 'force=1') : tokenUrl;
+            const resp = await fetch(url, { credentials: 'include', cache: 'no-store' });
             const data = await resp.json();
-            if (!data || !data.success) return null;
-            expiresAt = data.ttl_seconds ? Date.now() + (data.ttl_seconds * 1000) : 0;
-            return data.token;
+            return data && data.success ? data.token : null;
         } catch (e) {
             console.error('[ahyTokenRefresh] fetch error', e);
             return null;
@@ -242,20 +240,21 @@ window.ahyTokenRefresh = window.ahyTokenRefresh || (function () {
     }
 
     return {
-        // Returns a token, fetching one live if we don't have one cached or it's about to expire.
+        // Returns a token, fetching one live only if we don't already have one cached in memory.
+        // Server is allowed to answer this from its own short-lived file cache.
         async get() {
-            const isStale = !cached || (expiresAt && Date.now() > expiresAt - REFRESH_BEFORE_MS);
-            if (cached && !isStale) return cached;
+            if (cached) return cached;
             if (!inflight) {
-                inflight = fetchLive().then(t => { cached = t; inflight = null; return t; });
+                inflight = fetchLive(false).then(t => { cached = t; inflight = null; return t; });
             }
             return inflight;
         },
-        // Forces a brand-new live token (used after a 401) and notifies listeners.
+        // Used after a 401: the token we had was just rejected by the platform, so the
+        // server must mint a genuinely new one instead of handing back its cached copy.
         async refresh() {
             cached = null;
-            expiresAt = 0;
-            const t = await this.get();
+            const t = await fetchLive(true);
+            cached = t;
             if (t) window.dispatchEvent(new CustomEvent('ahy-token-refreshed', { detail: t }));
             return t;
         },

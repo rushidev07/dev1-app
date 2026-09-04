@@ -11,6 +11,14 @@
                     <argument name="sortOrder" xsi:type="number">260</argument>
                 </arguments>
             </block> -->
+            <block class="Magento\Customer\Block\Account\SortLinkInterface"
+                   name="customer-account-navigation-caliber-membership-link">
+                <arguments>
+                    <argument name="label" xsi:type="string" translate="true">Caliber Membership</argument>
+                    <argument name="path" xsi:type="string">calibernation/account</argument>
+                    <argument name="sortOrder" xsi:type="number">45</argument>
+                </arguments>
+            </block>
         </referenceBlock>
     </body>
 </page>

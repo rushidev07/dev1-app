@@ -27,7 +27,7 @@ class Edit extends Action
         $id = (int) $this->getRequest()->getParam('entity_id');
         $result = $this->resultPageFactory->create();
         $result->setActiveMenu('Ahy_CaliberNation::price_rules');
-        $result->getConfig()->getTitle()->prepend($id ? __('Edit Member Price Rule') : __('New Member Price Rule'));
+        $result->getConfig()->getTitle()->prepend($id ? __('Edit Category Level Discount') : __('New Category Level Discount'));
         return $result;
     }
 }

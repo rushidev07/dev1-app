@@ -35,7 +35,11 @@ class Token extends Action implements HttpGetActionInterface
 
         try {
             $storeId = (int) $this->storeManager->getStore()->getId();
-            $tokenData = $this->tokenService->getTokenData($storeId);
+            // "force" is set by the client only when it is retrying after a 401 from
+            // the platform — i.e. it already knows the cached token was rejected, so
+            // the local file cache must be bypassed rather than trusted.
+            $forceRefresh = (bool) $this->getRequest()->getParam('force');
+            $tokenData = $this->tokenService->getTokenData($storeId, $forceRefresh);
 
             if ($tokenData['token'] === '') {
                 return $result->setHttpResponseCode(503)

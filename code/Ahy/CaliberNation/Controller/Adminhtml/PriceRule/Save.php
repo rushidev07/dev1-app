@@ -50,6 +50,23 @@ class Save extends Action
                 $data['target_id'] = (int) reset($data['target_id']);
             }
 
+            // Prevent duplicate: check if this category already has a rule.
+            if (!$id && !empty($data['target_id'])) {
+                $conn   = $this->resource->getConnection();
+                $table  = $this->resource->getMainTable();
+                $exists = $conn->fetchOne(
+                    $conn->select()->from($table, ['entity_id'])
+                        ->where('target_id = ?', (int) $data['target_id'])
+                        ->limit(1)
+                );
+                if ($exists) {
+                    $this->messageManager->addErrorMessage(
+                        __('This category already has a discount rule. Please edit the existing record instead.')
+                    );
+                    return $redirect->setPath('*/*/new');
+                }
+            }
+
             $model->addData($data);
             $this->resource->save($model);
             $this->messageManager->addSuccessMessage(__('Member price rule saved.'));

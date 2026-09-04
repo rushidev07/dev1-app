@@ -118,7 +118,7 @@ class Products extends Template
         $endpointUrl  = $this->helper->getEndpointUrl();
         $platformBase = rtrim(preg_replace('#/api/v1/ingest/products.*#', '', $endpointUrl), '/');
         if (!$platformBase) {
-            $platformBase = 'https://app.falcosense.com';
+            $platformBase = 'http://host.docker.internal:8080';
         }
 
         $url = $platformBase . '/api/v1/sliders/' . urlencode($type)

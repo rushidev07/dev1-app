@@ -787,7 +787,7 @@ $ahyBrandName = $escaper->escapeJs($ahyBrandName);
                                         </button>
                                     </template>
                                     <template x-if="product.type === 'configurable'">
-                                        <button @click.prevent="$dispatch('ahy-open-config-modal', product)"
+                                        <button @click.prevent="$dispatch('ahy-cfg-modal-open', product)"
                                                 class="capitalize kuBtnDark !flex justify-center items-center w-full !rounded-full !bg-transparent !text-ahy-blue hover:shadow-[#0d2f47_0px_0px_0px_1px_inset] !text-sm !py-1.5 !px-2.5 font-bold !border-2 !border-ahy-blue">
                                             Options
                                         </button>
@@ -860,7 +860,7 @@ $ahyBrandName = $escaper->escapeJs($ahyBrandName);
                                     </button>
                                 </template>
                                 <template x-if="product.type === 'configurable'">
-                                    <button @click.prevent="$dispatch('ahy-open-config-modal', product)"
+                                    <button @click.prevent="$dispatch('ahy-cfg-modal-open', product)"
                                             class="flex items-center gap-2 border-2 border-ahy-blue text-ahy-blue rounded-full px-5 py-2 text-sm font-bold">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                                         Options
@@ -1262,7 +1262,6 @@ document.addEventListener('alpine:init', () => {
         .ahy-filters { flex-grow: 1; max-width: 300px; }
     }
     @media (min-width: 768px) {
-        .marketplace-seller-profile .columns { padding-right: 0 !important; }
         .marketplace-seller-profile .column.main { padding-right: 0 !important; }
     }
     .meet-seller-tabs { background-color: transparent; }
@@ -1270,33 +1269,33 @@ document.addEventListener('alpine:init', () => {
         margin-inline: auto;
     }
     @media (min-width: 640px) {
-       .marketplace-seller-profile.ahy-search-open .pt-8.pb-0.lg\:pb-8.max-w-screen-xl, 
+       .marketplace-seller-profile .columns, 
         .ahy-filter-layout {
-            max-width: 640px;
+            max-width: 640px !important;
         }
     }
     @media (min-width: 768px) {
-        .marketplace-seller-profile.ahy-search-open .pt-8.pb-0.lg\:pb-8.max-w-screen-xl,
+        .marketplace-seller-profile .columns,
         .ahy-filter-layout {
-            max-width: 768px;
+            max-width: 768px !important;
         }
     }
     @media (min-width: 1024px) {
-        .marketplace-seller-profile.ahy-search-open .pt-8.pb-0.lg\:pb-8.max-w-screen-xl,
+        .marketplace-seller-profile .columns,
         .ahy-filter-layout {
-            max-width: 1024px;
+            max-width: 1024px !important;
         }
     }
     @media (min-width: 1280px) {
-        .marketplace-seller-profile.ahy-search-open .pt-8.pb-0.lg\:pb-8.max-w-screen-xl,
+        .marketplace-seller-profile .columns,
         .ahy-filter-layout {
-            max-width: 1280px;
+            max-width: 1280px !important;
         }
     }
     @media (min-width: 1536px) {
-        .marketplace-seller-profile.ahy-search-open .pt-8.pb-0.lg\:pb-8.max-w-screen-xl,
+        .marketplace-seller-profile .columns,
         .ahy-filter-layout {
-            max-width: 1536px;
+            max-width: 1536px !important;
         }
     }
 </style>

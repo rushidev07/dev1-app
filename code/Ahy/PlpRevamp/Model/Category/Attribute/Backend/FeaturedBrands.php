@@ -55,6 +55,18 @@ class FeaturedBrands extends AbstractBackend
             $value = $value[$code];
         }
 
+        // Apply the drag-and-drop order. The hidden `position` field on each record
+        // carries it; rows without one keep their submitted order behind the rest.
+        // Sorted here rather than stored, so the array order in the JSON stays the
+        // single source of truth for every consumer (AllBrands, SubcategoryCards).
+        // usort is stable as of PHP 8, so equal/absent positions keep submitted order.
+        $value = array_values($value);
+        usort($value, static function ($a, $b) {
+            $posA = isset($a['position']) && $a['position'] !== '' ? (float)$a['position'] : PHP_INT_MAX;
+            $posB = isset($b['position']) && $b['position'] !== '' ? (float)$b['position'] : PHP_INT_MAX;
+            return $posA <=> $posB;
+        });
+
         $clean = [];
         foreach ($value as $row) {
             if (!is_array($row)) {
@@ -95,8 +107,26 @@ class FeaturedBrands extends AbstractBackend
             return parent::afterLoad($object);
         }
 
+        // Drop nameless rows before the form ever sees them. beforeSave() already
+        // strips them on the way out, but values written before that guard existed
+        // (or by an import / direct SQL) would otherwise render as blank rows the
+        // admin cannot delete permanently.
+        $rows = array_values(array_filter(
+            $rows,
+            static fn($row) => is_array($row) && trim((string)($row['name'] ?? '')) !== ''
+        ));
+
+        if ($rows === []) {
+            $object->setData($code, null);
+            return parent::afterLoad($object);
+        }
+
         $mediaBaseUrl = rtrim($this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_MEDIA), '/');
+        $position = 0;
         foreach ($rows as &$row) {
+            // Seed the hidden position field from the stored array order, so a drag
+            // has consistent numbers to reshuffle rather than starting from blanks.
+            $row['position'] = $position++;
             $image = (string)($row['image'] ?? '');
             $row['image'] = $image !== ''
                 ? [['name' => $image, 'url' => $mediaBaseUrl . '/catalog/category/' . ltrim($image, '/')]]

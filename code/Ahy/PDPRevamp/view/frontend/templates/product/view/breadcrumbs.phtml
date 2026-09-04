@@ -1,0 +1,53 @@
+<?php
+/**
+ * PDP breadcrumbs. Replaces the theme's client-side (document.referrer based)
+ * version - see Ahy\PDPRevamp\ViewModel\ProductBreadcrumbs for why - and
+ * matches the revamp design: no underlines, light separators, the current page
+ * in bold, and visible at every breakpoint.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\ViewModel\ProductBreadcrumbs;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ProductBreadcrumbs $breadcrumbsViewModel */
+$breadcrumbsViewModel = $viewModels->require(ProductBreadcrumbs::class);
+
+$crumbs = $breadcrumbsViewModel->getCrumbs();
+if (count($crumbs) < 2) {
+    return;
+}
+$lastIndex = count($crumbs) - 1;
+?>
+<nav class="pdp-breadcrumbs border-b" style="min-height:44px; background-color:#F7F5F0; border-color:#EBE8E1;" aria-label="<?= $escaper->escapeHtmlAttr(__('Breadcrumb')) ?>">
+    <div class="container py-3">
+        <ol class="flex flex-wrap items-center gap-2" style="font-size:15px;">
+            <?php foreach ($crumbs as $index => $crumb): ?>
+                <?php if ($index > 0): ?>
+                    <li aria-hidden="true" style="color:#BBBBBB;">/</li>
+                <?php endif; ?>
+                <li>
+                    <?php if ($index === $lastIndex || $crumb['url'] === null): ?>
+                        <span class="font-semibold" style="color:#2D3A3A;" aria-current="page">
+                            <?= $escaper->escapeHtml($crumb['label']) ?>
+                        </span>
+                    <?php else: ?>
+                        <a
+                            href="<?= $escaper->escapeUrl($crumb['url']) ?>"
+                            class="transition-colors hover:underline"
+                            style="color:#8A9A8A;"
+                        ><?= $escaper->escapeHtml($crumb['label']) ?></a>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ol>
+    </div>
+</nav>
+<script type="application/ld+json">
+    <?= /* @noEscape */ $breadcrumbsViewModel->getJsonLd() ?>
+</script>

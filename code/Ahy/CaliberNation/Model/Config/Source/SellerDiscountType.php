@@ -20,7 +20,7 @@ class SellerDiscountType implements OptionSourceInterface
     public function toOptionArray(): array
     {
         return [
-            ['value' => '',                    'label' => __('-- None (no blanket discount) --')],
+            ['value' => '',                    'label' => __('-- None (no discount) --')],
             ['value' => DiscountType::PERCENT, 'label' => __('Percentage off (%)')],
             ['value' => DiscountType::FIXED,   'label' => __('Fixed amount off')],
         ];

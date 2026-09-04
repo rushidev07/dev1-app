@@ -50,6 +50,23 @@ class Save extends Action
                 $data['seller_id'] = (int) reset($data['seller_id']);
             }
 
+            // Prevent duplicate: check if this seller_id already has a participation record.
+            if (!$id && !empty($data['seller_id'])) {
+                $conn   = $this->resource->getConnection();
+                $table  = $this->resource->getMainTable();
+                $exists = $conn->fetchOne(
+                    $conn->select()->from($table, ['entity_id'])
+                        ->where('seller_id = ?', (int) $data['seller_id'])
+                        ->limit(1)
+                );
+                if ($exists) {
+                    $this->messageManager->addErrorMessage(
+                        __('This seller is already participating. Please edit the existing record instead.')
+                    );
+                    return $redirect->setPath('*/*/new');
+                }
+            }
+
             // Discount value is now optional (participate without a blanket discount →
             // use per-product Member Discount instead). Blank normalises to 0 so the
             // NOT NULL column is satisfied and no seller-wide discount is applied.

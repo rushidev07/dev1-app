@@ -22,7 +22,14 @@ $config = $viewModel->getCheckoutConfig();
     class="nav-braincrumbs mb-6 pb-1 flex justify-center md:space-x-4 md:border-b md:border-gray-200 bg-ahy-blue w-screen left-1/2 right-1/2 mx-[-50vw] relative
 "
 >
-    <?php if ($config->hasSteps() && $config->isMultiStepper()): ?>
+    <?php /*
+        Intentionally NOT gated on isMultiStepper(). Hyvä hides the waypoints when only
+        one step survives its conditions, which happens for a fully virtual cart such as
+        the Caliber Nation membership on its own: shipping/verify/ffl are all dropped and
+        a logged-in customer skips login, leaving REVIEW & ORDER alone. We still want the
+        step shown so the banner never renders as an empty blue strip.
+    */ ?>
+    <?php if ($config->hasSteps()): ?>
         <?= $block->getChildHtml('hyva.checkout.breadcrumbs.waypoints') ?>
     <?php endif ?>
 

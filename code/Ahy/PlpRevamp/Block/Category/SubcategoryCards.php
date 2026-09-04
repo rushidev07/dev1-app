@@ -26,6 +26,16 @@ class SubcategoryCards extends View
     /** Subcategories shown when the category leaves the count empty. */
     private const DEFAULT_SUBCATEGORY_COUNT = 8;
 
+    /** Hard ceiling on the count, whatever the category asks for. */
+    private const MAX_SUBCATEGORY_COUNT = 10;
+
+    /**
+     * Hard ceiling on featured products rendered on the category page.
+     * The source category usually holds more than we want inline; the rest stay
+     * reachable via the "See More" link, which points at that source category.
+     */
+    private const MAX_FEATURED_PRODUCTS = 8;
+
     private array $labelColorOptionMap = [];
     private array $productLabelOptionMap = [];
     private bool $usedFallback = false;
@@ -64,6 +74,39 @@ class SubcategoryCards extends View
         return (bool)$this->getCurrentCategory()->getData('ahy_use_subcategory_layout');
     }
 
+    /**
+     * Per-section switch, gated by the master layout switch.
+     *
+     * A NULL value counts as ON: categories that existed before these attributes
+     * were added have no row for them, and they must keep rendering exactly as
+     * they did. Only an explicit "0" turns a section off.
+     */
+    private function isSectionEnabled(string $attributeCode): bool
+    {
+        if (!$this->isSubcategoryLayoutEnabled()) {
+            return false;
+        }
+
+        $value = $this->getCurrentCategory()->getData($attributeCode);
+
+        return $value === null || $value === '' || (bool)$value;
+    }
+
+    public function isSubcategoryCardsEnabled(): bool
+    {
+        return $this->isSectionEnabled('ahy_show_subcategory_cards');
+    }
+
+    public function isFeaturedProductsEnabled(): bool
+    {
+        return $this->isSectionEnabled('ahy_show_featured_products');
+    }
+
+    public function isFeaturedBrandsEnabled(): bool
+    {
+        return $this->isSectionEnabled('ahy_show_featured_brands');
+    }
+
     // ---------------------------------------------------------------
     // Child categories — loads ahy_card_image explicitly
     // ---------------------------------------------------------------
@@ -82,8 +125,12 @@ class SubcategoryCards extends View
     }
 
     /**
-     * Max number of subcategories to render. Empty falls back to the default; an explicit 0 means
-     * no limit (show all).
+     * Number of subcategory cards to render.
+     *
+     * Empty falls back to DEFAULT_SUBCATEGORY_COUNT (8). An explicit value is clamped
+     * into 1..MAX_SUBCATEGORY_COUNT (10), so 0 or a negative yields 1 and anything
+     * above 10 yields 10. The admin field also validates the 1-10 range up front, so
+     * the clamp here only guards values written directly to the attribute.
      */
     public function getSubcategoryCardsCount(): int
     {
@@ -93,7 +140,7 @@ class SubcategoryCards extends View
             return self::DEFAULT_SUBCATEGORY_COUNT;
         }
 
-        return max(0, (int)$value);
+        return min(self::MAX_SUBCATEGORY_COUNT, max(1, (int)$value));
     }
 
     /** @deprecated use getChildCategories() */
@@ -115,6 +162,15 @@ class SubcategoryCards extends View
      * Admin-configurable line under the Featured Products heading.
      * Falls back to the previous hardcoded copy when the category leaves it empty.
      */
+    /**
+     * Blurb rendered under the Featured Products grid. Empty string = hide the block.
+     * Not escaped here — the template decides how to render it.
+     */
+    public function getFeaturedDescription(): string
+    {
+        return trim((string)$this->getCurrentCategory()->getData('ahy_featured_description'));
+    }
+
     public function getFeaturedSubtitle(): string
     {
         return (string)($this->getCurrentCategory()->getData('ahy_featured_subtitle')
@@ -128,7 +184,12 @@ class SubcategoryCards extends View
 
     public function getFeaturedCount(): int
     {
-        return max(1, (int)($this->getCurrentCategory()->getData('ahy_featured_products_count') ?: 8));
+        $configured = (int)($this->getCurrentCategory()->getData('ahy_featured_products_count')
+            ?: self::MAX_FEATURED_PRODUCTS);
+
+        // Clamp to [1, MAX_FEATURED_PRODUCTS]. A larger value configured on the
+        // category is capped rather than rejected, so existing data keeps working.
+        return min(self::MAX_FEATURED_PRODUCTS, max(1, $configured));
     }
 
     // ---------------------------------------------------------------
@@ -290,6 +351,10 @@ class SubcategoryCards extends View
      * Prefers the structured `ahy_featured_brands` attribute (name + link + image); falls back to
      * the legacy comma-separated `ahy_featured_brand_names` so existing categories keep working.
      *
+     * Every configured brand is returned. The section renders them as one horizontally
+     * scrollable row (.ahy-brand-grid), so the count no longer needs capping; the
+     * "See All" link still points at the All Brands page via getBrandsSeeMoreUrl().
+     *
      * @return array<int, array{label: string, url: string, image: string}>
      */
     public function getFeaturedBrands(): array
@@ -315,7 +380,7 @@ class SubcategoryCards extends View
     }
 
     /**
-     * "See More" target for the featured brands section — the All Brands page.
+     * "See All" target for the featured brands section — the All Brands page.
      */
     public function getBrandsSeeMoreUrl(): string
     {

@@ -65,23 +65,12 @@ $heroicons = $block->getData('view_models')
         </svg>
         <div>
             <?= $escaper->escapeHtml($magewire->errorMessage) ?>
-            <?php if ($magewire->refundProcessed): ?>
-            <div class="mt-3">
-                <a href="<?= $escaper->escapeUrl($block->getUrl('caliber-nation')) ?>"
-                   class="inline-flex items-center gap-2 font-bold text-ahy-blue underline hover:no-underline">
-                    <?= $escaper->escapeHtml(__('Buy a new membership here')) ?>
-                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                    </svg>
-                </a>
-            </div>
-            <?php endif; ?>
         </div>
     </div>
     <?php endif; ?>
 
     <!-- ── Rejoin CTA — Alpine manages confirmation panel, zero server round-trip ── -->
-    <div x-data="{ confirm: false }" <?= $magewire->refundProcessed ? 'style="display:none;"' : '' ?>>
+    <div x-data="{ confirm: false }">
 
         <?php if ($magewire->withinPaidThrough): ?>
         <!--

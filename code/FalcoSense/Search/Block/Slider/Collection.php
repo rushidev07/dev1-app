@@ -33,7 +33,7 @@ use Magento\Framework\View\Element\Template\Context;
  */
 class Collection extends Template
 {
-    private const PLATFORM_FALLBACK = 'https://app.falcosense.com';
+    private const PLATFORM_FALLBACK = 'http://host.docker.internal:8080';
 
     private SmartSearchHelper $helper;
 

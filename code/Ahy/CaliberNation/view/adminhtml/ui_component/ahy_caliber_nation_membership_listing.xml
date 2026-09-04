@@ -31,6 +31,7 @@
     <listingToolbar name="listing_top">
         <bookmark name="bookmarks"/>
         <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
         <filters name="listing_filters"/>
         <paging name="listing_paging"/>
     </listingToolbar>
@@ -83,7 +84,7 @@
                 <label translate="true">Renewal Date</label>
             </settings>
         </column>
-        <column name="auto_renew">
+        <column name="auto_renew" component="Magento_Ui/js/grid/columns/select">
             <settings>
                 <filter>select</filter>
                 <options class="Magento\Config\Model\Config\Source\Yesno"/>
@@ -91,11 +92,7 @@
                 <label translate="true">Auto-Renew</label>
             </settings>
         </column>
-        <column name="payment_token_id">
-            <settings>
-                <label translate="true">Vault Token</label>
-            </settings>
-        </column>
+
         <actionsColumn name="actions" class="Ahy\CaliberNation\Ui\Component\Listing\Column\MembershipActions">
             <settings>
                 <indexField>entity_id</indexField>

@@ -8,7 +8,7 @@
                 <resource id="Ahy_CaliberNation::caliber_nation" title="Caliber Nation" sortOrder="80">
                     <resource id="Ahy_CaliberNation::membership" title="Membership Management" sortOrder="10"/>
                     <resource id="Ahy_CaliberNation::seller_pricing" title="Seller Participation &amp; Pricing" sortOrder="20"/>
-                    <resource id="Ahy_CaliberNation::price_rules" title="Member Price Rules" sortOrder="30"/>
+                    <resource id="Ahy_CaliberNation::price_rules" title="Category Level Discounts" sortOrder="30"/>
                     <resource id="Ahy_CaliberNation::refund_requests" title="Early Cancellations" sortOrder="40"/>
                 </resource>
 

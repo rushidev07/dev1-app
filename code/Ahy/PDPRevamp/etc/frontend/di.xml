@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Catalog\Block\Product\View\Gallery">
+        <plugin name="ahy_pdprevamp_gallery_template" type="Ahy\PDPRevamp\Plugin\GalleryTemplatePlugin"/>
+        <!-- Adds "thumb_caption" to the gallery JSON the PDP template consumes. -->
+        <plugin name="ahy_pdprevamp_gallery_thumb_caption"
+                type="Ahy\PDPRevamp\Plugin\Gallery\AddThumbCaptionToJson"/>
+    </type>
+    <type name="Magento\Catalog\Block\Product\View">
+        <plugin name="ahy_pdprevamp_product_view_template" type="Ahy\PDPRevamp\Plugin\ProductViewTemplatePlugin"/>
+    </type>
+    <type name="Magento\Swatches\Block\Product\Renderer\Configurable">
+        <plugin name="ahy_pdprevamp_swatch_renderer_template" type="Ahy\PDPRevamp\Plugin\SwatchRendererTemplatePlugin"/>
+    </type>
+    <type name="Magento\Theme\Block\Html\Breadcrumbs">
+        <plugin name="ahy_pdprevamp_breadcrumbs_template" type="Ahy\PDPRevamp\Plugin\BreadcrumbsTemplatePlugin"/>
+    </type>
+    <type name="Ahy\PDPRevamp\Block\Product\View\StockStatus">
+        <plugin name="ahy_pdprevamp_stockstatus_template" type="Ahy\PDPRevamp\Plugin\StockStatusTemplatePlugin"/>
+    </type>
+    <!-- Swaps the PDP PayPal Smart Button template. Guarded inside the plugin
+         by an ancestry walk, so the minicart/cart button is never affected -
+         see the class docblock. -->
+    <type name="Magento\Paypal\Block\Express\InContext\SmartButton">
+        <plugin name="ahy_pdprevamp_paypal_shortcut_template" type="Ahy\PDPRevamp\Plugin\PaypalShortcutTemplatePlugin"/>
+    </type>
+    <type name="Magento\Framework\Phrase\Renderer\Translate">
+        <plugin name="ahy_pdprevamp_preheader_translate" type="Ahy\PDPRevamp\Plugin\PreheaderTranslatePlugin"/>
+    </type>
+    <!-- Makes the "Frequently Bought Together" widget's advertised 10% bundle
+         discount real - see Plugin\SalesRule\Model\RulesApplier's docblock. -->
+    <type name="Magento\Checkout\Model\Cart">
+        <plugin name="ahy_pdprevamp_tag_fbt_bundle_item" type="Ahy\PDPRevamp\Plugin\Checkout\Model\Cart\TagFbtBundleItem"/>
+    </type>
+    <type name="Magento\SalesRule\Model\RulesApplier">
+        <plugin name="ahy_pdprevamp_fbt_bundle_discount" type="Ahy\PDPRevamp\Plugin\SalesRule\Model\RulesApplier"/>
+    </type>
+      <type name="Magento\Cms\Block\Block">
+        <plugin name="ahy_pdprevamp_avantlink_sponsor_banner_link" type="Ahy\PDPRevamp\Plugin\Cms\AvantLinkSponsorBannerLinkPlugin"/>
+    </type>
+</config>

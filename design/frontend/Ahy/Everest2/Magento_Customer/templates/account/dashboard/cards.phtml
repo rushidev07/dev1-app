@@ -16,6 +16,10 @@ $vaultCards = $viewModels->require(CustomerVaultCards::class);
 /** @var \Ahy\SavedCC\ViewModel\ConfigProvider $savedCcConfig */
 $savedCcConfig = $viewModels->require(\Ahy\SavedCC\ViewModel\ConfigProvider::class);
 
+/** @var \Ahy\CaliberNation\ViewModel\MembershipCard $membershipCard */
+$membershipCard = $viewModels->require(\Ahy\CaliberNation\ViewModel\MembershipCard::class);
+$renewalTokenId = $membershipCard->getRenewalTokenId();
+
 if (!$savedCcConfig->isEnabled()) {
     return; // do not render anything
 }
@@ -229,6 +233,12 @@ $sortedTokens = array_merge($activeTokens, $expiredTokens);
                             class="bg-ahy-yellow-card rounded-xl shadow-lg p-6 w-full max-w-md">
                             <h2 class="text-lg font-semibold text-gray-800 mb-4"><?= $escaper->escapeHtml(__('Confirm Delete')) ?></h2>
                             <p class="text-gray-600 mb-6"><?= $escaper->escapeHtml(__('Are you sure you want to delete this card? This action cannot be undone.')) ?></p>
+                            <?php if ($renewalTokenId !== null && $tokenId === $renewalTokenId): ?>
+                                <div class="mb-6 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+                                    <p class="font-semibold mb-1"><?= $escaper->escapeHtml(__('This card is used for your Caliber Nation membership renewal.')) ?></p>
+                                    <p><?= $escaper->escapeHtml(__('Deleting it will turn off auto-renew — your membership will not renew automatically. You can re-enable auto-renew after adding a new card.')) ?></p>
+                                </div>
+                            <?php endif; ?>
                             <div class="flex justify-end gap-4">
                                 <button
                                     @click="showDeleteModal<?= $tokenId ?> = false; unlockScroll()"

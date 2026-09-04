@@ -7,7 +7,6 @@ use Ahy\CaliberNation\Api\Data\MembershipInterface;
 use Ahy\CaliberNation\Api\MembershipRepositoryInterface;
 use Ahy\CaliberNation\Model\Config;
 use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
@@ -17,14 +16,15 @@ class MembershipOverview implements ArgumentInterface
 {
     private ?MembershipInterface $membership = null;
     private bool $loaded = false;
+    private ?\Magento\Vault\Model\PaymentToken $boundToken = null;
+    private bool $boundTokenLoaded = false;
 
     public function __construct(
         private readonly CustomerSession $customerSession,
         private readonly MembershipRepositoryInterface $membershipRepository,
         private readonly TokenCollectionFactory $tokenCollectionFactory,
         private readonly Config $config,
-        private readonly UrlInterface $urlBuilder,
-        private readonly ResourceConnection $resource
+        private readonly UrlInterface $urlBuilder
     ) {}
 
     /** Whether the whole program is switched on (master admin flag). */
@@ -194,6 +194,28 @@ class MembershipOverview implements ArgumentInterface
      */
     private function getBoundUsableToken(): ?\Magento\Vault\Model\PaymentToken
     {
+        $token = $this->getBoundToken();
+        if (!$token) {
+            return null;
+        }
+
+        // An expired card cannot be charged, so it is not "usable" for renewal even
+        // though it is still active + visible in the vault.
+        return $this->isTokenExpired($token) ? null : $token;
+    }
+
+    /**
+     * The membership's bound token regardless of expiry — needed so the UI can say
+     * "your card expired" rather than silently showing "Not set", which reads as though
+     * the member never added one.
+     */
+    private function getBoundToken(): ?\Magento\Vault\Model\PaymentToken
+    {
+        if ($this->boundTokenLoaded) {
+            return $this->boundToken;
+        }
+        $this->boundTokenLoaded = true;
+
         $tokenId = $this->getMembership()?->getPaymentTokenId();
         if (!$tokenId) {
             return null;
@@ -208,7 +230,111 @@ class MembershipOverview implements ArgumentInterface
         /** @var \Magento\Vault\Model\PaymentToken $token */
         $token = $collection->getFirstItem();
 
-        return ($token && $token->getEntityId()) ? $token : null;
+        return $this->boundToken = ($token && $token->getEntityId()) ? $token : null;
+    }
+
+    /**
+     * Whether the bound card has passed its expiry.
+     *
+     * Checks BOTH sources because they can disagree: vault_payment_token.expires_at is
+     * written by the payment integration, while details.expirationDate ("MM/YYYY") is
+     * captured from the card at save time. Observed live: one token with expires_at
+     * 2025-01 but details 07/2032, and another showing details 06/2026 with a future
+     * expires_at. Either being in the past means the card cannot be charged, so treat
+     * the card as expired if EITHER says so — under-warning risks a silent failed
+     * renewal, which is the worse outcome.
+     */
+    private function isTokenExpired(\Magento\Vault\Model\PaymentToken $token): bool
+    {
+        $expiresAt = $token->getExpiresAt();
+        if ($expiresAt && strtotime((string) $expiresAt) <= time()) {
+            return true;
+        }
+
+        $details = json_decode($token->getTokenDetails() ?? '{}', true);
+        $carded  = (string) ($details['expirationDate'] ?? '');
+
+        // "MM/YYYY" — a card is valid through the END of its expiry month.
+        if (preg_match('~^(\d{1,2})/(\d{4})$~', $carded, $m)) {
+            $month = (int) $m[1];
+            $year  = (int) $m[2];
+            if ($month >= 1 && $month <= 12) {
+                $endOfMonth = strtotime(sprintf('%04d-%02d-01 00:00:00', $year, $month) . ' +1 month');
+
+                return $endOfMonth !== false && $endOfMonth <= time();
+            }
+        }
+
+        // Neither source proves expiry → treat as usable rather than wrongly warning.
+        return false;
+    }
+
+    /**
+     * True when the card bound for renewal has passed its expiry date. Drives the
+     * warning on the account panel: auto-renew cannot succeed against this card.
+     */
+    public function isRenewalCardExpired(): bool
+    {
+        $token = $this->getBoundToken();
+
+        return $token !== null && $this->isTokenExpired($token);
+    }
+
+    /** Masked summary of the EXPIRED bound card, e.g. "VISA •••• 1111". */
+    public function getExpiredCardSummary(): string
+    {
+        $token = $this->getBoundToken();
+        if (!$token || !$this->isTokenExpired($token)) {
+            return '';
+        }
+
+        $details = json_decode($token->getTokenDetails() ?? '{}', true);
+        $type    = strtoupper($details['type'] ?? '');
+        $masked  = $details['maskedCC'] ?? '****';
+
+        return trim("{$type} •••• {$masked}");
+    }
+
+    /**
+     * The expiry date to SHOW in the warning — whichever source is actually in the past.
+     *
+     * The two sources can disagree (see isTokenExpired), so displaying the wrong one
+     * produces a contradiction like "Card expired 06/2030". Prefer the date that has
+     * genuinely passed; when both have, show the earlier.
+     */
+    public function getExpiredCardExpiry(): string
+    {
+        $token = $this->getBoundToken();
+        if (!$token) {
+            return '';
+        }
+
+        $candidates = [];
+
+        $expiresAt = $token->getExpiresAt();
+        if ($expiresAt) {
+            $ts = strtotime((string) $expiresAt);
+            if ($ts && $ts <= time()) {
+                $candidates[] = $ts;
+            }
+        }
+
+        $details = json_decode($token->getTokenDetails() ?? '{}', true);
+        $carded  = (string) ($details['expirationDate'] ?? '');
+        if (preg_match('~^(\d{1,2})/(\d{4})$~', $carded, $m)) {
+            $endOfMonth = strtotime(sprintf('%04d-%02d-01 00:00:00', (int) $m[2], (int) $m[1]) . ' +1 month');
+            if ($endOfMonth && $endOfMonth <= time()) {
+                // Report the month printed on the card, not the exclusive end boundary.
+                $candidates[] = strtotime(sprintf('%04d-%02d-01', (int) $m[2], (int) $m[1]));
+            }
+        }
+
+        if ($candidates) {
+            return date('m/Y', min($candidates));
+        }
+
+        // Not expired by either source; fall back to whatever the card says.
+        return $carded;
     }
 
     // ── Customer ─────────────────────────────────────────────────────────────
@@ -255,35 +381,4 @@ class MembershipOverview implements ArgumentInterface
         return (bool) $this->getMembership()?->getAutoRenew();
     }
 
-    /**
-     * True when this membership was expired by admin after reviewing a refund request.
-     * Used to show a "refund processed — buy a new membership" message instead of the
-     * normal "Renew Membership" CTA.
-     */
-    public function isRefundReviewed(): bool
-    {
-        $membership = $this->getMembership();
-        if (!$membership) {
-            return false;
-        }
-
-        // Block on both expired AND cancelled — expiry may have failed server-side,
-        // but the admin's reviewed decision stands in either case.
-        $blockedStatuses = [MembershipInterface::STATUS_EXPIRED, MembershipInterface::STATUS_CANCELLED];
-        if (!\in_array($membership->getStatus(), $blockedStatuses, true)) {
-            return false;
-        }
-
-        try {
-            $conn  = $this->resource->getConnection();
-            $table = $this->resource->getTableName('ahy_caliber_nation_refund_request');
-            $latestStatus = $conn->fetchOne(
-                "SELECT status FROM {$table} WHERE membership_id = ? ORDER BY entity_id DESC LIMIT 1",
-                [(int) $membership->getEntityId()]
-            );
-            return $latestStatus === 'reviewed';
-        } catch (\Exception) {
-            return false;
-        }
-    }
 }

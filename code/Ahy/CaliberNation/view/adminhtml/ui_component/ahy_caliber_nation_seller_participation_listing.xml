@@ -39,6 +39,7 @@
     <listingToolbar name="listing_top">
         <bookmark name="bookmarks"/>
         <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
         <filters name="listing_filters"/>
         <paging name="listing_paging"/>
     </listingToolbar>
@@ -55,6 +56,14 @@
             <settings>
                 <filter>text</filter>
                 <label translate="true">Seller ID</label>
+            </settings>
+        </column>
+        <!-- Shop name resolved in the grid collection (shop_title -> shop_url ->
+             customer name), so admins can identify a seller without knowing ids. -->
+        <column name="seller_name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Seller Name</label>
             </settings>
         </column>
         <column name="is_enabled" component="Magento_Ui/js/grid/columns/select">

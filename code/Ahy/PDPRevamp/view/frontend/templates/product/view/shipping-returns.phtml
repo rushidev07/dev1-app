@@ -1,0 +1,54 @@
+<?php
+/**
+ * PDP Shipping & Returns row - inline accordion (not a slide-out drawer).
+ * Short summary copy for now, matching the reference; the full CMS block
+ * (shipping-and-return-slideout-content) is Page Builder content meant
+ * for a dedicated policy page, not this compact PDP summary.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+?>
+<div class="py-2.5 border-t border-b" style="border-color:#e5e7eb;" x-data="{open:false}">
+    <button
+        type="button"
+        @click="open = !open"
+        class="flex items-center justify-between w-full text-sm font-bold text-ahy-blue pt-2"
+    >
+        <?= __('Shipping & Returns') ?>
+        <span :class="{ 'rotate-180': open }" class="transition-transform duration-200">
+            <?= $heroicons->chevronDownHtml('w-5 h-5', 20, 20, ['aria-hidden' => 'true']) ?>
+        </span>
+    </button>
+    <div
+        class="sr-shipping-content text-sm"
+        :class="{ 'sr-shipping-open': open }"
+        style="color:#5c656b;"
+    >
+        <p class="p-0"><?= __('Free standard shipping on orders over $50. Expedited options available at checkout.') ?></p>
+        <p class="p-0 pb-3 mt-1"><?= __('30-day hassle-free returns. Items must be in original condition with tags attached.') ?></p>
+    </div>
+</div>
+<style>
+    .sr-shipping-content {
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        padding-top: 0;
+        transition: max-height 250ms ease-out, opacity 200ms ease-out, padding-top 250ms ease-out;
+    }
+    .sr-shipping-open {
+        max-height: 200px;
+        opacity: 1;
+        padding-top: 1rem;
+    }
+</style>

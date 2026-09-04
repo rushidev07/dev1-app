@@ -1,0 +1,400 @@
+<?php
+/**
+ * PDP "Recently Viewed" carousel. Per-visitor view history has no
+ * server-side/FPC-safe source in this stack, so it's tracked client-side in
+ * localStorage (sku + viewed-at timestamp) and the display data (name,
+ * image, price, rating) for those SKUs is fetched from Magento's own
+ * GraphQL endpoint on page load - no new backend endpoint needed.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\RecentlyViewed;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ProductPage;
+use Magento\Catalog\Model\Product;
+
+/** @var RecentlyViewed $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+
+/** @var Product $product */
+$product = $productViewModel->getProduct();
+
+$storeCode = $block->getStoreManager()->getStore()->getCode();
+?>
+<section
+    class="ahy-rv-section"
+    x-data="ahyRecentlyViewed('<?= /* @noEscape */ $escaper->escapeJs($product->getSku()) ?>', '<?= /* @noEscape */ $escaper->escapeJs($storeCode) ?>')"
+    x-init="init()"
+    x-show="items.length > 0"
+    x-cloak
+    @resize.window.debounce="checkOverflow(); updateScrollButtons()"
+>
+<div class="container py-6 ahy-rv-container">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ahy-rv-icon">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span class="ahy-rv-title"><?= __('Recently Viewed') ?></span>
+            <span class="ahy-rv-count" x-text="'(' + items.length + ' ' + (items.length === 1 ? '<?= __('item') ?>' : '<?= __('items') ?>') + ')'"></span>
+        </div>
+        <div class="flex items-center gap-1.5" x-show="hasOverflow" x-cloak>
+            <button type="button" @click="scrollByCard(-1)" aria-label="<?= $escaper->escapeHtmlAttr(__('Previous')) ?>" class="ahy-carousel-nav-btn ahy-rv-nav-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button type="button" @click="scrollByCard(1)" aria-label="<?= $escaper->escapeHtmlAttr(__('Next')) ?>" class="ahy-carousel-nav-btn ahy-rv-nav-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div x-ref="track" class="ahy-recently-viewed-track grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <template x-for="entry in items" :key="entry.sku">
+            <a :href="entry.url" class="group ahy-rv-card rounded-lg overflow-hidden">
+                <div class="relative overflow-hidden ahy-rv-image-wrap" style="aspect-ratio:1/1;">
+                    <img :src="entry.image" :alt="entry.name" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy">
+                    <span class="ahy-rv-badge-time" x-text="entry.timeAgo"></span>
+                    <span class="ahy-rv-badge-viewing" x-show="entry.isCurrent" x-cloak><?= __('Viewing') ?></span>
+                </div>
+                <div class="p-2">
+                    <p class="ahy-rv-brand ahy-rv tracking-wider" x-show="entry.brand" x-text="entry.brand"></p>
+                    <p class="ahy-rv-name ahy-rv leading-tight" x-text="entry.name"></p>
+                    <div class="flex items-center justify-between mt-1.5">
+                        <div class="flex items-center ahy-rv-stars" x-show="entry.ratingPercent > 0">
+                            <template x-for="i in 5" :key="i">
+                                <svg width="8" height="8" viewBox="0 0 24 24" stroke-width="2" :fill="i <= Math.round(entry.ratingPercent / 20) ? '#fbbf24' : 'none'" :stroke="i <= Math.round(entry.ratingPercent / 20) ? '#fbbf24' : '#d1d5db'">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                </svg>
+                            </template>
+                        </div>
+                        <div class="ahy-rv-price" x-text="'$' + entry.price.toFixed(2)"></div>
+                    </div>
+                </div>
+            </a>
+        </template>
+    </div>
+</div>
+</section>
+<script>
+    function ahyRecentlyViewed(currentSku, storeCode) {
+        return {
+            items: [],
+            storageKey: 'ahy_recently_viewed',
+            hasOverflow: false,
+            atStart: true,
+            atEnd: false,
+
+            init() {
+                this.recordView(currentSku);
+                const stored = this.readStored();
+                if (!stored.length) {
+                    return;
+                }
+                const skus = stored.map(entry => entry.sku);
+                Promise.all([
+                    this.fetchProducts(skus),
+                    this.fetchBrands(skus).catch(() => ({})),
+                ])
+                    .then(([productsBySku, brandsBySku]) => this.buildItems(stored, productsBySku, brandsBySku))
+                    .catch(() => { this.items = []; });
+            },
+
+            readStored() {
+                try {
+                    const raw = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+                    return Array.isArray(raw) ? raw : [];
+                } catch (e) {
+                    return [];
+                }
+            },
+
+            recordView(sku) {
+                let stored = this.readStored().filter(entry => entry.sku !== sku);
+                stored.unshift({ sku: sku, viewedAt: Date.now() });
+                stored = stored.slice(0, 20);
+                try {
+                    localStorage.setItem(this.storageKey, JSON.stringify(stored));
+                } catch (e) {
+                    // storage unavailable (private mode / quota) - view just won't persist
+                }
+            },
+
+            fetchProducts(skus) {
+                // "custom_attributes" is not queried here - this install
+                // doesn't have Magento_CustomAttributesGraphQl installed, so
+                // that field doesn't exist on ProductInterface at all; the
+                // GraphQL validator crashes (rather than cleanly rejecting
+                // the query) if it's requested with arguments. Brand comes
+                // from fetchBrands() instead, a small PHP endpoint that
+                // resolves it server-side.
+                const query = `query RecentlyViewed($skus: [String!]) {
+                    products(filter: { sku: { in: $skus } }, pageSize: ${skus.length}) {
+                        items {
+                            sku
+                            name
+                            url_key
+                            url_rewrites { url }
+                            rating_summary
+                            review_count
+                            small_image { url }
+                            price_range { minimum_price { final_price { value } } }
+                        }
+                    }
+                }`;
+
+                return fetch('/graphql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Store': storeCode },
+                    body: JSON.stringify({ query, variables: { skus } })
+                })
+                    .then(response => response.json())
+                    .then(json => {
+                        if (json.errors) {
+                            throw new Error('graphql error');
+                        }
+                        const bySku = {};
+                        (json.data?.products?.items || []).forEach(item => {
+                            bySku[item.sku] = item;
+                        });
+                        return bySku;
+                    });
+            },
+
+            fetchBrands(skus) {
+                const params = new URLSearchParams();
+                skus.forEach(sku => params.append('skus[]', sku));
+
+                return fetch(BASE_URL + 'ahyyotpo/index/productbrands?' + params.toString())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('brand fetch failed');
+                        }
+                        return response.json();
+                    });
+            },
+
+            buildItems(stored, productsBySku, brandsBySku) {
+                const now = Date.now();
+                this.items = stored
+                    .filter(entry => productsBySku[entry.sku])
+                    .slice(0, 8)
+                    .map(entry => {
+                        const p = productsBySku[entry.sku];
+                        return {
+                            sku: entry.sku,
+                            name: this.decodeHtmlEntities(p.name),
+                            // Whether a product's real URL ends in ".html"
+                            // is inconsistent per-product on this store
+                            // (older/newer reindexes picked up different
+                            // catalog/seo/product_url_suffix values over
+                            // time), so neither a hardcoded suffix nor
+                            // url_key alone is reliable. url_rewrites is the
+                            // actual url_rewrite table data for this
+                            // product - the shortest entry (no "/") is the
+                            // plain product URL; longer ones are the same
+                            // product scoped under a category path.
+                            url: '/' + this.pickProductUrl(p),
+                            image: p.small_image?.url || '',
+                            price: p.price_range?.minimum_price?.final_price?.value || 0,
+                            ratingPercent: p.rating_summary || 0,
+                            brand: (brandsBySku && brandsBySku[entry.sku]) || '',
+                            isCurrent: entry.sku === currentSku,
+                            timeAgo: this.formatTimeAgo(now - entry.viewedAt)
+                        };
+                    });
+                this.$nextTick(() => {
+                    this.checkOverflow();
+                    this.updateScrollButtons();
+                });
+            },
+
+            pickProductUrl(product) {
+                const rewrites = (product.url_rewrites || []).map(r => r.url).filter(Boolean);
+                if (!rewrites.length) {
+                    // No url_rewrite row at all (shouldn't normally happen,
+                    // but url_key alone is the only thing left to try).
+                    return product.url_key;
+                }
+                return rewrites.reduce((shortest, candidate) =>
+                    candidate.length < shortest.length ? candidate : shortest
+                );
+            },
+
+            checkOverflow() {
+                const track = this.$refs.track;
+                this.hasOverflow = !!track && track.scrollWidth > track.clientWidth + 1;
+            },
+
+            updateScrollButtons() {
+                const track = this.$refs.track;
+                if (!track) {
+                    return;
+                }
+                this.atStart = track.scrollLeft <= 1;
+                this.atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 8;
+            },
+
+            formatTimeAgo(diffMs) {
+                const minutes = Math.floor(diffMs / 60000);
+                if (minutes < 1) {
+                    return '<?= __('Now') ?>';
+                }
+                if (minutes < 60) {
+                    return minutes + ' <?= __('min ago') ?>';
+                }
+                const hours = Math.floor(minutes / 60);
+                if (hours < 24) {
+                    return hours + ' <?= __('hr ago') ?>';
+                }
+                return Math.floor(hours / 24) + ' <?= __('days ago') ?>';
+            },
+
+            decodeHtmlEntities(text) {
+                // GraphQL returns product names with HTML entities still
+                // encoded (e.g. "Spice&trade;", "&quot;Bulletproof&quot;
+                // Glass"). x-text sets plain textContent, which never
+                // decodes entities, so they were showing up as literal
+                // "&trade;"/"&quot;" text instead of ™/". A throwaway
+                // <textarea> is a safe way to let the browser do that
+                // decoding for us without risking HTML injection (its
+                // value is read back as text, never inserted as markup).
+                const el = document.createElement('textarea');
+                el.innerHTML = text || '';
+                return el.value;
+            },
+
+            scrollByCard(direction) {
+                const track = this.$refs.track;
+                track.scrollBy({ left: direction * (track.clientWidth * 0.8), behavior: 'smooth' });
+            }
+        };
+    }
+</script>
+<style>
+    @media (max-width: 425px) {
+        .ahy-rv-section .ahy-rv-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+    }
+    .ahy-recently-viewed-track { scrollbar-width: none; -ms-overflow-style: none; }
+    .ahy-recently-viewed-track::-webkit-scrollbar { display: none; }
+    .ahy-carousel-nav-btn:disabled {
+        opacity: 0.3;
+        border-color: transparent;
+        cursor: not-allowed;
+    }
+    .ahy-carousel-nav-btn:disabled:hover {
+        background-color: transparent;
+    }
+
+    .ahy-rv-section {
+        position: relative;
+        z-index: 0;
+    }
+    .ahy-rv-container {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    .ahy-rv-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 100vw;
+        transform: translateX(-50%);
+        background-color: #F5F5F0;
+        border-top: 1px solid #e5e7eb;
+        z-index: -1;
+    }
+    .ahy-rv-icon { color: rgba(13,47,71,.5); }
+    .ahy-rv-title {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #0d2f47;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .ahy-rv-count { font-size: 0.75rem; color: #6b7688; }
+
+    .ahy-rv-nav-btn {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 9999px;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(13,47,71,.5);
+        transition: all .15s ease;
+    }
+    .ahy-rv-nav-btn:hover {
+        color: #0d2f47;
+        border-color: rgba(13,47,71,.3);
+    }
+
+    .ahy-rv-card {
+        display: block;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        transition: box-shadow .15s ease, border-color .15s ease;
+    }
+    .ahy-rv-card:hover {
+        box-shadow: 0 4px 12px 0 rgba(0,0,0,.08);
+        border-color: rgba(232,93,38,.3);
+    }
+    .ahy-rv-image-wrap { background: rgba(107,118,136,.1); }
+    .ahy-rv-badge-time {
+        position: absolute;
+        bottom: 0.375rem;
+        right: 0.375rem;
+        font-size: 9px;
+        font-weight: 500;
+        background: rgba(0,0,0,.6);
+        color: #fff;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        backdrop-filter: blur(4px);
+    }
+    .ahy-rv-badge-viewing {
+        position: absolute;
+        top: 0.375rem;
+        left: 0.375rem;
+        font-size: 9px;
+        font-weight: 700;
+        background: #e85d26;
+        color: #fff;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+    }
+    .ahy-rv-brand {
+        font-size: 9px;
+        color: #6b7688;
+        text-transform: uppercase;
+    }
+    .ahy-rv-name {
+        font-size: 11px;
+        font-weight: 600;
+        color: #0d2f47;
+        margin-top: 0.125rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .ahy-rv-stars { gap: 1px; }
+    .ahy-rv-price {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #0d2f47;
+        font-family: "DM Mono", monospace;
+    }
+    .ahy-rv{
+        padding: 0 !important;
+    }
+</style>

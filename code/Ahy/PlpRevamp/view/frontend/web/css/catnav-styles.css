@@ -3264,21 +3264,39 @@ p.kuResultsNumber.\!font-semibold.text-ahy-blue {
     text-decoration: none !important;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   CaliberNation column collapse (Klevu PLP + PHP PLP)
 
-/* ==========================================================================
-   AHY-SUPPRESS-FALCO-GRID
-   Hides FalcoSense's duplicate search grid so only the PlpRevamp grid shows.
+   The member price only exists for products that actually resolve a discount,
+   so the CaliberNation column is hidden (x-show) whenever the pricing endpoint
+   returned nothing for that product. This modifier lets the normal price take
+   the whole row instead of leaving a blank half.
 
-   Both templates render <div x-data="ahySearchResults(...)"> as their root, so
-   x-data cannot tell them apart. The x-effect attribute can — it is server
-   rendered, static, and different in each:
+   Declared last, and !important, because the mobile rule above forces
+   .ahy-price-grid back to two columns with !important.
+   ────────────────────────────────────────────────────────────────────────── */
+.ahy-price-grid--single {
+    grid-template-columns: 1fr !important;
+}
 
-     FalcoSense results.phtml   x-effect="var m = document.querySelector(...)"
-     PlpRevamp  falco_search…   x-effect="if (!loading) { var m = ... }"
-
-   Matching on the "var m =" prefix therefore hits FalcoSense's root only.
-   No-op if FalcoSense's grid is not on the page.
-   ========================================================================== */
-div[x-data^="ahySearchResults"][x-effect^="var m ="] {
-    display: none !important;
+/* ── No CaliberNation price: use the freed width (Klevu PLP + PHP PLP) ──────
+   Mirrors .plp-price-grid--single for the ahy-* card markup. Explicit placement
+   so a card with no discount keeps its title/price stacked in column 1. */
+@media (min-width: 768px) {
+    .ahy-price-grid--single .normal-price-col {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;      /* equal halves, as in the caliber layout */
+        column-gap: 24px;
+        align-items: start;
+        /* Centred 1px stripe instead of a border — the halves are individually-placed
+           grid items, so a border would break into two segments. */
+        background-image: linear-gradient(#e5e7eb, #e5e7eb);
+        background-size: 1px 100%;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    .ahy-price-grid--single .normal-price-col .ahy-plp-normal-price-title   { grid-column: 1; grid-row: 1; }
+    .ahy-price-grid--single .normal-price-col .ahy-plp-normal-price         { grid-column: 1; grid-row: 2; }
+    .ahy-price-grid--single .normal-price-col .ahy-plp-non-member-container { grid-column: 2; grid-row: 1; justify-self: start; padding-left: 4px; }
+    .ahy-price-grid--single .normal-price-col .ahy-plp-msrp-title           { grid-column: 2; grid-row: 2; padding-left: 4px; }
 }

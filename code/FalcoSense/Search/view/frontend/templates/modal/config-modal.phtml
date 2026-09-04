@@ -70,9 +70,22 @@ function ahySmartSearchCfgModal(productDetailUrl, searchToken, addToCartUrl) {
             if (window._ahySmartSearchCfgModalInited) return;
             window._ahySmartSearchCfgModalInited = true;
             document.body.appendChild(this.$el);
-            window.ahyTokenRefresh.get().then(t => { if (t) this.searchToken = t; });
-            window.addEventListener('ahy-token-refreshed', e => { this.searchToken = e.detail; });
+
+            // Listeners are bound FIRST, and the token fetch is optional-chained.
+            // Previously the latch above was set, then window.ahyTokenRefresh.get()
+            // ran before any addEventListener. ahyTokenRefresh is defined by
+            // html/header/search-form.phtml, so on any page where that has not run
+            // (or ran later) this line threw, the two addEventListener calls below
+            // never executed, and — because the latch was already true — nothing
+            // ever retried. The modal silently stopped responding to its open event.
             window.addEventListener('ahy-cfg-modal-open', (e) => { this.openModal(e.detail); });
+            window.addEventListener('ahy-token-refreshed', e => { this.searchToken = e.detail; });
+
+            try {
+                window.ahyTokenRefresh?.get()?.then(t => { if (t) this.searchToken = t; });
+            } catch (e) {
+                console.error('[ahySmartSearchCfgModal] token refresh unavailable', e);
+            }
         },
 
         async openModal(stub) {
@@ -237,12 +250,24 @@ function ahySmartSearchCfgModal(productDetailUrl, searchToken, addToCartUrl) {
             //   Pattern 1 — SIZE-Color : "S-Brown", "M-Royal Blue", "XL-Navy"
             //   Pattern 2 — Color-SIZE : "Army-S", "Heather Deep Teal-M", "Olive- XL"
             // Both are detected and split into separate Color and Size groups.
-            const sizeTokens = ['XS','S','M','L','XL','2XL','XXL','3XL','4XL','5XL'];
+            const sizeTokens = [
+                'XXS','XS','X-SMALL','EXTRA SMALL','SMALL','S',
+                'MEDIUM','M',
+                'X-LARGE','EXTRA LARGE','LARGE','L','XL',
+                'XX-LARGE','EXTRA EXTRA LARGE','XXL','2XL',
+                '3XL','4XL','5XL',
+            ];
             const sizeOrder  = sizeTokens;
+            // Longest-first so multi-word tokens (e.g. "EXTRA LARGE") match before
+            // shorter ones (e.g. "L") that would otherwise swallow only part of them.
+            const sizeAlt = [...sizeTokens]
+                .sort((a, b) => b.length - a.length)
+                .map(t => t.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'))
+                .join('|');
             // pat1: size token at START followed by the color
-            const pat1 = /^(XS|S|M|L|XL|2XL|XXL|3XL|4XL|5XL)\s*-\s*(.+)$/i;
+            const pat1 = new RegExp('^(' + sizeAlt + ')\\s*-\\s*(.+)$', 'i');
             // pat2: color at START, size token at END (non-greedy color capture)
-            const pat2 = /^(.+?)\s*-\s*(XS|S|M|L|XL|2XL|XXL|3XL|4XL|5XL)$/i;
+            const pat2 = new RegExp('^(.+?)\\s*-\\s*(' + sizeAlt + ')$', 'i');
 
             const hasCombined = this._variants.length > 0 && this._variants.every(v => {
                 const keys = Object.keys(v.attrs || {});
@@ -457,7 +482,7 @@ function ahySmartSearchCfgModal(productDetailUrl, searchToken, addToCartUrl) {
                     <span class="text-4xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(getPrice())"></span>
                 </div>
             </template>
-            <a :href="product ? '/' + (product.url_key || '') + '.html#shipping' : '#'"
+            <a :href="product ? '/' + (product.url_key || '') + (product.brand === 'EOD' ? '.html' : '') + '#shipping' : '#'"
                class="inline-block mt-2 text-ahy-blue font-semibold text-sm underline">Shipping &amp; Returns</a>
         </div>
 

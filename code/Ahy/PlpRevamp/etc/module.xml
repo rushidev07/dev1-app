@@ -9,6 +9,8 @@
             <!-- <module name="Klevu_Search"/> -->
             <module name="FalcoSense_Search"/>
             <module name="Magento_Catalog"/>
+            <!-- Minicart member-price plugin consumes CaliberNation's pricing contract. -->
+            <module name="Ahy_CaliberNation"/>
             <module name="Webkul_Marketplace"/>
         </sequence>
     </module>

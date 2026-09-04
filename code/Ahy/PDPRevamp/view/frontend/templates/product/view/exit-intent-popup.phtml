@@ -1,0 +1,569 @@
+<?php
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\ExitIntentPopup;
+use Magento\Framework\Escaper;
+
+/** @var ExitIntentPopup $block */
+/** @var Escaper $escaper */
+
+if (!$block->isEnabled()) {
+    return;
+}
+
+$timerSeconds = $block->getTimerHours() * 3600;
+$discountPercent = $block->getDiscountPercent();
+?>
+<style>
+    .ahy-exit-popup-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0009;
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        padding: 1rem;
+    }
+
+    .ahy-exit-popup-card {
+        position: relative;
+        width: 100%;
+        max-width: 28rem;
+        overflow: hidden;
+        border-radius: 1rem;
+        background: #ffffff;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .ahy-exit-popup-topbar {
+        height: 6px;
+        width: 100%;
+        background: linear-gradient(to right, #f97316, #fbbf24);
+    }
+
+    .ahy-exit-popup-close {
+        position: absolute;
+        right: 16px;
+        top: 16px;
+        display: flex;
+        height: 32px;
+        width: 32px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: #f3f4f6;
+        color: #0d2f47;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .ahy-exit-popup-close:hover {
+        background: #e5e7eb;
+    }
+
+    .ahy-exit-popup-body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
+        padding: 32px;
+        text-align: center;
+    }
+
+    .ahy-exit-popup-icon-wrap {
+        margin: 0 auto 20px;
+        display: flex;
+        height: 64px;
+        width: 64px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: rgba(232, 93, 38, 0.1);
+    }
+
+    .ahy-exit-popup-icon-wrap img {
+        height: 28px;
+        width: 28px;
+    }
+
+    .ahy-exit-popup-heading {
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 1.375;
+        color: #0d2f47;
+        margin: 0;
+    }
+
+    .ahy-exit-popup-text {
+        margin-top: 8px;
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+
+    .ahy-exit-popup-highlight {
+        font-weight: 700;
+        color: #e85d26;
+    }
+
+    .ahy-exit-popup-timer {
+        margin-top: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 0.75rem;
+        border: 1px solid #fde68a;
+        background: #fffbeb;
+        padding: 10px 16px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #92400e;
+    }
+
+    .ahy-exit-popup-timer img {
+        height: 14px;
+        width: 14px;
+        color: #d97706;
+    }
+
+    .ahy-exit-popup-timer-value {
+        font-weight: 700;
+        font-family: 'DM Mono', monospace;
+    }
+
+    .ahy-exit-popup-form {
+        margin-top: 20px;
+    }
+
+    .ahy-exit-popup-input {
+        background: #ffffff;
+        background-clip: padding-box;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem !important;
+        font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.42857143;
+        padding: 0 16px;
+        vertical-align: baseline;
+        width: 100%;
+        box-sizing: border-box !important;
+        min-height: 48px !important;
+        height: 48px !important;
+        color: #374151;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .ahy-exit-popup-input::placeholder {
+        color: #9ca3af;
+    }
+
+    .ahy-exit-popup-input:focus {
+        outline: none;
+        border-color: #e85d26;
+        box-shadow: 0 0 0 3px rgba(232, 93, 38, 0.3);
+    }
+
+    .ahy-exit-popup-error {
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: #ef4444;
+    }
+
+    .ahy-exit-popup-submit {
+        margin-top: 12px;
+        width: 100%;
+        height: 48px;
+        border-radius: 0.75rem;
+        background: #e85d26;
+        box-shadow: 0 10px 15px -3px rgba(232, 93, 38, 0.2), 0 4px 6px -4px rgba(232, 93, 38, 0.2);
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffffff;
+        border: none;
+        cursor: pointer;
+    }
+
+    .ahy-exit-popup-submit:hover {
+        background: #d04d1a;
+    }
+
+    .ahy-exit-popup-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .ahy-exit-popup-dismiss {
+        margin-top: 20px;
+        background: none;
+        border: none;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #6b7280;
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .ahy-exit-popup-dismiss:hover {
+        color: #0d2f47;
+    }
+
+    .ahy-exit-popup-thankyou {
+        margin-top: 16px;
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+
+    /* Email-only delivery: no code on screen, so the address it went to is the
+       reassurance the customer needs instead. */
+    .ahy-exit-popup-sent {
+        margin-top: 8px;
+        font-size: 0.9375rem;
+        color: #0d2f47;
+        word-break: break-word;
+    }
+
+    .ahy-exit-popup-code-row {
+        margin-top: 12px;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    /* Monospace and letter-spaced because this gets read aloud and typed by
+       hand - "0" vs "O" has to be distinguishable. */
+    .ahy-exit-popup-code {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 16px;
+        border: 1px dashed #e85d26;
+        border-radius: 0.75rem;
+        background: #fff7ed;
+        font-family: 'DM Mono', monospace;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #0d2f47;
+        word-break: break-all;
+    }
+
+    .ahy-exit-popup-copy {
+        flex: 0 0 auto;
+        min-height: 48px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 0.75rem;
+        background: #0d2f47;
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .ahy-exit-popup-copy:hover {
+        background: #143f5e;
+    }
+
+    .ahy-exit-popup-note {
+        margin-top: 12px;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+</style>
+<div
+    x-data="pdprevampExitIntentPopup({
+        timerSeconds: <?= (int) $timerSeconds ?>,
+        subscribeUrl: '<?= $escaper->escapeJs($block->getSubscribeUrl()) ?>',
+        productId: <?= (int) $block->getCurrentProductId() ?>
+    })"
+    x-init="init()"
+    @keydown.escape.window="close()"
+>
+    <div
+        x-show="open"
+        x-cloak
+        x-transition.opacity
+        class="ahy-exit-popup-overlay"
+        @click.self="close()"
+    >
+        <div x-show="open" x-transition.scale.origin.center class="ahy-exit-popup-card">
+            <div class="ahy-exit-popup-topbar"></div>
+
+            <button
+                type="button"
+                @click="close()"
+                class="ahy-exit-popup-close"
+                aria-label="<?= $escaper->escapeHtmlAttr(__('Close')) ?>"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            </button>
+
+            <div class="ahy-exit-popup-body">
+                <div class="ahy-exit-popup-icon-wrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gift" style="color:#e85d26;" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"></path></svg>
+                </div>
+
+                <h2 class="ahy-exit-popup-heading">
+                    <?= $escaper->escapeHtml(__("Wait — Don't Leave Empty-Handed!")) ?>
+                </h2>
+
+                <template x-if="!submitted">
+                    <div>
+                        <p class="ahy-exit-popup-text">
+                            <?= $escaper->escapeHtml(__('Get')) ?>
+                            <span class="ahy-exit-popup-highlight"><?= $escaper->escapeHtml(__('%1% off', $discountPercent)) ?></span>
+                            <?= $escaper->escapeHtml($block->getDescriptionText()) ?>
+                        </p>
+
+                        <div class="ahy-exit-popup-timer">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock" style="color:#d97706;" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            <span>
+                                <?= $escaper->escapeHtml(__('Offer expires in')) ?>
+                                <span class="ahy-exit-popup-timer-value" x-text="formattedTime"></span>
+                            </span>
+                        </div>
+
+                        <form class="ahy-exit-popup-form" @submit.prevent="submit()">
+                            <input
+                                type="email"
+                                required
+                                x-model="email"
+                                placeholder="<?= $escaper->escapeHtmlAttr(__('Enter your email address')) ?>"
+                                class="ahy-exit-popup-input"
+                            />
+                            <p x-show="errorMsg" x-cloak class="ahy-exit-popup-error" x-text="errorMsg"></p>
+                            <button
+                                type="submit"
+                                :disabled="submitting"
+                                class="ahy-exit-popup-submit"
+                            >
+                                <span x-show="!submitting"><?= $escaper->escapeHtml(__('Claim My %1% Off', $discountPercent)) ?></span>
+                                <span x-show="submitting" x-cloak><?= $escaper->escapeHtml(__('Please wait…')) ?></span>
+                            </button>
+                        </form>
+
+                        <button type="button" @click="close()" class="ahy-exit-popup-dismiss">
+                            <?= $escaper->escapeHtml(__("No thanks, I'll pay full price")) ?>
+                        </button>
+                    </div>
+                </template>
+
+                <?php /* Two thank-you states, chosen by whether the server sent a
+                       code back rather than by a separate flag.
+
+                       With email delivery on, Controller\Index\Subscribe omits
+                       coupon_code from the response entirely, so couponCode stays
+                       empty and the "check your email" state renders. The code is
+                       therefore never in the page source or the network response -
+                       which is the point; hiding it in markup would still leave it
+                       readable in devtools. */ ?>
+                <template x-if="submitted && couponCode">
+                    <div class="ahy-exit-popup-thankyou">
+                        <p><?= $escaper->escapeHtml(__('Your discount code is ready')) ?></p>
+                        <div class="ahy-exit-popup-code-row">
+                            <code class="ahy-exit-popup-code" x-text="couponCode"></code>
+                            <button
+                                type="button"
+                                class="ahy-exit-popup-copy"
+                                @click="copyCode()"
+                                x-text="copied
+                                    ? '<?= $escaper->escapeJs(__('Copied')) ?>'
+                                    : '<?= $escaper->escapeJs(__('Copy')) ?>'"
+                            ></button>
+                        </div>
+                        <?php /* Redemption is logged-in only (the sales rule excludes
+                               the NOT LOGGED IN group), so guests are told before
+                               they reach checkout rather than hitting an
+                               unexplained rejection there. */ ?>
+                        <p class="ahy-exit-popup-note">
+                            <?= $escaper->escapeHtml(__('Sign in to use your code at checkout.')) ?>
+                        </p>
+                    </div>
+                </template>
+
+                <template x-if="submitted && !couponCode">
+                    <div class="ahy-exit-popup-thankyou">
+                        <p><?= $escaper->escapeHtml(__('Check your email')) ?></p>
+                        <p class="ahy-exit-popup-sent">
+                            <?= $escaper->escapeHtml(__('We\'ve sent your discount code to')) ?>
+                            <strong x-text="email"></strong>
+                        </p>
+                        <p class="ahy-exit-popup-note">
+                            <?= $escaper->escapeHtml(__('Sign in to use your code at checkout. If it does not arrive in a few minutes, check your spam folder.')) ?>
+                        </p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function pdprevampExitIntentPopup(config) {
+        return {
+            open: false,
+            armed: true,
+            dismissed: false,
+            email: '',
+            errorMsg: '',
+            submitting: false,
+            submitted: false,
+            couponCode: '',
+            copied: false,
+            timerSeconds: config.timerSeconds,
+            subscribeUrl: config.subscribeUrl,
+            productId: config.productId || 0,
+            expiry: 0,
+            formattedTime: '00:00:00',
+            interval: null,
+            init() {
+                const storageKey = 'ahyExitPopupExpiry';
+                const dismissKey = 'ahyExitPopupDismissed';
+                let expiry = parseInt(localStorage.getItem(storageKey), 10);
+                if (!expiry || isNaN(expiry) || expiry <= Date.now()) {
+                    expiry = Date.now() + (this.timerSeconds * 1000);
+                    localStorage.setItem(storageKey, String(expiry));
+                }
+                this.expiry = expiry;
+
+                // A dismissal used to live only in memory, so browsing several
+                // PDPs re-showed the popup on each one. Persisted alongside the
+                // expiry so "no thanks" is respected for the rest of the window.
+                if (localStorage.getItem(dismissKey) === '1') {
+                    this.dismissed = true;
+                }
+
+                this.tick();
+                this.interval = setInterval(() => this.tick(), 1000);
+
+                // Desktop: cursor leaves through the top of the viewport.
+                document.addEventListener('mouseout', (event) => this.handleMouseOut(event));
+
+                // Touch devices have no cursor, so the mouseout trigger above can
+                // never fire there - the popup previously never appeared on phones
+                // or tablets at all. A fast upward scroll reads as intent to
+                // leave; a dwell timer covers the case where they simply stop.
+                this.initMobileTriggers();
+            },
+            handleMouseOut(event) {
+                if (!this.canShow()) {
+                    return;
+                }
+                if (event.clientY <= 0 && event.relatedTarget === null) {
+                    this.show();
+                }
+            },
+            initMobileTriggers() {
+                if (!window.matchMedia('(hover: none), (pointer: coarse)').matches) {
+                    return;
+                }
+
+                let lastY = window.scrollY;
+                let lastT = Date.now();
+
+                window.addEventListener('scroll', () => {
+                    if (!this.canShow()) {
+                        return;
+                    }
+
+                    const y = window.scrollY;
+                    const now = Date.now();
+                    const dt = now - lastT;
+
+                    if (dt > 0) {
+                        // px per ms; negative delta = scrolling up.
+                        const velocity = (lastY - y) / dt;
+                        // Only well past the top, so an initial bounce does not
+                        // count, and only on a decisive flick upward.
+                        if (velocity > 1.2 && y > 400) {
+                            this.show();
+                        }
+                    }
+
+                    lastY = y;
+                    lastT = now;
+                }, { passive: true });
+
+                // Fallback for a reader who stops rather than scrolls away.
+                setTimeout(() => {
+                    if (this.canShow() && window.scrollY > 200) {
+                        this.show();
+                    }
+                }, 45000);
+            },
+            canShow() {
+                return this.armed && !this.open && !this.dismissed && !this.submitted;
+            },
+            show() {
+                this.open = true;
+                this.armed = false;
+            },
+            close() {
+                this.open = false;
+                this.dismissed = true;
+                try {
+                    localStorage.setItem('ahyExitPopupDismissed', '1');
+                } catch (e) {
+                    // Private mode or blocked storage - dismissal just falls back
+                    // to being per-page-load, which is the old behaviour.
+                }
+            },
+            copyCode() {
+                if (!this.couponCode || !navigator.clipboard) {
+                    return;
+                }
+                navigator.clipboard.writeText(this.couponCode).then(() => {
+                    this.copied = true;
+                    setTimeout(() => { this.copied = false; }, 2000);
+                });
+            },
+            tick() {
+                const remaining = Math.max(0, Math.floor((this.expiry - Date.now()) / 1000));
+                const hours = Math.floor(remaining / 3600);
+                const minutes = Math.floor((remaining % 3600) / 60);
+                const seconds = remaining % 60;
+                this.formattedTime = [hours, minutes, seconds].map((n) => String(n).padStart(2, '0')).join(':');
+                if (remaining <= 0 && this.interval) {
+                    clearInterval(this.interval);
+                }
+            },
+            submit() {
+                if (!this.email || this.submitting) {
+                    return;
+                }
+                this.submitting = true;
+                this.errorMsg = '';
+                fetch(this.subscribeUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this.email, product_id: this.productId })
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        this.submitting = false;
+                        if (data.success) {
+                            // The code comes back from the server; nothing is
+                            // guessed client-side.
+                            this.couponCode = data.coupon_code || '';
+                            this.submitted = true;
+                        } else {
+                            this.errorMsg = data.message || '<?= $escaper->escapeJs(__('Something went wrong. Please try again.')) ?>';
+                        }
+                    })
+                    .catch(() => {
+                        this.submitting = false;
+                        this.errorMsg = '<?= $escaper->escapeJs(__('Something went wrong. Please try again.')) ?>';
+                    });
+            }
+        };
+    }
+</script>

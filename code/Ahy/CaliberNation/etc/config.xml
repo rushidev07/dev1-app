@@ -50,6 +50,12 @@
                 <average_savings_static>0</average_savings_static>
                 <earlybird_message></earlybird_message>
             </messaging>
+            <early_access>
+                <!-- Early-access / early-bird feature. Off by default until dates and copy are configured. -->
+                <enabled>0</enabled>
+                <member_badge_text>Early Access — You're in! Members get this deal first.</member_badge_text>
+                <non_member_badge_text>Members get early access. Join Caliber Nation to unlock early access.</non_member_badge_text>
+            </early_access>
             <landing>
                 <!-- Headline figures on the landing page's stats band. Numbers only;
                      formatting (currency / commas / %) is applied by the ViewModel.

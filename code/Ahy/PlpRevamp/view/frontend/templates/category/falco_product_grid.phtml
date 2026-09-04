@@ -3,28 +3,32 @@
 $productsApiUrl  = $block->escapeUrl($block->getProductsApiUrl());
 $searchToken     = $block->getSearchToken((int) $block->getPlatformStoreId());
 $categoryName    = $block->getCategoryName();
+$categoryId      = $block->getCategoryId();
 $addToCartUrl    = $block->escapeUrl($block->getUrl('checkout/cart/add'));
 $platformStoreId = (int) $block->getPlatformStoreId();
 $yotpoEndpoint   = $block->escapeUrl($block->getYotpoEndpointUrl());
 $caliberEndpoint = $block->escapeUrl($block->getUrl('caliber-nation/pricing/memberprice'));
+$sellerEndpoint  = $block->escapeUrl($block->getUrl('ahy_plprevamp/seller/names'));
 ?>
 <script>
 var _ahyCatInit = {
-    url:      <?= json_encode($productsApiUrl) ?>,
-    token:    <?= json_encode($searchToken) ?>,
-    category: <?= json_encode($categoryName) ?>,
-    storeId:  <?= (int) $platformStoreId ?>
+    url:        <?= json_encode($productsApiUrl) ?>,
+    token:      <?= json_encode($searchToken) ?>,
+    category:   <?= json_encode($categoryName) ?>,
+    categoryId: <?= (int) $categoryId ?>,
+    storeId:    <?= (int) $platformStoreId ?>
 };
 var YOTPO_ENDPOINT   = '<?= $yotpoEndpoint ?>';
 var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
+var SELLER_ENDPOINT  = '<?= $sellerEndpoint ?>';
 </script>
 
 <div
-    x-data="ahyCategoryResults(_ahyCatInit.url, _ahyCatInit.token, _ahyCatInit.category, _ahyCatInit.storeId)"
+    x-data="ahyCategoryResults(_ahyCatInit.url, _ahyCatInit.token, _ahyCatInit.category, _ahyCatInit.storeId, _ahyCatInit.categoryId)"
     x-init="init()"
     x-effect="(() => { let m = document.querySelector('.column.main'); if (m && !loading) m.style.setProperty('min-height', 'auto', 'important'); })()"
     x-cloak
-    class="w-full"
+    class="ahy-plp-root w-full"
 >
 
     <div class="md:hidden bg-ahy-bg border-b border-gray-300" x-show="!loading && results.length > 0"
@@ -306,7 +310,7 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
             </div>
         </aside>
 
-        <div class="flex-1 min-w-0">
+        <div class="flex-1 min-w-0" id="ahy-plp-results-top">
 
             <div class="hidden md:flex items-center justify-end mb-5" x-show="!loading && results.length > 0">
                 <div x-data="{ open: false }" class="relative flex items-center gap-1 text-sm text-ahy-blue">
@@ -400,7 +404,8 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
 
                                 <!-- Seller line -->
                                 <div class="plp-card-seller"
-                                     x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+                                     x-data="{ get _sn(){ return sellerNames[String(product.product_id)] || null } }"
+                                     x-text="_sn ? 'Sold by ' + _sn.name : (product.brand ? 'Sold by ' + product.brand : '')"></div>
 
                                 <!-- Yotpo stars -->
                                 <div class="plp-rating"
@@ -415,15 +420,17 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                                             </svg>
                                         </template>
                                     </div>
-                                    <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : ''"></span>
+                                    <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : '(0)'"></span>
                                 </div>
 
                                 <!-- 2-column price grid -->
-                                <div class="plp-price-section">
-                                    <div class="plp-price-grid">
-                                        <!-- Left: CaliberNation -->
-                                        <div class="plp-caliber-col"
-                                             x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                <div class="plp-price-section"
+                                     x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                    <div class="plp-price-grid"
+                                         :class="_cp ? '' : 'plp-price-grid--single'"
+                                         :style="_cp ? 'grid-template-columns: 1fr 1fr' : 'grid-template-columns: 1fr'">
+                                        <!-- Left: CaliberNation (hidden when no pricing configured) -->
+                                        <div class="plp-caliber-col" x-show="_cp">
                                             <div class="plp-caliber-title">CaliberNation Price</div>
                                             <div class="plp-caliber-value" x-text="_cp ? _cp.formattedMember : '$0.00'"></div>
                                             <div class="plp-caliber-save">
@@ -435,21 +442,25 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                                                     <span x-text="_cp ? Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : '0% OFF MSRP'"></span>
                                                 </div>
                                             </div>
-                                            <a class="plp-caliber-join" href="/caliber-nation">JOIN CALIBER ></a>
+                                            <a class="plp-caliber-join" href="/caliber-nation"><span>JOIN CALIBER</span><svg class="plp-caliber-join-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 18 15 12 9 6"/></svg></a>
                                         </div>
 
                                         <!-- Right: Normal price -->
                                         <div class="plp-normal-col">
                                             <template x-if="hasDiscount">
                                                 <div>
-                                                    <div class="plp-normal-title">Sale Price</div>
-                                                    <div class="plp-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
-                                                    <div class="plp-nonmember-wrap">
-                                                        <span class="plp-nonmember-text">NON-MEMBERS SAVE <span class="plp-pct-inline" x-text="savingsPct + '%'"></span></span>
-                                                        <span class="plp-nonmember-msrp"><span class="plp-pct-block" x-text="savingsPct + '% '"></span>OFF MSRP</span>
+                                                    <div class="plp-normal-main">
+                                                        <div class="plp-normal-title">Sale Price</div>
+                                                        <div class="plp-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
                                                     </div>
-                                                    <div class="plp-msrp-line">
-                                                        MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                                    <div class="plp-normal-promo">
+                                                        <div class="plp-nonmember-wrap">
+                                                            <span class="plp-nonmember-text">NON-MEMBERS SAVE <span class="plp-pct-inline" x-text="savingsPct + '%'"></span></span>
+                                                            <span class="plp-nonmember-msrp"><span class="plp-pct-block" x-text="savingsPct + '% '"></span>OFF MSRP</span>
+                                                        </div>
+                                                        <div class="plp-msrp-line">
+                                                            MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </template>
@@ -470,7 +481,6 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
 
                                 <!-- Add to cart / Options button -->
                                 <div class="plp-atc-wrap">
-                                    <!-- FREE Shipping hidden — matches old Klevu behaviour. To re-enable: uncomment below -->
                                     <!-- <p class="plp-free-shipping" :class="isFreeShipping(product) ? '' : 'plp-invisible'">FREE Shipping</p> -->
                                     <div class="plp-atc-btn-wrap">
                                         <template x-if="product.type !== 'configurable'">
@@ -485,8 +495,8 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                                         </template>
                                         <template x-if="product.type === 'configurable'">
                                             <button class="plp-atc-btn"
-                                                    @click.prevent="$dispatch('ahy-open-config-modal', product)">
-                                                <span>Options</span>
+                                                    @click.prevent="$dispatch('ahy-cfg-modal-open', product)">
+                                                <span>View More Details ></span>
                                             </button>
                                         </template>
                                     </div>
@@ -532,7 +542,8 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                                x-text="cleanName(product.name)"></a>
 
                             <div class="plp-card-seller"
-                                 x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+                                 x-data="{ get _sn(){ return sellerNames[String(product.product_id)] || null } }"
+                                 x-text="_sn ? 'Sold by ' + _sn.name : (product.brand ? 'Sold by ' + product.brand : '')"></div>
 
                             <!-- Yotpo stars mobile -->
                             <div class="plp-rating"
@@ -553,10 +564,11 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                             <div class="mt-2">
                                 <template x-if="hasDiscount">
                                     <div x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
-                                        <div class="plp-mobile-price-grid">
-                                            <div class="plp-mobile-caliber">
+                                        <div class="plp-mobile-price-grid"
+                                             :style="_cp ? 'grid-template-columns: 1fr 1fr' : 'grid-template-columns: 1fr'">
+                                            <div class="plp-mobile-caliber" x-show="_cp">
                                                 <div class="plp-caliber-title">CaliberNation</div>
-                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : '$0.00'"></div>
+                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : ''"></div>
                                             </div>
                                             <div class="plp-mobile-normal">
                                                 <div class="plp-normal-title">Sale Price</div>
@@ -571,10 +583,11 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                                 </template>
                                 <template x-if="!hasDiscount && product.price">
                                     <div x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
-                                        <div class="plp-mobile-price-grid">
-                                            <div class="plp-mobile-caliber">
+                                        <div class="plp-mobile-price-grid"
+                                             :style="_cp ? 'grid-template-columns: 1fr 1fr' : 'grid-template-columns: 1fr'">
+                                            <div class="plp-mobile-caliber" x-show="_cp">
                                                 <div class="plp-caliber-title">CaliberNation</div>
-                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : '$0.00'"></div>
+                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : ''"></div>
                                             </div>
                                             <div class="plp-mobile-normal">
                                                 <div class="plp-normal-title">Price</div>
@@ -598,9 +611,9 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
                                     </button>
                                 </template>
                                 <template x-if="product.type === 'configurable'">
-                                    <button @click.prevent="$dispatch('ahy-open-config-modal', product)"
+                                    <button @click.prevent="$dispatch('ahy-cfg-modal-open', product)"
                                             class="plp-mobile-atc-btn">
-                                        Options
+                                        View More Details >
                                     </button>
                                 </template>
                                 <button @click.prevent="addToWishlist(product.product_id)"
@@ -623,35 +636,48 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
             </div>
 
             <!-- ==================== PAGINATION ==================== -->
-            <div x-show="!loading && results.length > 0 && totalPages > 1" class="flex justify-center items-center gap-8 pt-10 pb-4">
+            <div x-show="!loading && results.length > 0 && totalPages > 1" class="flex justify-center items-center gap-4 md:gap-8 pt-10 pb-4 px-2">
                 <button aria-label="Previous" :disabled="page <= 1"
                         @click="page > 1 && goToPage(page - 1)"
-                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200"
+                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200 flex-shrink-0"
                         :class="page <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:border-ahy-blue'">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
 
-                <div x-data="{ open: false }" class="relative">
-                    <button @click="open = !open" class="font-bold text-ahy-blue flex items-center gap-1">
+                <div x-data="{
+                        open: false,
+                        dropTop: 0,
+                        dropLeft: 0,
+                        toggle() {
+                            const r = this.$refs.trigger.getBoundingClientRect();
+                            this.dropTop  = r.bottom + 4;
+                            this.dropLeft = r.left + r.width / 2;
+                            this.open = !this.open;
+                        }
+                     }" class="relative flex-shrink-0">
+                    <button x-ref="trigger" @click.stop="toggle()" class="font-bold text-ahy-blue flex items-center gap-1">
                         Page <span x-text="page"></span> of <span x-text="totalPages"></span>
                         <svg class="w-4 h-4 ml-1 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
-                    <nav x-show="open" @click.outside="open = false"
-                         class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 max-h-52 overflow-auto py-1">
-                        <template x-for="p in totalPages" :key="p">
-                            <button class="w-full text-center px-4 py-2.5 text-sm hover:bg-gray-50"
-                                    :class="p === page ? 'font-bold text-ahy-blue' : ''"
-                                    @click="goToPage(p); open = false"
-                                    x-text="'Page ' + p"></button>
-                        </template>
-                    </nav>
+                    <template x-teleport="body">
+                        <nav x-show="open" @click.outside="open = false"
+                             :style="`position:fixed;top:${dropTop}px;left:${dropLeft}px;transform:translateX(-50%);z-index:9999;`"
+                             class="bg-white border border-gray-200 rounded-xl shadow-lg w-36 max-h-52 overflow-auto py-1">
+                            <template x-for="p in totalPages" :key="p">
+                                <button class="w-full text-center px-4 py-2.5 text-sm hover:bg-gray-50"
+                                        :class="p === page ? 'font-bold text-ahy-blue' : ''"
+                                        @click="goToPage(p); open = false"
+                                        x-text="'Page ' + p"></button>
+                            </template>
+                        </nav>
+                    </template>
                 </div>
 
                 <button aria-label="Next" :disabled="page >= totalPages"
                         @click="page < totalPages && goToPage(page + 1)"
-                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200"
+                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200 flex-shrink-0"
                         :class="page >= totalPages ? 'opacity-30 cursor-not-allowed' : 'hover:border-ahy-blue'">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </button>
@@ -660,19 +686,35 @@ var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
         </div>
     </div>
 </div>
+<!--
+    Pre-boot loader. The component root above carries x-cloak, and Hyva ships
+    [x-cloak]{display:none!important} - so until Alpine initialises the grid AND
+    its own loader overlay are both hidden, leaving a blank gap. This static loader
+    renders from the server HTML and is retired by CSS the instant Alpine strips
+    x-cloak off the root, so there is no JS race and no visual gap between the two.
+-->
+<div class="ahy-preboot-loader" aria-hidden="true">
+    <div class="ahy-page-loader" style="margin:0;"></div>
+</div>
+
 
 
 <!-- smart-slider.phtml belongs to FalcoSense, not PlpRevamp -->
 
 <script>
-function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformStoreId) {
+function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformStoreId, categoryId) {
     return {
         productsApiUrl,
         searchToken,
         categoryName,
         platformStoreId,
+        categoryId,
         results: [],
         caliberPrices: {},
+        // Real marketplace seller per product (marketplace_product.seller_id ->
+        // shop_title). Products with no seller are absent, so the card renders an
+        // empty seller line rather than a hardcoded placeholder.
+        sellerNames: {},
         caliberMember: false,
         caliberPricingEnabled: false,
         cartLoading: {},
@@ -712,9 +754,19 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
                     String(b.min) === this.activePriceMin && String(b.max) === this.activePriceMax
                 ) || null;
             }
-            const reserved = ['p', 'sort', 'price_min', 'price_max'];
+            // Page state, tracking and Magento system params are NOT facet filters.
+            // Everything else is forwarded to the API as key=value|value2.
+            // Without this guard, arriving with ?utm_source=..., ?gclid=... or
+            // ?___store=... filtered the query on a non-existent attribute and the
+            // PLP rendered "No records found" on a category that has products.
+            const NON_FILTER_PARAMS = [
+                'p', 'sort', 'price_min', 'price_max',
+                '___store', '___from_store', 'SID', 'sid',
+                'gclid', 'fbclid', 'msclkid', 'dclid', 'ttclid', 'igshid', 'mc_cid', 'mc_eid',
+                'product_list_order', 'product_list_dir', 'product_list_limit', 'product_list_mode'
+            ];
             params.forEach((value, key) => {
-                if (reserved.includes(key)) return;
+                if (NON_FILTER_PARAMS.includes(key) || key.startsWith('utm_')) return;
                 value.split('|').forEach(v => {
                     if (v) this.activeFilters.push({ key, label: key, value: v });
                 });
@@ -739,6 +791,13 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
                 const url = new URL(this.productsApiUrl);
                 url.searchParams.set('search_token', this.searchToken);
                 url.searchParams.set('category', this.categoryName);
+                // Two categories can share the same name (e.g. a "Featured Products"
+                // subcategory exists under both "Boating Gear" and "Hunting Gear"), so
+                // the name-only filter above matches every same-named category's
+                // products combined. Sending category_ids scopes the match to this
+                // exact category — the API prefers it over the name filter when both
+                // are present (see OpenSearchService's category_ids-first handling).
+                if (this.categoryId) url.searchParams.set('category_ids', this.categoryId);
                 url.searchParams.set('page', this.page);
                 url.searchParams.set('per_page', this.pageSize);
                 if (this.platformStoreId) url.searchParams.set('platform_store_id', this.platformStoreId);
@@ -767,6 +826,16 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
                     this.total      = (data.pagination && data.pagination.total) || 0;
                     this.pageSize   = (data.pagination && data.pagination.per_page) || 24;
                     this.totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+
+                    // A stale ?p= beyond the last page comes back as an empty data
+                    // array with total > 0, which would otherwise render the empty
+                    // state. Snap back to the last real page and refetch once — the
+                    // reset guarantees this cannot recurse further.
+                    if (this.results.length === 0 && this.total > 0 && this.page > this.totalPages) {
+                        this.page = this.totalPages;
+                        this._writeUrl();
+                        return this.fetch();
+                    }
                     this.apiFacets  = data.facets || [];
                     this.buildFilters();
 
@@ -793,6 +862,10 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
                                 }
                             })
                             .catch(e => console.error('[CaliberNation] price fetch error', e));
+                            fetch(SELLER_ENDPOINT + '?ids=' + _caliberIds, { credentials: 'include' })
+                                .then(r => r.json())
+                                .then(d => { this.sellerNames = d.names || {}; })
+                                .catch(e => console.error('[AHY PLP] seller name fetch error', e));
                     }
                 } else {
                     console.error('[SmartSearch] Category API error:', data);
@@ -850,9 +923,9 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
         },
 
         _scrollToResults() {
-            const el = document.querySelector('.column.main');
+            const el = document.querySelector('#ahy-plp-results-top') || document.querySelector('.column.main');
             if (!el) return;
-            const y = Math.max(0, el.getBoundingClientRect().top + window.pageYOffset);
+            const y = Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - 16);
             window.scrollTo({ top: y, behavior: 'smooth' });
         },
 
@@ -1067,12 +1140,20 @@ document.addEventListener('alpine:initialized', function() {
     @media (min-width: 1024px) {
         .ahy-filter-count { margin-left: 1.5rem !important; }
         .ahy-filter-sidebar { width: 285px !important; padding-right: 24px; flex-shrink: 0; }
-        .ahy-filter-layout { gap: 3rem !important; }
+        .ahy-filter-layout { gap: 2rem !important; }
         .ahy-filter-sidebar label { gap: 0.625rem !important; }
     }
-    .catalog-category-view .columns { column-gap: 0 !important; row-gap: 0 !important; }
-    @media (min-width: 426px) {
+    @media (min-width: 1440px) {
+        .ahy-filter-layout { gap: 1rem !important; }
+    }
+    #category-results-layout { overflow: visible; }
+    .catalog-category-view .columns { column-gap: 0 !important; row-gap: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+    @media (min-width: 426px) and (max-width: 767px) {
         .catalog-category-view .column.main { padding-left: 0 !important; padding-right: 0 !important; }
+    }
+    
+    @media (min-width: 768px) {
+        .catalog-category-view .column.main { padding-right: 0 !important; }
     }
     .page-layout-2columns-left .columns,
     .page-layout-2columns-right .columns,
@@ -1086,7 +1167,7 @@ document.addEventListener('alpine:initialized', function() {
     }
     @media (max-width: 640px){
         .ahy-filters-menu {width:100vw;transform:translateX(-50%);margin-left:50%;}
-        .ahy-filters {flex-grow: 1; max-width: 300px;}
+        .ahy-filters {flex-grow: 1; width: clamp(110px, calc(110px + (100vw - 320px) * 0.59375), 300px) !important; max-width: 300px;}
     }
     .catalog-category-view .wishlist-widget { display: none !important; }
     .sidebar.sidebar-additional { display: none; }
@@ -1098,10 +1179,11 @@ document.addEventListener('alpine:initialized', function() {
         position: relative;
         padding: 0;
         list-style: none;
+        min-width: 0;
     }
     .plp-card-wrap {
         background: white;
-        border: 1px solid #e5e7eb;
+        border: 1px solid rgb(239 234 221);
         display: flex;
         flex-direction: column;
         height: 100%;
@@ -1111,8 +1193,8 @@ document.addEventListener('alpine:initialized', function() {
     /* Stock badge */
     .plp-stock-badge-wrap {
         position: absolute;
-        left: 24px;
-        top: 28px;
+        left: 7px;
+        top: 11px;
         z-index: 10;
     }
     .plp-stock-badge {
@@ -1201,6 +1283,7 @@ document.addEventListener('alpine:initialized', function() {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        margin-top: 0.8rem;
     }
 
     /* Rating */
@@ -1223,8 +1306,51 @@ document.addEventListener('alpine:initialized', function() {
     /* Price section */
     .plp-price-section {
         margin-top: 4px;
-        padding: 1rem 1.5rem 0.75rem;
+        padding: 0.75rem 1.5rem 0.5rem;
     }
+
+    /* ── No CaliberNation price: use the freed width ────────────────────────
+       The column collapses to 1fr, so the normal-price block lays itself out as
+       a 2x2 grid instead of a tall stack:
+
+           Sale Price          |  NON-MEMBERS SAVE x% OFF MSRP
+           $19.99              |  MSRP  $29.00
+
+       Placement is explicit rather than auto-flow so the no-discount card —
+       which has only the title and value — keeps them stacked in column 1
+       instead of being pushed side by side. Desktop only; the mobile cards use
+       their own markup. */
+    @media (min-width: 768px) {
+        /* Scoped to :has(.plp-normal-promo) so only the discounted card splits in
+           two — a card without a discount has just the price half and keeps its
+           normal stacked flow. The two halves are wrapper elements, so each stacks
+           independently: the badge no longer sets the height of the row holding
+           "Sale Price", which is what was pushing the price away from its label. */
+        .plp-price-grid--single .plp-normal-col > div:has(.plp-normal-promo) {
+            display: grid;
+            grid-template-columns: 1fr 1fr;      /* equal halves, as in the caliber layout */
+            column-gap: 24px;
+            align-items: start;
+        }
+        /* Divider drawn as a centred 1px background stripe rather than a border: the
+           two halves are individually-placed grid items, not wrapper elements, so a
+           border would render as two broken segments. Same #e5e7eb as
+           .plp-caliber-col's border-right.
+
+           Gated on :has() so it only appears when the right-hand column actually has
+           content. A card with no discount has no badge and no MSRP line, and a rule
+           against an empty half is just a stray line. Browsers without :has() drop
+           this rule entirely, which loses the divider rather than misplacing it. */
+        .plp-price-grid--single .plp-normal-col > div:has(.plp-normal-promo) {
+            background-image: linear-gradient(#e5e7eb, #e5e7eb);
+            background-size: 1px 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .plp-price-grid--single .plp-normal-promo { padding-left: 4px; }
+        .plp-price-grid--single .plp-normal-promo .plp-nonmember-wrap { margin-top: 0; }
+    }
+
     .plp-price-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1235,17 +1361,17 @@ document.addEventListener('alpine:initialized', function() {
         padding-right: 12px;
     }
     .plp-caliber-title {
-        font-size: 0.7rem;
+        font-size: 0.8rem;
         color: #dc2626;
         font-weight: 600;
-        letter-spacing: 0.05em;
+        letter-spacing: 0em;
         white-space: nowrap;
     }
     .plp-normal-title {
-        font-size: 0.9rem;
+        font-size: 0.7rem;
         color: #12334b;
         font-weight: 600;
-        letter-spacing: 0.04em;
+        letter-spacing: 0em;
         padding-left: 0.5rem;
     }
     .plp-caliber-value {
@@ -1297,10 +1423,13 @@ document.addEventListener('alpine:initialized', function() {
         color: #dc2626;
         font-weight: 700;
         text-decoration: none;
-        margin-top: 4px;
-        display: block;
-        text-align: center;
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
     }
+    .plp-caliber-join-icon { flex-shrink: 0; }
     .plp-nonmember-wrap {
         font-size: 0.65rem;
         color: #ffffff;
@@ -1308,9 +1437,8 @@ document.addEventListener('alpine:initialized', function() {
         background: #D30100;
         padding: 2px 6px;
         border-radius: 6px;
-        margin-top: 4px;
-        text-align: center;
-        width: 9rem;
+        margin: 4px 0 0;
+        width: 8rem;
     }
     .plp-nonmember-text,
     .plp-nonmember-msrp {
@@ -1321,7 +1449,8 @@ document.addEventListener('alpine:initialized', function() {
     .plp-msrp-line {
         font-size: 0.65rem;
         color: #6b7280;
-        margin-top: 2px;
+        margin-top: 5px;
+        /* Left-aligned, matching the design and the other card templates. */
         padding-left: 0.5rem;
     }
     .plp-see-options-btn {
@@ -1336,6 +1465,7 @@ document.addEventListener('alpine:initialized', function() {
         padding: 6px 10px;
         font-weight: 700;
         border: 2px solid #0d2f47;
+        padding-top: 0.7rem; padding-bottom: 0.7rem;
     }
 
     .plp-pct-block { display: none; }
@@ -1365,6 +1495,7 @@ document.addEventListener('alpine:initialized', function() {
         font-weight: 700;
         border: 0;
         cursor: pointer;
+        padding-top: 0.7rem; padding-bottom: 0.7rem;
     }
     .plp-atc-btn:hover {
         background: #12334b;
@@ -1406,7 +1537,7 @@ document.addEventListener('alpine:initialized', function() {
     .plp-mobile-caliber-value {
         font-size: 1.25rem;
         font-weight: 700;
-        color: #dc2626;
+        color: #0d2f47;
     }
     .plp-mobile-normal-value {
         font-size: 1.25rem;
@@ -1514,16 +1645,33 @@ document.addEventListener('alpine:initialized', function() {
             width: 100% !important;
         }
     }
-    /* 2 cols at 640-767px */
-    @media (min-width: 640px) and (max-width: 767px) {
+    /* 2 cols at 550-767px */
+    @media (min-width: 550px) and (max-width: 767px) {
         .plp-desktop-grid { grid-template-columns: 1fr 1fr !important; }
         .plp-card-img { height: 160px !important; max-width: 100% !important; }
         .plp-caliber-value { font-size: 1.2rem !important; }
         .plp-normal-value  { font-size: 1rem !important; }
         .plp-price-section { padding: 0.75rem !important; }
     }
-    /* 1 col below 640px */
-    @media (max-width: 639px) {
+    /* Tighter pricing at 550-639px (narrower 2-col cards) */
+    @media (min-width: 550px) and (max-width: 639px) {
+        .plp-card-img { height: 130px !important; }
+        .plp-price-section { padding: 0.4rem 1.5rem 0.5rem !important; }
+        .plp-price-grid { gap: 4px !important; }
+        .plp-caliber-col { padding-right: 4px !important; min-width: 0; overflow: hidden; }
+        .plp-normal-col { min-width: 0; overflow: hidden; }
+        .plp-caliber-value { font-size: 0.95rem !important; }
+        .plp-normal-value { font-size: 0.85rem !important; padding-left: 0.25rem !important; }
+        .plp-normal-title { font-size: 0.75rem !important; padding-left: 0.25rem !important; }
+        .plp-caliber-title { font-size: 0.6rem !important; }
+        .plp-caliber-save { padding: 0.2rem 0.25rem !important; min-height: 2rem !important; }
+        .plp-caliber-save-text { font-size: 0.55rem !important; }
+        .plp-caliber-save-icon svg { width: 12px !important; height: 12px !important; }
+        .plp-nonmember-wrap { max-width: 100% !important; font-size: 0.55rem !important; }
+        .plp-msrp-line { padding-left: 0.25rem !important; }
+    }
+    /* 1 col below 550px */
+    @media (max-width: 549px) {
         .plp-desktop-grid { grid-template-columns: 1fr !important; }
     }
 
@@ -1538,8 +1686,28 @@ document.addEventListener('alpine:initialized', function() {
        ≥1537px: 3 cols, 1025-1536px: 2 cols, ≤1024px: 1 col (sidebar) */
     .plp-product-grid {
         grid-template-columns: 1fr 1fr; /* 2 cols base (768px+) */
+        background-color: rgb(239 234 221);
     }
-    @media (min-width: 1537px) {
+    .plp-mobile-list {
+        background-color: rgb(239 234 221);
+    }
+    @media (min-width: 1024px) and (max-width: 1439px) {
+        .plp-caliber-value { font-size: 1.3rem !important; }
+        .plp-normal-value  { font-size: 1.1rem !important; }
+        .plp-caliber-col   { padding-right: 6px; }
+        .plp-price-grid    { gap: 6px; }
+    }
+    @media (min-width: 1440px) and (max-width: 1919px) {
+        .plp-product-grid {
+            grid-template-columns: 1fr 1fr 1fr !important; /* 3 cols */
+        }
+        .plp-caliber-value { font-size: 1.4rem !important; }
+        .plp-normal-value  { font-size: 1.2rem !important; }
+        .plp-caliber-save  { padding: 0.2rem 0.3rem; }
+        .plp-caliber-col   { padding-right: 12px; }
+        .plp-price-grid    { gap: 5px; }
+    }
+    @media (min-width: 1920px) {
         .plp-product-grid {
             grid-template-columns: 1fr 1fr 1fr !important; /* 3 cols */
         }
@@ -1549,6 +1717,43 @@ document.addEventListener('alpine:initialized', function() {
         .plp-card {
             grid-column: 1 / -1 !important;
         }
+        /* Tablet: give the filter sidebar a fixed width and widen the gap so the
+           grid does not crowd it between 768px and the lg breakpoint. */
+        .ahy-filter-sidebar { width: 275px !important; }
+        .ahy-filter-layout  { gap: 3rem !important; }
     }
 
+    @media (max-width: 320px) {
+        .plp-nonmember-wrap {
+            width: 8rem;
+        }
+        .plp-price-grid {
+            gap: 6px;
+        }
+        .plp-caliber-col {
+            padding-right: 8px;
+        }
+    }
+
+
+
+    /* Pre-boot loader - see the markup comment next to .ahy-preboot-loader */
+    .ahy-preboot-loader {
+        /* Must mirror .ahy-modal-loader-overlay exactly: that one is a fixed,
+           opaque, full-viewport curtain. Anything less and the page paints
+           visibly before Alpine boots and drops the real curtain over it. */
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #efeadd;
+    }
+    .ahy-plp-root:not([x-cloak]) + .ahy-preboot-loader { display: none; }
 </style>

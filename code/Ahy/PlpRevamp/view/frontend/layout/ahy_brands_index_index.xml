@@ -19,8 +19,8 @@
             <action method="addCrumb">
                 <argument name="crumbName" xsi:type="string">all_brands</argument>
                 <argument name="crumbInfo" xsi:type="array">
-                    <item name="label" xsi:type="string">All Brands</item>
-                    <item name="title" xsi:type="string">All Brands</item>
+                    <item name="label" xsi:type="string">Featured Brands</item>
+                    <item name="title" xsi:type="string">Featured Brands</item>
                 </argument>
             </action>
         </referenceBlock>

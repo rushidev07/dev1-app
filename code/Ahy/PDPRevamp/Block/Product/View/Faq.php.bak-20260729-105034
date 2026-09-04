@@ -1,0 +1,101 @@
+<?php
+declare(strict_types=1);
+
+namespace Ahy\PDPRevamp\Block\Product\View;
+
+use Amasty\Faq\Model\ResourceModel\Question\Collection;
+use Amasty\Faq\Model\ResourceModel\Question\CollectionFactory;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Magento\Customer\Model\Session as CustomerSession;
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+use Magento\Store\Model\StoreManagerInterface;
+
+/**
+ * PDP FAQ block. Shows the FAQ questions assigned to this product (or its
+ * categories) in Amasty's FAQ & Product Questions module, i.e. the same
+ * content editable from the Magento admin under Amasty > FAQ.
+ */
+class Faq extends Template
+{
+    private CollectionFactory $collectionFactory;
+    private ViewModelRegistry $viewModelRegistry;
+    private CustomerSession $customerSession;
+    private StoreManagerInterface $storeManager;
+
+    public function __construct(
+        Context $context,
+        CollectionFactory $collectionFactory,
+        ViewModelRegistry $viewModelRegistry,
+        CustomerSession $customerSession,
+        StoreManagerInterface $storeManager,
+        array $data = []
+    ) {
+        parent::__construct($context, $data);
+        $this->collectionFactory = $collectionFactory;
+        $this->viewModelRegistry = $viewModelRegistry;
+        $this->customerSession = $customerSession;
+        $this->storeManager = $storeManager;
+    }
+
+    public function getProduct(): \Magento\Catalog\Model\Product
+    {
+        /** @var CurrentProduct $currentProduct */
+        $currentProduct = $this->viewModelRegistry->require(CurrentProduct::class);
+        return $currentProduct->get();
+    }
+
+    /**
+     * @return \Amasty\Faq\Model\Question[]
+     */
+    public function getFaqs(): array
+    {
+        $productId = (int) $this->getProduct()->getId();
+
+        /** @var Collection $collection */
+        $collection = $this->collectionFactory->create();
+        $collection->addProductFilter($productId);
+        $collection->addFrontendFilters(
+            $this->customerSession->isLoggedIn(),
+            (int) $this->storeManager->getStore()->getId(),
+            null,
+            (int) $this->customerSession->getCustomerGroupId()
+        );
+        $collection->getSelect()->group('main_table.question_id');
+
+        return $collection->getItems();
+    }
+
+    /**
+     * Tag titles across all questions, used as the FAQ filter pills.
+     *
+     * @param \Amasty\Faq\Model\Question[] $faqs
+     * @return string[]
+     */
+    public function getCategories(array $faqs): array
+    {
+        $categories = [];
+        foreach ($faqs as $faq) {
+            foreach ($faq->getTags() as $tag) {
+                $categories[$tag->getTitle()] = true;
+            }
+        }
+        return array_keys($categories);
+    }
+
+    /**
+     * Comma-separated tag titles for a single question, used to drive the
+     * Alpine.js filter-pill visibility check on the frontend.
+     *
+     * @param \Amasty\Faq\Model\Question $faq
+     */
+    public function getTagTitlesCsv($faq): string
+    {
+        $titles = [];
+        foreach ($faq->getTags() as $tag) {
+            $titles[] = $tag->getTitle();
+        }
+        return implode(',', $titles);
+    }
+}

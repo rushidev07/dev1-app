@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--
+    Nested under Magento_Sales::sales so the permission sits with the other
+    marketing/sales resources an admin role would already be granted, rather than
+    creating a new top-level tree for one grid.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <acl>
+        <resources>
+            <resource id="Magento_Backend::admin">
+                <resource id="Magento_Backend::marketing">
+                    <resource id="Ahy_PDPRevamp::exit_coupon_claims"
+                              title="PDP Exit Popup Claims"
+                              sortOrder="100"/>
+                </resource>
+            </resource>
+        </resources>
+    </acl>
+</config>

@@ -9,7 +9,7 @@ use Magento\Catalog\Model\Product\Configuration\Item\ItemResolverInterface;
 
 class ImageProvider extends \Magento\Checkout\Model\Cart\ImageProvider
 {
-    private const CDN_BASE = '/media/catalog/product';
+    private const CDN_BASE = 'https://d1sq8cqyuyotg2.cloudfront.net/media/catalog/product';
 
     public function __construct(
         CartItemRepositoryInterface $itemRepository,

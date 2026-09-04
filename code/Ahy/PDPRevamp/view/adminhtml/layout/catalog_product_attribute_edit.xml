@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Merges into the REAL, classic product attribute edit page (the one at
+ * Stores > Attributes > Product > <attribute>) the same way Magento_Swatches
+ * merges in its own "Manage Swatch" grid - see vendor/magento/module-swatches/
+ * view/adminhtml/layout/catalog_product_attribute_edit.xml. This page is built
+ * from Magento\Framework\Data\Form blocks/tabs, NOT the ui_component in
+ * view/adminhtml/ui_component/product_attribute_add_form.xml (that file only
+ * feeds the separate "quick create attribute" ui_component modal).
+ *
+ * Positioned right after Magento_Swatches' "main.swatches_visual" block (the
+ * native swatch grid), still ahead of the "advanced" section, matching where
+ * that grid itself sits.
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="main">
+            <block class="Ahy\PDPRevamp\Block\Adminhtml\Attribute\Edit\Options\TwoColor"
+                   after="main.swatches_visual"
+                   name="main.two_color_swatches"
+                   as="two_color_swatches"/>
+        </referenceContainer>
+    </body>
+</page>

@@ -107,10 +107,6 @@ class MembershipManagementService
             return $this->result(false, 'Your membership is not cancelled.');
         }
 
-        if ($this->refundRequestService->isRefundReviewed((int) $membership->getEntityId())) {
-            return $this->result(false, 'Your refund has already been processed. Please contact support to rejoin.');
-        }
-
         $renewal = $membership->getRenewalDate();
         if (!$renewal || strtotime((string) $renewal) <= time()) {
             // Term already over — this is a genuine rejoin (new paid term), not a resume.
@@ -130,8 +126,6 @@ class MembershipManagementService
             $this->logger->error('[CaliberNation] resumeMembership failed for customer ' . $customerId . ': ' . $e->getMessage());
             return $this->result(false, 'Could not restore your membership. Please try again.');
         }
-
-        $this->refundRequestService->markReinstated((int) $membership->getEntityId());
 
         $this->activityLogger->log(
             $customerId,

@@ -360,6 +360,11 @@
                             <argument name="configProvider" xsi:type="object">
                                 \Ahy\SavedCC\ViewModel\ConfigProvider
                             </argument>
+                            <!-- Optional: when the Caliber Nation membership is in the cart,
+                                 the save-card checkbox explains it also powers auto-renewal. -->
+                            <argument name="membershipCart" xsi:type="object">
+                                \Ahy\CaliberNation\ViewModel\Checkout\MembershipInCart
+                            </argument>
                         </arguments>
                     </block>
                     <block name="checkout.payment.method.customervaultcards"

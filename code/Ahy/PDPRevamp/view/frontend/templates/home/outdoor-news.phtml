@@ -1,0 +1,99 @@
+<?php
+/**
+ * Homepage "Outdoor News" section. Content is dynamic - fetched client-side
+ * from the Everest Digest WordPress feed (same source used by
+ * Ahy_ThemeCustomization's PDP news section), just restyled to match the
+ * homepage design.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+?>
+<div class="ahy-outdoor-news-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <h2 class="text-2xl sm:text-3xl font-bold mb-6" style="color:#0d2f47;">
+        <?= __('Outdoor News') ?>
+    </h2>
+    <div
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+        x-data="ahyOutdoorNewsData()"
+        x-init="getNewsDataFromJson()"
+    >
+        <template x-for="(item, index) in newsData" :key="getNewsLink(index)">
+            <a
+                class="flex flex-col group"
+                :href="getNewsLink(index)"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                <div class="rounded-lg overflow-hidden mb-3" style="aspect-ratio:16/10;">
+                    <img
+                        class="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+                        :src="getFeaturedImage(index)"
+                        :alt="getNewsTitle(index)"
+                        loading="lazy"
+                    />
+                </div>
+                <h3
+                    class="font-bold text-base sm:text-lg leading-snug mb-1 line-clamp-2 group-hover:underline"
+                    style="color:#0d2f47;"
+                    x-html="getNewsTitle(index)"
+                ></h3>
+                <div class="text-sm" style="color:#6b7280;">
+                    <?= __('by') ?> <span class="font-semibold" x-html="getAuthor(index)"></span>
+                    <span aria-hidden="true">&middot;</span>
+                    <span x-html="getNewsDate(index)"></span>
+                </div>
+            </a>
+        </template>
+    </div>
+    <div class="flex justify-center pt-8">
+        <a href="/everestdigest" target="_blank" rel="noopener noreferrer">
+            <button
+                class="ahy-outdoor-news-cta rounded-full border-2 px-8 py-3 text-sm font-bold"
+                style="border-color:#0d2f47;color:#0d2f47;"
+            >
+                <?= __('Read More Outdoor News') ?>
+            </button>
+        </a>
+    </div>
+</div>
+
+<script defer>
+    function ahyOutdoorNewsData() {
+        return {
+            newsData: [],
+            newsJsonEndpoint: `${BASE_URL}everestdigest/wp-admin/admin-ajax.php?action=ahy_latest_posts_json`,
+            getNewsTitle(i) {
+                return this.newsData[i].title;
+            },
+            getNewsLink(i) {
+                return this.newsData[i].link;
+            },
+            getFeaturedImage(i) {
+                return this.newsData[i].featured_image_url;
+            },
+            getAuthor(i) {
+                return this.newsData[i].author;
+            },
+            getNewsDate(i) {
+                return this.newsData[i].date;
+            },
+            getNewsDataFromJson() {
+                fetch(this.newsJsonEndpoint)
+                    .then(res => res.json())
+                    .then(data => {
+                        this.newsData = data.slice(0, 3);
+                    });
+            }
+        };
+    }
+</script>
+
+<style>
+    .ahy-outdoor-news-cta:hover {
+        box-shadow: #0d2f47 0px 0px 0px 1px inset;
+    }
+</style>

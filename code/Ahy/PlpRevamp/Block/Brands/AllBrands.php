@@ -126,4 +126,15 @@ class AllBrands extends Template
         $mediaBaseUrl = rtrim((string)$this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_MEDIA), '/');
         return $mediaBaseUrl . '/ahy_plprevamp/banner/' . ltrim($value, '/');
     }
+
+    /**
+     * Everest logo shown when a brand has no image of its own — the same asset and
+     * path SubcategoryCards::getFallbackImageUrl() uses, so both surfaces fall back
+     * to one image.
+     */
+    public function getFallbackImageUrl(): string
+    {
+        $mediaBaseUrl = rtrim((string)$this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_MEDIA), '/');
+        return $mediaBaseUrl . '/ahy_plp/everest-fallback-logo.png';
+    }
 }

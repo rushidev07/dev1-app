@@ -26,7 +26,7 @@ class Index implements HttpGetActionInterface
 
         // Derive suggest URL from endpoint base (e.g. https://app-staging.falcosense.com/api/v1/ingest/... -> .../api/v1/suggest)
         $endpoint = $this->helper->getEndpointUrl();
-        $parts    = parse_url($endpoint ?: '');
+        $parts    = parse_url($endpoint ?: 'http://localhost:8001');
         $base     = ($parts['scheme'] ?? 'http') . '://' . ($parts['host'] ?? 'localhost');
         if (!empty($parts['port'])) {
             $base .= ':' . $parts['port'];

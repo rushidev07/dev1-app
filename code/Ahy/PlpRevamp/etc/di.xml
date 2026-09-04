@@ -49,4 +49,14 @@
         </arguments>
     </type>
 
+    <!-- Console: backfill Featured Products categories across the existing tree. -->
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="ahy_plp_featured_categories_create" xsi:type="object">Ahy\PlpRevamp\Console\Command\CreateFeaturedCategories</item>
+                <item name="ahy_plp_card_keywords_export" xsi:type="object">Ahy\PlpRevamp\Console\Command\ExportCardKeywords</item>
+            </argument>
+        </arguments>
+    </type>
+
 </config>

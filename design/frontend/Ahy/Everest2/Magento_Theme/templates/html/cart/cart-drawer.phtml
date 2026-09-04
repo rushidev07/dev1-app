@@ -218,13 +218,12 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
         @toggle-cart.window="ahyToggleCart()"
         @keydown.window.escape="open=false"
 >
-    <template x-teleport="body">
     <template x-if="cart && cart.summary_count">
         <div role="dialog"
             aria-labelledby="cart-drawer-title"
             aria-modal="true"
             @click.outside="open=false"
-            class="fixed inset-y-0 ahy-minicart-drawer right-0 z-30 flex max-w-full overflow-y-auto" style="z-index:200;">
+            class="fixed inset-y-0 ahy-minicart-drawer right-0 z-30 flex max-w-full overflow-y-auto">
             <div class="backdrop"
                 x-show="open"
                 x-transition:enter="ease-in-out duration-500"
@@ -292,7 +291,7 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
                                         loading="lazy"
                                     />
                                 </a>
-                                <div class="w-2/4 space-y-2">
+                                <div class="w-5/12 space-y-2">
                                     <div>
                                         <p class="text-lg font-normal text-ahy-blue line-clamp-2">
                                             <span x-html="item.product_name"></span>
@@ -320,18 +319,44 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
                                         </button>
                                     </div> -->
                                 </div>
-                                <div class="w-1/4">
-                                    <template x-if="item.product_price_value !== getTotalProductPrice(item.product_price_value, item.qty)">
-                                        <div class="flex items-end flex-col">
-                                            <p class="text-lg font-bold text-ahy-blue"><span x-html="hyva.formatPrice(getTotalProductPrice(item.product_price_value, item.qty))"></span></p>
-                                            <p class="text-sm text-ahy-body-text-color flex gap-1">Each <span x-html="hyva.formatPrice(item.product_price_value)"></span></p>
+                                <div class="w-1/3">
+                                    <!--
+                                        One price block, not two.
+
+                                        This used to be a pair of templates keyed on
+                                          product_price_value !== getTotalProductPrice(...)   and
+                                          product_price_value ==  getTotalProductPrice(...)
+                                        which are NOT mutually exclusive: product_price_value
+                                        arrives as a string ("14.6") while getTotalProductPrice()
+                                        returns a number (14.6), so !== is true (different types)
+                                        AND == is true (loose) at the same time, and both blocks
+                                        rendered. Switching on item.qty > 1 removes the coercion
+                                        trap entirely.
+                                    -->
+                                    <div class="flex items-end flex-col">
+                                        <!-- Label + charged price share one line. whitespace-nowrap
+                                             keeps "CALIBERNATION PRICE" from wrapping in the narrow
+                                             column; the inline colour beats the text-ahy-blue class
+                                             without needing a new Tailwind class in the JIT build. -->
+                                        <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                            <template x-if="item.caliber_has_member_price">
+                                                <span class="text-[10px] font-semibold uppercase tracking-tight"
+                                                      style="color:#0D2E47;">CaliberNation Price</span>
+                                            </template>
+                                            <p class="text-lg font-bold text-ahy-blue"
+                                               :style="item.caliber_has_member_price ? 'color:#0D2E47' : ''"
+                                               x-html="hyva.formatPrice(getTotalProductPrice(item.product_price_value, item.qty))"></p>
                                         </div>
-                                    </template>
-                                    <template x-if="item.product_price_value == getTotalProductPrice(item.product_price_value, item.qty)">
-                                        <div class="flex items-end flex-col">
-                                            <p class="text-lg font-bold text-ahy-blue flex gap-1"><span x-html="hyva.formatPrice(item.product_price_value)"></span></p>
-                                        </div>
-                                    </template>
+
+                                        <!-- Pre-membership total, struck, BELOW the member price.
+                                             caliber_* keys are set only for active members with a member
+                                             price on this line (Ahy\PlpRevamp\Plugin\Checkout\MinicartMemberPrice);
+                                             absent otherwise, so non-members render exactly as before. -->
+                                        <template x-if="item.caliber_has_member_price">
+                                            <p class="text-sm text-ahy-body-text-color line-through"
+                                               x-html="hyva.formatPrice(getTotalProductPrice(item.caliber_regular_price_value, item.qty))"></p>
+                                        </template>
+                                    </div>
                                     <template x-if="parseFloat(item.product_price_value) > 0">
                                         <div class="flex items-end flex-col mt-2">
                                             <div class="flex items-center border-2 border-ahy-blue rounded-full overflow-hidden w-fit">
@@ -425,6 +450,5 @@ $heroicons = $viewModels->require(HeroiconsOutline::class);
             </div>
             <?= $block->getChildHtml('loading') ?>
         </div>
-    </template>
     </template>
 </section>

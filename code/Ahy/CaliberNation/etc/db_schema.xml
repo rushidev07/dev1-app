@@ -102,6 +102,7 @@
         <column xsi:type="smallint" name="is_enabled" unsigned="true" nullable="false" default="1" comment="Whether the seller participates"/>
         <column xsi:type="varchar" name="discount_type" length="16" nullable="false" default="percent" comment="percent|fixed (amount off)"/>
         <column xsi:type="decimal" name="discount_value" scale="4" precision="12" nullable="false" default="0" comment="Percent off, or fixed amount off"/>
+        <column xsi:type="smallint" name="is_early_access" unsigned="true" nullable="false" default="0" comment="Whether this seller is flagged for early access"/>
         <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
         <column xsi:type="timestamp" name="updated_at" on_update="true" default="CURRENT_TIMESTAMP" nullable="false" comment="Updated At"/>
 
@@ -113,6 +114,9 @@
         </constraint>
         <index referenceId="AHY_CLBR_NTN_SELLER_PARTICIPATION_ENABLED" indexType="btree">
             <column name="is_enabled"/>
+        </index>
+        <index referenceId="AHY_CLBR_NTN_SELLER_PARTICIPATION_IS_EARLY_ACCESS" indexType="btree">
+            <column name="is_early_access"/>
         </index>
     </table>
 
@@ -174,17 +178,11 @@
         <column xsi:type="int" name="membership_id" padding="10" unsigned="true" nullable="false" comment="Membership entity_id"/>
         <column xsi:type="datetime" name="start_date" nullable="true" comment="Membership start date at time of cancellation"/>
         <column xsi:type="datetime" name="cancelled_at" nullable="false" comment="When the membership was cancelled"/>
-        <column xsi:type="varchar" name="status" length="16" nullable="false" default="pending" comment="pending|reviewed"/>
-        <column xsi:type="int" name="reviewed_by" padding="10" unsigned="true" nullable="true" comment="Admin user_id who reviewed"/>
-        <column xsi:type="datetime" name="reviewed_at" nullable="true" comment="When the request was reviewed"/>
         <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
 
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="entity_id"/>
         </constraint>
-        <index referenceId="AHY_CALIBER_NATION_REFUND_REQUEST_STATUS" indexType="btree">
-            <column name="status"/>
-        </index>
         <index referenceId="AHY_CALIBER_NATION_REFUND_REQUEST_CUSTOMER_ID" indexType="btree">
             <column name="customer_id"/>
         </index>

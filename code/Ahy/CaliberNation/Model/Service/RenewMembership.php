@@ -115,7 +115,10 @@ class RenewMembership
 
     private function handleSuccess(MembershipInterface $membership, float $amount, int $tokenId, string $transId): array
     {
-        $months = $this->config->getMembershipDurationMonths();
+        // Base term only. Signup bonus months are a ONE-TIME incentive granted at
+        // activation; including them here would re-grant the bonus on every renewal
+        // (13 months of access for a 12-month payment, compounding yearly).
+        $months = $this->config->getBaseTermMonths();
         // Extend from the current renewal date to avoid drift.
         $base = $membership->getRenewalDate() ?: date('Y-m-d H:i:s');
         $newRenewal = date('Y-m-d H:i:s', strtotime($base . " +{$months} months"));

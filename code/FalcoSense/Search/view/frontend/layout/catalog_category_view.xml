@@ -6,6 +6,7 @@
             <block class="FalcoSense\Search\Block\Category"
                    name="ahy_smartsearch_category"
                    template="FalcoSense_Search::category/results.phtml"
+                   cacheable="false"
                    before="-">
                 <block class="Magento\Framework\View\Element\Template"
                        name="ahy_smartsearch_category_zero_results"

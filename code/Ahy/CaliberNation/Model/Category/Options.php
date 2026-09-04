@@ -7,22 +7,23 @@ declare(strict_types=1);
 
 namespace Ahy\CaliberNation\Model\Category;
 
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Data\OptionSourceInterface;
 
 /**
- * Option source of catalog categories for the Member Price Rule form — so the
- * admin picks a category from a searchable dropdown instead of typing an id.
- * Label = breadcrumb path ("Parent > Child") + id; value = category id.
- * Root levels (1 = root, 2 = store root "Default Category") are excluded from the
- * displayed path.
+ * Option source of catalog categories for the Member Price Rule form.
+ * Categories that already have a rule are shown as disabled (greyed out).
+ * When editing an existing record the current category is excluded from
+ * the disabled set.
  */
 class Options implements OptionSourceInterface
 {
     private ?array $options = null;
 
     public function __construct(
-        private readonly ResourceConnection $resource
+        private readonly ResourceConnection $resource,
+        private readonly RequestInterface $request
     ) {}
 
     public function toOptionArray(): array
@@ -32,6 +33,16 @@ class Options implements OptionSourceInterface
         }
 
         $conn = $this->resource->getConnection();
+
+        // Fetch already-used category IDs, excluding the record being edited.
+        $currentEntityId = (int) $this->request->getParam('entity_id');
+        $usedSelect = $conn->select()
+            ->from($this->resource->getTableName('ahy_caliber_nation_member_price_rule'), ['target_id']);
+        if ($currentEntityId) {
+            $usedSelect->where('entity_id != ?', $currentEntityId);
+        }
+        $usedCategories = array_flip(array_map('intval', $conn->fetchCol($usedSelect)));
+
         $nameAttrId = (int) $conn->fetchOne(
             $conn->select()
                 ->from(['a' => $this->resource->getTableName('eav_attribute')], ['attribute_id'])
@@ -59,16 +70,26 @@ class Options implements OptionSourceInterface
         $options = [];
         foreach ($rows as $r) {
             if ((int) $r['level'] < 2) {
-                continue; // skip root / store-root
+                continue;
             }
             $id = (int) $r['entity_id'];
-            $segments = array_slice(array_map('intval', explode('/', (string) $r['path'])), 2); // drop roots 1 & 2
+            $alreadyUsed = isset($usedCategories[$id]);
+            $segments = array_slice(array_map('intval', explode('/', (string) $r['path'])), 2);
             $crumbs = [];
             foreach ($segments as $segId) {
                 $crumbs[] = $names[$segId] ?? ('#' . $segId);
             }
             $label = $crumbs ? implode(' > ', $crumbs) : ($names[$id] ?: 'Category');
-            $options[] = ['value' => $id, 'label' => sprintf('%s (#%d)', $label, $id)];
+            $option = [
+                'value' => $id,
+                'label' => $alreadyUsed
+                    ? sprintf('%s (#%d) — Already Has Rule', $label, $id)
+                    : sprintf('%s (#%d)', $label, $id),
+            ];
+            if ($alreadyUsed) {
+                $option['disabled'] = true;
+            }
+            $options[] = $option;
         }
 
         usort($options, static fn ($a, $b) => strcasecmp((string) $a['label'], (string) $b['label']));

@@ -1,0 +1,57 @@
+<?php
+/**
+ * Non-member Price / MSRP box. Reflects the product's actual catalog price.
+ * The CaliberNation member-price box and "Exclusive Member Savings" / Join
+ * Now promo that used to sit above this were removed at the user's request
+ * (the member price was only ever a dummy 15%-off placeholder, not real
+ * Caliber group tier/catalog-rule pricing).
+ *
+ * The MSRP line (struck-through) only renders when the product actually
+ * has a real deal - a special_price active, so final_price < regular_price.
+ * Without that check, a product with no special price at all showed the
+ * same amount twice (once plain, once struck-through as "MSRP"), which
+ * looks like a stuck/static price rather than "no deal right now".
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\CalibernationPrice;
+use Ahy\PDPRevamp\ViewModel\CaliberMemberPrice;
+use Magento\Framework\Escaper;
+
+/** @var CalibernationPrice $block */
+/** @var Escaper $escaper */
+
+$product = $block->getProduct();
+
+$priceHelper = $block->getPriceHelper();
+
+$finalPrice = (float) $product->getPriceInfo()->getPrice('final_price')->getAmount()->getValue();
+$regularPrice = (float) $product->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
+$hasDeal = $finalPrice < $regularPrice;
+
+$nonMemberPrice = $priceHelper->currency($finalPrice, true, false);
+$msrpPrice = $priceHelper->currency($regularPrice, true, false);
+
+/** @var CaliberMemberPrice $caliberMemberPriceViewModel */
+$caliberMemberPriceViewModel = $block->getData('caliber_member_price_view_model');
+$caliberPrice = $caliberMemberPriceViewModel
+    ? $caliberMemberPriceViewModel->getCaliberPrice($product)
+    : null;
+?>
+
+
+<div class="calibernation-price-box space-y-2">
+    <div class="flex items-baseline gap-4 px-1">
+        <div class="flex items-baseline gap-1.5">
+            <span class="text-xs font-semibold uppercase" style="color:#6b7688;"><?= __('Price') ?>:</span>
+            <span class="text-xl font-bold" style="color:#1f2937;" data-role="non-member-price"><?= /* @noEscape */ $nonMemberPrice ?></span>
+        </div>
+        <?php if ($hasDeal): ?>
+            <div class="flex items-baseline gap-1.5">
+                <span class="text-xs font-semibold uppercase" style="color:#5c656b;"><?= __('MSRP') ?>:</span>
+                <span class="text-base line-through" style="color:#5c656b;" data-role="msrp-price"><?= /* @noEscape */ $msrpPrice ?></span>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>

@@ -39,6 +39,7 @@
     <listingToolbar name="listing_top">
         <bookmark name="bookmarks"/>
         <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
         <filters name="listing_filters"/>
         <paging name="listing_paging"/>
     </listingToolbar>
@@ -51,21 +52,21 @@
                 <sorting>desc</sorting>
             </settings>
         </column>
-        <column name="scope">
+
+        <!-- Resolved in the grid collection; falls back to "Category #<id>" if deleted. -->
+        <column name="category_name">
             <settings>
-                <filter>select</filter>
-                <options class="Ahy\CaliberNation\Model\Config\Source\RuleScope"/>
-                <dataType>select</dataType>
-                <label translate="true">Scope</label>
+                <filter>text</filter>
+                <label translate="true">Category</label>
             </settings>
         </column>
         <column name="target_id">
             <settings>
                 <filter>text</filter>
-                <label translate="true">Target ID (category/product)</label>
+                <label translate="true">Category ID</label>
             </settings>
         </column>
-        <column name="discount_type">
+        <column name="discount_type" component="Magento_Ui/js/grid/columns/select">
             <settings>
                 <filter>select</filter>
                 <options class="Ahy\CaliberNation\Model\Config\Source\DiscountType"/>
@@ -79,7 +80,7 @@
                 <label translate="true">Discount Value</label>
             </settings>
         </column>
-        <column name="is_active">
+        <column name="is_active" component="Magento_Ui/js/grid/columns/select">
             <settings>
                 <filter>select</filter>
                 <options class="Magento\Config\Model\Config\Source\Yesno"/>

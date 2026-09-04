@@ -23,7 +23,7 @@
             unused) FalcoSense\Search\Controller\Search\Index — see
             view/frontend/layout/fs_search_index.xml for the matching layout.
         -->
-        <!-- <route id="fs" frontName="fs"> -->
+           <!-- <route id="fs" frontName="fs"> -->
         <route id="fs_search" frontName="fs">
             <module name="FalcoSense_Search"/>
         </route>

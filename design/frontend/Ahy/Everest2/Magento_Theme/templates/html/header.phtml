@@ -56,8 +56,17 @@ $showMiniCart = $storeConfig->getStoreConfig(\Magento\Checkout\Block\Cart\Sideba
 <div x-on:resize.window="isMobile = (window.innerWidth < 1024) ? true : false" x-data="{isMobile: (window.innerWidth < 1024) ? true : false}" class="min-h-[161px] h-auto lg:h-[174px]">
     <template x-if="isMobile">
         <section class="ahy-header">
-            <div class="pre-header flex justify-center bg-ahy-blue text-white text-xs">
+            <div class="pre-header flex justify-center bg-ahy-blue text-white text-xs"
+                 style="position:relative;"
+                 x-data="{ savings: {} }"
+                 @private-content-loaded.window="if ($event.detail.data['caliber-nation-savings']) savings = $event.detail.data['caliber-nation-savings']">
                 <span class="p-3 text-center"><?= __("EVEREST.COM IS AN OUTDOOR GEAR MARKETPLACE SUPPORTING 1,000'S OF SELLERS - SHOP TODAY AND SAVE!") ?></span>
+                <template x-if="savings.has">
+                    <span class="cn-savings-pill" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:4px;background:#e01a2b;color:#fff;font-size:0.66rem;font-weight:700;padding:2px 9px;border-radius:9999px;white-space:nowrap;">
+                        <span style="font-weight:400;"><?= __('Saved') ?></span>
+                        <span x-text="savings.formatted"></span>
+                    </span>
+                </template>
             </div>
             <div id="header"
                 class="relative z-40 w-full bg-ahy-bg"
@@ -213,8 +222,18 @@ $showMiniCart = $storeConfig->getStoreConfig(\Magento\Checkout\Block\Cart\Sideba
     </template>
     <template x-if="!isMobile">
         <section class="ahy-header desktop">
-            <div class="pre-header flex justify-center bg-ahy-blue text-white">
+            <div class="pre-header flex justify-center bg-ahy-blue text-white"
+                 style="position:relative;"
+                 x-data="{ savings: {} }"
+                 @private-content-loaded.window="if ($event.detail.data['caliber-nation-savings']) savings = $event.detail.data['caliber-nation-savings']">
                 <span class="py-3 text-center"><?= __("EVEREST.COM IS AN OUTDOOR GEAR MARKETPLACE SUPPORTING 1,000'S OF SELLERS - SHOP TODAY AND SAVE!") ?></span>
+                <template x-if="savings.has">
+                    <span class="cn-savings-pill" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:5px;background:#e01a2b;color:#fff;font-size:0.72rem;font-weight:700;padding:3px 12px;border-radius:9999px;white-space:nowrap;">
+                        <span style="font-weight:400;"><?= __('You\'ve saved') ?></span>
+                        <span x-text="savings.formatted"></span>
+                        <span style="font-weight:400;"><?= __('as a member') ?></span>
+                    </span>
+                </template>
             </div>
             <div id="header"
                 class="relative z-40 w-full bg-ahy-bg"

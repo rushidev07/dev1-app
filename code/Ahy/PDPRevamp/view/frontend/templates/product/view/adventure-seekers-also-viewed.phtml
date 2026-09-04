@@ -1,0 +1,364 @@
+<?php
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\AdventureSeekersAlsoViewed;
+use Magento\Framework\Escaper;
+
+/** @var AdventureSeekersAlsoViewed $block */
+/** @var Escaper $escaper */
+
+$items = $block->getItems();
+if (count($items) < 2) {
+    return;
+}
+
+$title = $block->getGroupTitle() ?: __('Adventure Seekers Also Viewed');
+?>
+<div
+    class="adventure-seekers-also-viewed pt-8 pb-4 md:pb-8"
+    x-data="ahyAdventureSeekersCarousel(<?= $escaper->escapeHtmlAttr(json_encode($items)) ?>)"
+    @resize.window.debounce="checkOverflow(); updateScrollButtons()"
+>
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="font-extrabold text-ahy-blue text-sm sm:text-xl leading-tight">
+            <?= $escaper->escapeHtml($title) ?>
+        </h2>
+        <div class="flex items-center gap-2 shrink-0 ml-3" x-show="hasOverflow" x-cloak>
+            <button type="button" @click="scrollByCards(-1)" :disabled="atStart"
+                class="ahy-carousel-nav-btn w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition"
+                aria-label="<?= $escaper->escapeHtmlAttr(__('Previous')) ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button type="button" @click="scrollByCards(1)" :disabled="atEnd"
+                class="ahy-carousel-nav-btn w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition"
+                aria-label="<?= $escaper->escapeHtmlAttr(__('Next')) ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div x-ref="scroller" @scroll.debounce.50ms="updateScrollButtons()"
+        class="ahy-asav-track flex gap-4 sm:gap-5 overflow-x-auto snap-x scroll-smooth items-stretch"
+        style="padding-bottom:10px;">
+        <template x-for="item in items" :key="item.id">
+            <div
+                class="snap-start shrink-0 rounded-lg overflow-hidden relative flex flex-col bg-white"
+                :style="'width:210px;border:1px solid oklch(90% .005 80);transition:box-shadow 0.15s cubic-bezier(.4,0,.2,1);' + (hoveredId === item.id ? 'box-shadow:0 4px 20px 0 rgba(0,0,0,0.10);' : '')"
+                @mouseenter="hoveredId = item.id"
+                @mouseleave="hoveredId = null"
+            >
+                <!-- Image -->
+                <div class="overflow-hidden relative shrink-0" style="aspect-ratio:1/1;">
+                    <img :src="item.image" :alt="item.name"
+                        class="w-full h-full object-cover bg-white"
+                        style="transition:transform 0.3s cubic-bezier(.4,0,.2,1);"
+                        :style="hoveredId === item.id ? 'transform:scale(1.05);' : 'transform:scale(1);'"
+                    >
+                    <!-- Badges -->
+                    <div class="absolute top-2 left-2 z-10 flex flex-col items-start gap-1">
+                        <template x-for="badge in item.badges" :key="badge.label">
+                            <span x-text="badge.label"
+                                class="rounded-full px-2 py-0.5 text-[10px] font-bold text-white uppercase leading-tight"
+                                :style="'background:' + badge.color"
+                            ></span>
+                        </template>
+                    </div>
+                    <!-- Wishlist -->
+                    <button type="button"
+                        @click.stop="toggleWish(item.id)"
+                        class="ahy-asav-wish-btn absolute top-2 right-2 z-10 w-7 h-7 rounded-full backdrop-blur-sm flex items-center justify-center"
+                        style="transition:opacity 0.15s cubic-bezier(.4,0,.2,1);"
+                        :style="(wished[item.id] || hoveredId === item.id) ? 'opacity:1;' : 'opacity:0;'"
+                        :aria-pressed="!!wished[item.id]"
+                        aria-label="<?= $escaper->escapeHtmlAttr(__('Toggle wishlist')) ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                            :fill="wished[item.id] ? '#e85d26' : 'none'"
+                            :stroke="wished[item.id] ? '#e85d26' : 'rgba(13,47,71,0.6)'"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            aria-hidden="true">
+                            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Card body -->
+                <div class="p-2.5 sm:p-3 flex flex-col flex-1">
+                    <div class="flex-1">
+                        <!-- Seller name -->
+                        <p x-text="item.sellerName"
+                            class="text-[10px] font-semibold uppercase tracking-wide truncate mb-0.5"
+                            style="color:oklch(0.5 0.015 240);"></p>
+                        <!-- Product name -->
+                        <p class="ahy-asav-name text-xs sm:text-sm font-bold text-ahy-blue leading-tight mb-1"
+                            style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;"
+                            x-text="item.name"></p>
+                        <!-- Star ratings - outer row always reserves its
+                             height even when a product has no reviews, so
+                             cards with and without ratings still put the
+                             price at the same offset. -->
+                        <div class="ahy-asav-rating-row flex items-center gap-1 mb-1">
+                            <template x-if="(ratings[item.id] && ratings[item.id].count > 0) || item.ratingSummary > 0">
+                                <div class="flex items-center gap-1">
+                                    <span class="flex gap-px">
+                                        <template x-for="star in [1,2,3,4,5]" :key="star">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24"
+                                                :fill="star <= Math.round(ratings[item.id] ? ratings[item.id].score : (item.ratingSummary / 20)) ? '#fbbf24' : 'none'"
+                                                stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                                aria-hidden="true">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                            </svg>
+                                        </template>
+                                    </span>
+                                    <span class="text-[10px]" style="color:oklch(0.5 0.015 240);"
+                                        x-text="ratings[item.id] ? '(' + ratings[item.id].count + ')' : (item.reviewsCount > 0 ? '(' + item.reviewsCount + ')' : '')">
+                                    </span>
+                                </div>
+                            </template>
+                        </div>
+                        <!-- Price -->
+                        <p class="flex items-baseline gap-1 flex-nowrap">
+                            <span class="font-bold text-ahy-blue text-base" x-text="'$' + item.finalPrice.toFixed(2)"></span>
+                            <span x-show="item.hasDiscount" class="text-xs text-gray-400 line-through" x-text="'$' + item.regularPrice.toFixed(2)"></span>
+                        </p>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex flex-col gap-1.5 pt-2">
+                        <template x-if="!item.isConfigurable">
+                            <button type="button"
+                                :disabled="!!addingIds[item.id]"
+                                @click="quickAdd(item)"
+                                class="w-full text-xs sm:text-xs py-2 rounded font-semibold text-white"
+                                :style="'background:#E75C26;transition:opacity 0.15s;opacity:' + (addingIds[item.id] ? '0.7' : '1') + ';'">
+                                <span x-text="addingIds[item.id] ? '<?= $escaper->escapeJs(__('Adding...')) ?>' : '<?= $escaper->escapeJs(__('Quick Add')) ?>'"></span>
+                            </button>
+                        </template>
+                        <template x-if="item.isConfigurable">
+                            <button type="button"
+                                class="w-full text-xs sm:text-sm py-2 rounded font-semibold text-white"
+                                style="background:#E75C26;"
+                                @click="openOptionsModal(item)"
+                            ><?= $escaper->escapeHtml(__('Options')) ?></button>
+                        </template>
+                        <a :href="item.url"
+                            class="w-full text-center text-xs sm:text-sm py-2 rounded font-semibold border border-gray-300 text-ahy-blue block"
+                            style="transition:background 0.15s,color 0.15s,border-color 0.15s;"
+                            @mouseenter="$event.currentTarget.style.background='#0d2f47';$event.currentTarget.style.color='#fff';$event.currentTarget.style.borderColor='#0d2f47'"
+                            @mouseleave="$event.currentTarget.style.background='';$event.currentTarget.style.color='';$event.currentTarget.style.borderColor=''"
+                        ><?= $escaper->escapeHtml(__('View Product')) ?></a>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+</div>
+<script>
+    function ahyAdventureSeekersCarousel(items) {
+        return {
+            items: items,
+            ratings: {},
+            addingIds: {},
+            wished: {},
+            wishingIds: {},
+            hoveredId: null,
+            hasOverflow: false,
+            atStart: true,
+            atEnd: false,
+            init() {
+                this.fetchRatings();
+                this.$nextTick(() => {
+                    this.checkOverflow();
+                    this.updateScrollButtons();
+                });
+            },
+            checkOverflow() {
+                const scroller = this.$refs.scroller;
+                this.hasOverflow = scroller.scrollWidth > scroller.clientWidth + 1;
+            },
+            updateScrollButtons() {
+                const scroller = this.$refs.scroller;
+                this.atStart = scroller.scrollLeft <= 1;
+                // Same wider tolerance as customers-also-bought.phtml: exact
+                // 1px equality left this stuck false due to subpixel
+                // scrollWidth rounding from responsive card images.
+                this.atEnd = scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 8;
+            },
+            // Opens FalcoSense's own configurable-options quickview (config-modal.phtml,
+            // wired globally via FalcoSense_Search's default.xml) instead of a Klevu-backed
+            // one - its addToCart() doesn't depend on klevu_addtocart() at all, and it
+            // opens the real minicart itself on success. The stub shape it expects
+            // (product_id/brand/price/special_price/type) differs from this carousel's
+            // own item shape (id/sellerName/regularPrice/finalPrice/isConfigurable), so
+            // it's mapped here rather than passing item through unchanged.
+            openOptionsModal(item) {
+                window.dispatchEvent(new CustomEvent('ahy-cfg-modal-open', {
+                    detail: {
+                        product_id: item.id,
+                        sku: item.sku,
+                        name: item.name,
+                        image: item.image,
+                        brand: item.sellerName,
+                        price: item.regularPrice,
+                        special_price: item.hasDiscount ? item.finalPrice : undefined,
+                        type: 'configurable',
+                    },
+                    bubbles: true
+                }));
+            },
+            fetchRatings() {
+                this.items.forEach((item) => {
+                    fetch(BASE_URL + 'ahyyotpo/index/bulkratings?product_id=' + item.id)
+                        .then((r) => r.json())
+                        .then((rating) => {
+                            if (rating && rating.total_reviews > 0) {
+                                this.ratings = {
+                                    ...this.ratings,
+                                    [item.id]: {
+                                        score: rating.average_score,
+                                        count: rating.total_reviews,
+                                    }
+                                };
+                            }
+                        })
+                        .catch((error) => console.error(error));
+                });
+            },
+            toggleWish(id) {
+                if (this.wished[id] || this.wishingIds[id]) {
+                    return;
+                }
+                this.wishingIds[id] = true;
+                // Fill immediately on click so the UI reacts instantly, regardless
+                // of network/response timing; reverted below if the add fails.
+                this.wished = { ...this.wished, [id]: true };
+                const postData = 'product=' + id
+                    + '&uenc=' + hyva.getUenc()
+                    + '&form_key=' + hyva.getFormKey()
+                    + '&qty=1';
+                fetch(BASE_URL + 'wishlist/index/add/', {
+                    headers: {
+                        'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    },
+                    body: postData,
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'include',
+                }).then((response) => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else if (response.ok) {
+                        return response.json();
+                    } else {
+                        typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages(
+                            [{ type: 'warning', text: '<?= $escaper->escapeJs(__('Could not add item to wishlist.')) ?>' }], 5000
+                        );
+                    }
+                }).then((response) => {
+                    this.wishingIds[id] = false;
+                    if (!response) {
+                        const reverted = { ...this.wished };
+                        delete reverted[id];
+                        this.wished = reverted;
+                        return;
+                    }
+                    if (!response.success) {
+                        const reverted = { ...this.wished };
+                        delete reverted[id];
+                        this.wished = reverted;
+                    }
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages(
+                        [{
+                            type: response.success ? 'success' : 'error',
+                            text: response.success
+                                ? '<?= $escaper->escapeJs(__('%1 has been added to your Wish List.', __('Product'))) ?>'
+                                : response.error_message,
+                        }], 5000
+                    );
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                    if (response.success) {
+                        setTimeout(() => { window.location.href = BASE_URL + 'wishlist/'; }, 600);
+                    }
+                }).catch((error) => {
+                    this.wishingIds[id] = false;
+                    const reverted = { ...this.wished };
+                    delete reverted[id];
+                    this.wished = reverted;
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages(
+                        [{ type: 'error', text: error }], 5000
+                    );
+                });
+            },
+            scrollByCards(direction) {
+                const scroller = this.$refs.scroller;
+                const card = scroller.querySelector(':scope > div');
+                const gap = window.innerWidth >= 640 ? 20 : 16;
+                const cardWidth = card ? card.getBoundingClientRect().width + gap : 230;
+                scroller.scrollBy({ left: direction * cardWidth, behavior: 'smooth' });
+            },
+            quickAdd(item) {
+                if (this.addingIds[item.id]) return;
+                this.addingIds[item.id] = true;
+                try {
+                    const body = new URLSearchParams();
+                    body.set('product', item.id);
+                    body.set('qty', '1');
+                    body.set('form_key', hyva.getFormKey());
+                    fetch(item.addToCartUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: body.toString(),
+                        credentials: 'same-origin',
+                    })
+                    .then(() => {
+                        this.addingIds[item.id] = false;
+                        window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                        window.dispatchEvent(new CustomEvent('toggle-cart'));
+                        typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages(
+                            [{ type: 'success', text: '<?= $escaper->escapeJs(__('Item added to your cart.')) ?>' }], 5000
+                        );
+                    })
+                    .catch(() => {
+                        this.addingIds[item.id] = false;
+                        typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages(
+                            [{ type: 'error', text: '<?= $escaper->escapeJs(__('Something went wrong adding this item to your cart.')) ?>' }], 5000
+                        );
+                    });
+                } catch (e) {
+                    this.addingIds[item.id] = false;
+                }
+            },
+        };
+    }
+</script>
+<style>
+    /* Plain CSS instead of Tailwind's "disabled:" variants - those aren't
+       used anywhere else in this theme, so they aren't in the already-
+       compiled styles.css and would need a Tailwind rebuild to appear.
+       This works without one. */
+    .ahy-carousel-nav-btn:disabled {
+        opacity: 0.3;
+        border-color: transparent;
+        cursor: not-allowed;
+    }
+    .ahy-carousel-nav-btn:disabled:hover {
+        background-color: transparent;
+    }
+    .ahy-asav-wish-btn {
+        background-color: rgba(255, 255, 255, 0.8);
+    }
+    @media (max-width: 425px) {
+        .adventure-seekers-also-viewed {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+    .ahy-asav-track { scrollbar-width: none; -ms-overflow-style: none; }
+    .ahy-asav-track::-webkit-scrollbar { display: none; }
+    .ahy-asav-rating-row { min-height: 14px; }
+    .ahy-asav-name { min-height: 54px; }
+</style>

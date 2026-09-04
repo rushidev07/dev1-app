@@ -370,7 +370,11 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
                 url.searchParams.set('category', this.categoryName);
                 url.searchParams.set('page', this.page);
                 url.searchParams.set('per_page', this.pageSize);
-                if (this.platformStoreId) url.searchParams.set('platform_store_id', this.platformStoreId);
+                // platform_store_id intentionally omitted — getPlatformStoreId()'s
+                // position-based calculation is wrong for single-store-view sites
+                // (always resolves to 1). Omitting it lets the backend fall back to
+                // the store already correctly configured on the API key itself,
+                // same as the header search (search-form.phtml) and search/results.phtml.
 
                 const filterMap = {};
                 this.activeFilters.forEach(f => {

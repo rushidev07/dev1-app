@@ -9,6 +9,8 @@ $platformStoreId = (int) $block->getPlatformStoreId();
 $customerGeoState = $block->escapeJs($block->getCustomerGeoState());
 $searchQueryHtml = $block->escapeHtmlAttr($block->getSearchQuery());
 $yotpoEndpoint   = $block->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$caliberEndpoint = $block->escapeUrl($block->getUrl('caliber-nation/pricing/memberprice'));
+$sellerEndpoint  = $block->escapeUrl($block->getUrl('ahy_plprevamp/seller/names'));
 
 // ---- AHY DEBUG: identifies which route/handle/block rendered this template ----
 $ahyDbgHandle   = $block->escapeJs((string) $block->getRequest()->getFullActionName());
@@ -36,7 +38,9 @@ $ahyDbgAction   = $block->escapeJs((string) $block->getRequest()->getActionName(
             }
         }
     }
-    var YOTPO_ENDPOINT = '<?= $yotpoEndpoint ?>';
+    var YOTPO_ENDPOINT   = '<?= $yotpoEndpoint ?>';
+    var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
+    var SELLER_ENDPOINT  = '<?= $sellerEndpoint ?>';
 </script>
 
 <!-- ================= AHY PLP DEBUG (remove when done) ================= -->
@@ -457,7 +461,8 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
 
                                 <!-- Seller line -->
                                 <div class="plp-card-seller"
-                                     x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+                                     x-data="{ get _sn(){ return sellerNames[String(product.product_id)] || null } }"
+                                     x-text="_sn ? 'Sold by ' + _sn.name : (product.brand ? 'Sold by ' + product.brand : '')"></div>
 
                                 <!-- Yotpo stars -->
                                 <div class="plp-rating"
@@ -472,37 +477,43 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                             </svg>
                                         </template>
                                     </div>
-                                    <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : ''"></span>
+                                    <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : '(0)'"></span>
                                 </div>
 
                                 <!-- 2-column price grid -->
-                                <div class="plp-price-section">
-                                    <div class="plp-price-grid">
-                                        <!-- Left: CaliberNation -->
-                                        <div class="plp-caliber-col">
+                                <div class="plp-price-section"
+                                     x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                    <div class="plp-price-grid" :class="_cp ? '' : 'plp-price-grid--single'">
+                                        <!-- Left: CaliberNation (hidden when no member price is available) -->
+                                        <div class="plp-caliber-col" x-show="_cp">
                                             <div class="plp-caliber-title">CaliberNation Price</div>
-                                            <div class="plp-caliber-value">$0.00</div>
+                                            <div class="plp-caliber-value" x-text="_cp ? _cp.formattedMember : ''"></div>
                                             <div class="plp-caliber-save">
                                                 <span class="plp-caliber-save-icon">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                                                 </span>
-                                                <span class="plp-caliber-save-text">MEMBERS SAVE $0.00<br>0% OFF MSRP</span>
+                                                <span class="plp-caliber-save-text"
+                                                      x-html="_cp ? 'MEMBERS SAVE ' + _cp.formattedSavings + '<br>' + Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : ''"></span>
                                             </div>
-                                            <a class="plp-caliber-join" href="/caliber-nation">JOIN CALIBER ></a>
+                                            <a class="plp-caliber-join" href="/caliber-nation"><span>JOIN CALIBER</span><svg class="plp-caliber-join-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 18 15 12 9 6"/></svg></a>
                                         </div>
 
                                         <!-- Right: Normal price -->
                                         <div class="plp-normal-col">
                                             <template x-if="hasDiscount">
                                                 <div>
-                                                    <div class="plp-normal-title">Sale Price</div>
-                                                    <div class="plp-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
-                                                    <div class="plp-nonmember-wrap">
-                                                        <span class="plp-nonmember-text">NON-MEMBERS SAVE <span class="plp-pct-inline" x-text="savingsPct + '%'"></span></span>
-                                                        <span class="plp-nonmember-msrp"><span class="plp-pct-block" x-text="savingsPct + '% '"></span>OFF MSRP</span>
+                                                    <div class="plp-normal-main">
+                                                        <div class="plp-normal-title">Sale Price</div>
+                                                        <div class="plp-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
                                                     </div>
-                                                    <div class="plp-msrp-line">
-                                                        MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                                    <div class="plp-normal-promo">
+                                                        <div class="plp-nonmember-wrap">
+                                                            <span class="plp-nonmember-text">NON-MEMBERS SAVE <span class="plp-pct-inline" x-text="savingsPct + '%'"></span></span>
+                                                            <span class="plp-nonmember-msrp"><span class="plp-pct-block" x-text="savingsPct + '% '"></span>OFF MSRP</span>
+                                                        </div>
+                                                        <div class="plp-msrp-line">
+                                                            MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </template>
@@ -538,8 +549,8 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                         </template>
                                         <template x-if="product.type === 'configurable'">
                                             <button class="plp-atc-btn"
-                                                    @click.prevent="$dispatch('ahy-open-config-modal', product)">
-                                                <span>Options</span>
+                                                    @click.prevent="$dispatch('ahy-cfg-modal-open', product)">
+                                                <span>View More Details ></span>
                                             </button>
                                         </template>
                                     </div>
@@ -585,7 +596,8 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                x-text="cleanName(product.name)"></a>
 
                             <div class="plp-card-seller"
-                                 x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+                                 x-data="{ get _sn(){ return sellerNames[String(product.product_id)] || null } }"
+                                 x-text="_sn ? 'Sold by ' + _sn.name : (product.brand ? 'Sold by ' + product.brand : '')"></div>
 
                             <!-- Yotpo stars mobile -->
                             <div class="plp-rating"
@@ -600,16 +612,16 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                         </svg>
                                     </template>
                                 </div>
-                                <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : ''"></span>
+                                <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : '(0)'"></span>
                             </div>
 
                             <div class="mt-2">
                                 <template x-if="hasDiscount">
-                                    <div>
-                                        <div class="plp-mobile-price-grid">
-                                            <div class="plp-mobile-caliber">
+                                    <div x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                        <div class="plp-mobile-price-grid" :class="_cp ? '' : 'plp-mobile-price-grid--single'">
+                                            <div class="plp-mobile-caliber" x-show="_cp">
                                                 <div class="plp-caliber-title">CaliberNation</div>
-                                                <div class="plp-mobile-caliber-value">$0.00</div>
+                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : ''"></div>
                                             </div>
                                             <div class="plp-mobile-normal">
                                                 <div class="plp-normal-title">Sale Price</div>
@@ -623,11 +635,11 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                     </div>
                                 </template>
                                 <template x-if="!hasDiscount && product.price">
-                                    <div>
-                                        <div class="plp-mobile-price-grid">
-                                            <div class="plp-mobile-caliber">
+                                    <div x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                        <div class="plp-mobile-price-grid" :class="_cp ? '' : 'plp-mobile-price-grid--single'">
+                                            <div class="plp-mobile-caliber" x-show="_cp">
                                                 <div class="plp-caliber-title">CaliberNation</div>
-                                                <div class="plp-mobile-caliber-value">$0.00</div>
+                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : ''"></div>
                                             </div>
                                             <div class="plp-mobile-normal">
                                                 <div class="plp-normal-title">Price</div>
@@ -652,7 +664,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                     </button>
                                 </template>
                                 <template x-if="product.type === 'configurable'">
-                                    <button @click.prevent="$dispatch('ahy-open-config-modal', product)"
+                                    <button @click.prevent="$dispatch('ahy-cfg-modal-open', product)"
                                             class="plp-mobile-atc-btn">
                                         Options
                                     </button>
@@ -727,6 +739,16 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
             analyticsUrl,
             customerGeoState,
             results: [],
+            // CaliberNation member pricing, keyed by product id. Only products that
+            // actually resolve a member discount come back, so a missing key means
+            // "no member price" and the CaliberNation column stays hidden.
+            caliberPrices: {},
+            // Real marketplace seller per product (marketplace_product.seller_id ->
+            // shop_title). Products with no seller are absent, so the card renders an
+            // empty seller line rather than a hardcoded placeholder.
+            sellerNames: {},
+            caliberMember: false,
+            caliberPricingEnabled: false,
             cartLoading: {},
             wishLoading: {},
             filters: [],
@@ -842,6 +864,26 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                                 );
                             }
                         });
+
+                        // Fetch CaliberNation member prices for loaded products
+                        this.caliberPrices = {};
+                        if (this.results.length) {
+                            const _caliberIds = this.results.map(p => p.product_id).join(',');
+                            fetch(CALIBER_ENDPOINT + '?ids=' + _caliberIds, { credentials: 'include' })
+                                .then(r => r.json())
+                                .then(d => {
+                                    if (d.pricing_enabled) {
+                                        this.caliberPricingEnabled = true;
+                                        this.caliberMember = d.is_member;
+                                        this.caliberPrices = d.prices || {};
+                                    }
+                                })
+                                .catch(e => console.error('[CaliberNation] price fetch error', e));
+                            fetch(SELLER_ENDPOINT + '?ids=' + _caliberIds, { credentials: 'include' })
+                                .then(r => r.json())
+                                .then(d => { this.sellerNames = d.names || {}; })
+                                .catch(e => console.error('[AHY PLP] seller name fetch error', e));
+                        }
                     } else {
                         console.error('[SmartSearch] Search API error:', data);
                     }
@@ -1310,6 +1352,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        margin-top: 0.8rem;
     }
     .plp-rating {
         display: flex;
@@ -1320,8 +1363,53 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
     }
     .plp-rating-stars { display: flex; gap: 2px; }
     .plp-rating-count { font-size: 0.75rem; color: #6b7280; }
-    .plp-price-section { margin-top: 4px; padding: 1rem 1.5rem 0.75rem; }
+    .plp-price-section { margin-top: 4px; padding: 0.75rem 1.5rem 0.5rem; }
+
+    /* ── No CaliberNation price: use the freed width ────────────────────────
+       The column collapses to 1fr, so the normal-price block lays itself out as
+       a 2x2 grid instead of a tall stack:
+
+           Sale Price          |  NON-MEMBERS SAVE x% OFF MSRP
+           $19.99              |  MSRP  $29.00
+
+       Placement is explicit rather than auto-flow so the no-discount card —
+       which has only the title and value — keeps them stacked in column 1
+       instead of being pushed side by side. Desktop only; the mobile cards use
+       their own markup. */
+    @media (min-width: 768px) {
+        /* Scoped to :has(.plp-normal-promo) so only the discounted card splits in
+           two — a card without a discount has just the price half and keeps its
+           normal stacked flow. The two halves are wrapper elements, so each stacks
+           independently: the badge no longer sets the height of the row holding
+           "Sale Price", which is what was pushing the price away from its label. */
+        .plp-price-grid--single .plp-normal-col > div:has(.plp-normal-promo) {
+            display: grid;
+            grid-template-columns: 1fr 1fr;      /* equal halves, as in the caliber layout */
+            column-gap: 24px;
+            align-items: start;
+        }
+        /* Divider drawn as a centred 1px background stripe rather than a border: the
+           two halves are individually-placed grid items, not wrapper elements, so a
+           border would render as two broken segments. Same #e5e7eb as
+           .plp-caliber-col's border-right.
+
+           Gated on :has() so it only appears when the right-hand column actually has
+           content. A card with no discount has no badge and no MSRP line, and a rule
+           against an empty half is just a stray line. Browsers without :has() drop
+           this rule entirely, which loses the divider rather than misplacing it. */
+        .plp-price-grid--single .plp-normal-col > div:has(.plp-normal-promo) {
+            background-image: linear-gradient(#e5e7eb, #e5e7eb);
+            background-size: 1px 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .plp-price-grid--single .plp-normal-promo { padding-left: 4px; }
+        .plp-price-grid--single .plp-normal-promo .plp-nonmember-wrap { margin-top: 0; }
+    }
+
     .plp-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    /* No CaliberNation price for this product — normal price takes the full width. */
+    .plp-price-grid--single { grid-template-columns: 1fr !important; }
     .plp-caliber-col { border-right: 1px solid #e5e7eb; padding-right: 12px; }
     .plp-caliber-title { font-size: 0.7rem; color: #dc2626; font-weight: 600; letter-spacing: 0.05em; }
     .plp-normal-title { font-size: 0.9rem; color: #12334b; font-weight: 600; letter-spacing: 0.04em; padding-left: 0.5rem; }
@@ -1341,7 +1429,8 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
     .plp-caliber-save-icon { flex-shrink: 0; margin-top: 1px; }
     .plp-caliber-save-icon svg { transform: scaleX(-1); }
     .plp-caliber-save-text { font-size: 0.65rem; color: #166534; font-weight: 600; }
-    .plp-caliber-join { font-size: 0.7rem; color: #dc2626; font-weight: 700; text-decoration: none; margin-top: 4px; display: block; }
+    .plp-caliber-join { font-size: 0.7rem; color: #dc2626; font-weight: 700; text-decoration: none; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .plp-caliber-join-icon { flex-shrink: 0; }
     .plp-nonmember-wrap {
         font-size: 0.65rem;
         color: #ffffff;
@@ -1354,7 +1443,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         width: 9rem;
     }
     .plp-nonmember-text, .plp-nonmember-msrp { font-size: inherit; color: inherit; font-weight: inherit; }
-    .plp-msrp-line { font-size: 0.65rem; color: #6b7280; margin-top: 2px; padding-left: 0.5rem; }
+    .plp-msrp-line { font-size: 0.65rem; color: #6b7280; margin-top: 5px; padding-left: 0.5rem; }
     .plp-see-options-btn {
         display: flex;
         justify-content: center;
@@ -1367,6 +1456,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         padding: 6px 10px;
         font-weight: 700;
         border: 2px solid #0d2f47;
+        padding-top: 0.7rem; padding-bottom: 0.7rem;
     }
     .plp-pct-block { display: none; }
     @media (min-width: 680px) and (max-width: 767px) {
@@ -1389,6 +1479,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         font-weight: 700;
         border: 0;
         cursor: pointer;
+        padding-top: 0.7rem; padding-bottom: 0.7rem;
     }
     .plp-atc-btn:hover { background: #12334b; }
     .plp-btn-loading { opacity: 0.6; pointer-events: none; }
@@ -1397,6 +1488,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
 
     /* ==================== Mobile card styles ==================== */
     .plp-mobile-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .plp-mobile-price-grid--single { grid-template-columns: 1fr !important; }
     .plp-mobile-caliber-value { font-size: 1.25rem; font-weight: 700; color: #dc2626; }
     .plp-mobile-normal-value { font-size: 1.25rem; font-weight: 700; color: #0d2f47; }
     .plp-mobile-msrp { font-size: 0.7rem; color: #6b7280; margin-top: 2px; }
@@ -1444,6 +1536,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         .plp-card-content { width: 100% !important; min-width: 0 !important; }
         .plp-card-name a { font-size: 0.85rem !important; height: auto !important; min-height: 2.2rem !important; }
         .plp-price-grid { grid-template-columns: 1fr 1fr !important; gap: 4px !important; }
+        .plp-price-grid--single { grid-template-columns: 1fr !important; }
         .plp-price-grid > div { min-width: 0 !important; overflow: hidden !important; }
         .plp-caliber-value { font-size: 1.1rem !important; font-weight: 700 !important; white-space: nowrap !important; }
         .plp-normal-value { font-size: 1.15rem !important; font-weight: 700 !important; white-space: nowrap !important; }
@@ -1453,6 +1546,10 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
 
     @media (min-width: 768px) and (max-width: 1023px) {
         .plp-atc-btn-wrap { display: flex !important; justify-content: flex-end !important; }
+        /* Tablet: give the filter sidebar a fixed width and widen the gap so the
+           grid does not crowd it between 768px and the lg breakpoint. */
+        .ahy-filter-sidebar { width: 275px !important; }
+        .ahy-filter-layout  { gap: 3rem !important; }
         .plp-atc-btn { width: 90px !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; padding-left: 0.75rem !important; padding-right: 0.75rem !important; font-size: 0.75rem !important; }
     }
 
