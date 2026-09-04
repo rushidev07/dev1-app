@@ -79,16 +79,14 @@ body.ahy-search-open { background:#efeadd !important; }
         margin: 80px auto;
         position: relative;
     }
-    /* Modal loader — white blurred backdrop, pinned over the results area while loading/paginating */
-    .ahy-modal-loader-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: 999998;
+    /* Products-area loader — scoped to just the results grid box (not the
+       filters sidebar or header), so a search/filter/sort fetch never blanks
+       the whole screen while the shopper is still typing. Positioned against
+       the relative wrapper placed directly around the grid, sized to match it. */
+    .ahy-products-loader-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -728,11 +726,24 @@ function ahyModalSearch(productsApiUrl, searchToken, addToCartUrl) {
             </div>
         </aside>
 
-        <!-- ── Main content ────────────────────────────── -->
-        <div class="flex-1 min-w-0 pt-6">
+        <!-- ── Main content ─────────────────────────────────
+             Loader below is scoped to just this products column (not the
+             filters sidebar or header), so a typing/filter/sort fetch never
+             touches anything the shopper is still interacting with. The grid
+             underneath stays mounted (not hidden) while a fetch is in
+             flight, so nothing collapses/reflows while the shopper keeps
+             typing (no CLS). Only the very first-ever fetch (nothing
+             rendered yet) has no content to sit on top of, so it gets a
+             min-height placeholder instead. -->
+        <div class="flex-1 min-w-0 pt-6 relative"
+             :style="(loading && !results.length) ? 'min-height:420px' : ''">
+
+            <div x-show="loading || paginationLoading" x-cloak class="ahy-products-loader-overlay">
+                <div class="ahy-page-loader" style="margin:0;"></div>
+            </div>
 
             <!-- ── Mobile filter/sort toolbar ──────────────── -->
-            <div class="md:hidden" x-show="!loading && results.length > 0">
+            <div class="md:hidden" x-show="results.length > 0">
                 <div class="flex items-center gap-4 py-4">
                     <!-- FILTER BY pill -->
                     <button @click="mobileFiltersOpen = !mobileFiltersOpen; mobileSortOpen = false"
@@ -795,7 +806,7 @@ function ahyModalSearch(productsApiUrl, searchToken, addToCartUrl) {
             </div>
 
             <!-- Sort row (desktop) -->
-            <div class="hidden md:flex items-center justify-end mb-5" x-show="!loading && results.length > 0">
+            <div class="hidden md:flex items-center justify-end mb-5" x-show="results.length > 0">
                 <div x-data="{ open: false }" class="relative flex items-center gap-1 text-sm text-ahy-blue">
                     <span>Sort by:</span>
                     <button @click="open = !open" class="font-bold flex items-center gap-1 ml-1">
@@ -822,22 +833,17 @@ function ahyModalSearch(productsApiUrl, searchToken, addToCartUrl) {
                 Did you mean <a class="text-ahy-blue font-semibold hover:underline cursor-pointer" @click.prevent="searchExact(suggestedQuery)" x-text="'&quot;' + suggestedQuery + '&quot;'"></a>?
             </div>
 
-            <!-- Modal loader — white blurred backdrop, shown for both the initial load and every pagination fetch -->
-            <div x-show="loading || paginationLoading" x-cloak class="ahy-modal-loader-overlay">
-                <div class="ahy-page-loader" style="margin:0;"></div>
-            </div>
-
             <?= /* @noEscape */ $block->getChildHtml("header_zero_results") ?>
 
             <!-- Desktop product grid -->
-            <div x-show="!loading && results.length > 0" class="hidden md:grid grid-cols-2 xl:grid-cols-3 gap-0.5">
+            <div x-show="results.length > 0" class="hidden md:grid grid-cols-2 xl:grid-cols-3 gap-0.5">
                 <template x-for="(product, index) in sortedResults()" :key="product.sku || product.product_id">
                     <?= /* @noEscape */ $block->getChildHtml("header_product_card_desktop") ?>
                 </template>
             </div>
 
             <!-- Mobile product list (< 640px horizontal, 640–768px padded) -->
-            <div x-show="!loading && results.length > 0" class="md:hidden flex flex-col gap-0.5">
+            <div x-show="results.length > 0" class="md:hidden flex flex-col gap-0.5">
                 <template x-for="(product, index) in sortedResults()" :key="'m-' + (product.sku || product.product_id)">
                     <?= /* @noEscape */ $block->getChildHtml("header_product_card_mobile") ?>
                 </template>
