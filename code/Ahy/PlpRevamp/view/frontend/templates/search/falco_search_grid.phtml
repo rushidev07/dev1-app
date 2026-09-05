@@ -791,6 +791,30 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                 const brandParam = params.get('brand');
                 if (brandParam) this.autoBrand = brandParam;
                 if (params.get('bypass_spell') === '1') this.bypassSpell = true;
+                if (params.get('price_min')) this.activePriceMin = params.get('price_min');
+                if (params.get('price_max')) this.activePriceMax = params.get('price_max');
+                if (this.activePriceMin || this.activePriceMax) {
+                    this.activePriceRange = this.priceRangeBuckets().find(b =>
+                        String(b.min) === this.activePriceMin && String(b.max) === this.activePriceMax
+                    ) || null;
+                }
+                // q/page/sort/tracking params are not facet filters. `brand` is
+                // restored separately above via autoBrand (matched against facet
+                // options once fetch() returns them, see buildFilters()) rather than
+                // as a plain activeFilters entry here, so it stays excluded to avoid
+                // double-adding it. Mirrors category/falco_product_grid.phtml's init().
+                const NON_FILTER_PARAMS = [
+                    'q', 'p', 'sort', 'price_min', 'price_max', 'brand', 'bypass_spell',
+                    '___store', '___from_store', 'SID', 'sid',
+                    'gclid', 'fbclid', 'msclkid', 'dclid', 'ttclid', 'igshid', 'mc_cid', 'mc_eid',
+                    'product_list_order', 'product_list_dir', 'product_list_limit', 'product_list_mode'
+                ];
+                params.forEach((value, key) => {
+                    if (NON_FILTER_PARAMS.includes(key) || key.startsWith('utm_')) return;
+                    value.split('|').forEach(v => {
+                        if (v) this.activeFilters.push({ key, label: key, value: v });
+                    });
+                });
 
                 const startFetch = () => {
                     window.ahyTokenRefresh?.get().then(t => {
@@ -993,6 +1017,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                 if (idx >= 0) this.activeFilters.splice(idx, 1);
                 else this.activeFilters.push({ key, label, value });
                 this.page = 1;
+                this._writeUrl();
                 this._scrollToResults();
                 this.fetch();
             },
@@ -1000,13 +1025,14 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
             removeFilter(key, value) {
                 this.activeFilters = this.activeFilters.filter(f => !(f.key === key && f.value === value));
                 this.page = 1;
+                this._writeUrl();
                 this._scrollToResults();
                 this.fetch();
             },
 
-            applyPriceFilter() { this.page = 1; this._scrollToResults(); this.fetch(); },
-            clearPriceFilter() { this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._scrollToResults(); this.fetch(); },
-            clearAllFilters() { this.activeFilters = []; this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._scrollToResults(); this.fetch(); },
+            applyPriceFilter() { this.page = 1; this._writeUrl(); this._scrollToResults(); this.fetch(); },
+            clearPriceFilter() { this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._writeUrl(); this._scrollToResults(); this.fetch(); },
+            clearAllFilters() { this.activeFilters = []; this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._writeUrl(); this._scrollToResults(); this.fetch(); },
 
             priceRangeBuckets() {
                 if (this.priceRange.min === null) return [];
@@ -1048,8 +1074,30 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                 window.scrollTo({ top: y, behavior: 'smooth' });
             },
 
-            goToPage(p) { this.page = p; this.paginationLoading = true; this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollToResults()); }); },
-            setSort(val) { this.sort = val; },
+            // Mirrors category/falco_product_grid.phtml's _writeUrl(). Rebuilds the
+            // whole query string from scratch, so `q`/`bypass_spell` are included
+            // here too — otherwise paginating/filtering would silently drop the
+            // search term itself from the address bar.
+            _writeUrl() {
+                const params = new URLSearchParams();
+                params.set('q', this.searchQuery);
+                if (this.bypassSpell) params.set('bypass_spell', '1');
+                if (this.page > 1) params.set('p', this.page);
+                if (this.sort !== 'relevance') params.set('sort', this.sort);
+                if (this.activePriceMin !== '') params.set('price_min', this.activePriceMin);
+                if (this.activePriceMax !== '') params.set('price_max', this.activePriceMax);
+                const filterMap = {};
+                this.activeFilters.forEach(f => {
+                    if (!filterMap[f.key]) filterMap[f.key] = [];
+                    filterMap[f.key].push(f.value);
+                });
+                Object.entries(filterMap).forEach(([key, vals]) => params.set(key, vals.join('|')));
+                const qs = params.toString();
+                window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+            },
+
+            goToPage(p) { this.page = p; this._writeUrl(); this.paginationLoading = true; this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollToResults()); }); },
+            setSort(val) { this.sort = val; this._writeUrl(); },
             sortLabel() {
                 return { relevance: 'Relevance', price_asc: 'Low to High', price_desc: 'High to Low' }[this.sort] || 'Relevance';
             },
