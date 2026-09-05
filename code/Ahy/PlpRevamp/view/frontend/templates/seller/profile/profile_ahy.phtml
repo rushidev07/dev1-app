@@ -1065,6 +1065,14 @@ document.addEventListener('alpine:init', () => {
             console.log('%c[FalcoSense PLP][profile_ahy.phtml] build: scroll-fix-2026-08-14', 'color:#0d2f47;font-weight:bold;');
             const params = new URLSearchParams(window.location.search);
             this.page = parseInt(params.get('p') || '1', 10);
+            // Normalize `p` into the URL on first load too (not just on later clicks),
+            // without touching any other param — matches goToPage()'s own unconditional
+            // p write below, and avoids stripping tracking params by rebuilding the URL.
+            if (!params.has('p')) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('p', this.page);
+                history.replaceState(history.state, '', url);
+            }
             await Promise.all([this.fetchFilters(), this.fetchProducts()]);
             // Landing directly on page 2+ (a reload, or a shared/bookmarked link)
             // would otherwise leave the shopper sitting above the banner/bio/tabs

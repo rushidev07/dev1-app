@@ -745,6 +745,15 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
             window.addEventListener('ahy-token-refreshed', e => { this.searchToken = e.detail; });
             const params = new URLSearchParams(window.location.search);
             this.page = parseInt(params.get('p') || '1', 10);
+            // Normalize `p` into the URL on first load too (not just on later clicks),
+            // without touching any other param — a full _writeUrl() rebuild here would
+            // also strip tracking params (gclid/fbclid/utm_*/etc.) before marketing
+            // scripts elsewhere on the page get a chance to read them from the URL.
+            if (!params.has('p')) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('p', this.page);
+                history.replaceState(null, '', url);
+            }
             const sortParam = params.get('sort');
             if (sortParam) this.sort = sortParam;
             if (params.get('price_min')) this.activePriceMin = params.get('price_min');
@@ -907,7 +916,7 @@ function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformS
 
         _writeUrl() {
             const params = new URLSearchParams();
-            if (this.page > 1) params.set('p', this.page);
+            params.set('p', this.page);
             if (this.sort !== 'relevance') params.set('sort', this.sort);
             if (this.activePriceMin !== '') params.set('price_min', this.activePriceMin);
             if (this.activePriceMax !== '') params.set('price_max', this.activePriceMax);

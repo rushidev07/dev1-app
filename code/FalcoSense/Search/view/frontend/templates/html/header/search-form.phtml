@@ -562,7 +562,7 @@ function ahyModalSearch(productsApiUrl, searchToken, addToCartUrl) {
        goToPage(p) {
            this.page = p;
            const url = new URL(window.location.href);
-           if (p > 1) { url.searchParams.set('p', p); } else { url.searchParams.delete('p'); }
+           url.searchParams.set('p', p);
            history.replaceState(history.state, '', url);
            this.paginationLoading = true;
            this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollModalToTop()); });
