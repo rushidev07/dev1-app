@@ -1,0 +1,78 @@
+<?php
+/**
+ * PDP-only stock status: adds "(X of Y in stock)" - X = number of
+ * configurable variants (color/size children) currently salable,
+ * Y = total number of variants. Simple products show "(N in stock)"
+ * using their own stock qty.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\StockStatus;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Magento\Catalog\Model\Product;
+use Magento\ConfigurableProduct\Model\Product\Type\Configurable;
+use Magento\Framework\Escaper;
+
+/** @var StockStatus $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var CurrentProduct $currentProduct */
+$currentProduct = $viewModels->require(CurrentProduct::class);
+
+/** @var Product $product */
+$product = $block->hasData('product')
+    ? $block->getData('product')
+    : $currentProduct->get();
+
+if (!$product || !$product->getId()) {
+    return;
+}
+
+$variantCountText = '';
+if ($product->getTypeId() === Configurable::TYPE_CODE) {
+    $stockRegistry = $block->getStockRegistry();
+    $typeInstance = $product->getTypeInstance();
+    $children = $typeInstance->getUsedProducts($product);
+    $totalVariants = count($children);
+    if ($totalVariants > 0) {
+        $inStockVariants = 0;
+        foreach ($children as $child) {
+            $stockItem = $stockRegistry->getStockItem($child->getId());
+            if ($stockItem->getIsInStock() && (float) $stockItem->getQty() > 0) {
+                $inStockVariants++;
+            }
+        }
+        $variantCountText = sprintf('%d of %d in stock', $inStockVariants, $totalVariants);
+    }
+} elseif ($product->getIsSalable()) {
+    $stockRegistry = $block->getStockRegistry();
+    $stockItem = $stockRegistry->getStockItem($product->getId());
+    $qty = (int) $stockItem->getQty();
+    if ($qty > 0) {
+        $variantCountText = sprintf('%d in stock', $qty);
+    }
+}
+?>
+<?php if ($block->getParentBlock()->displayProductStockStatus()): ?>
+    <div class="flex items-center flex-wrap gap-x-1.5 pt-1">
+        <?php if ($product->getIsSalable()): ?>
+            <p class="flex items-center justify-start align-middle available gap-x-1.5 stock"
+               title="<?= $escaper->escapeHtmlAttr(__('Availability')) ?>">
+                <span class="w-2.5 h-2.5 bg-green-500 rounded-full shrink-0"></span>
+                <span class="text-sm font-semibold whitespace-nowrap"><?= $escaper->escapeHtml(__('In stock')) ?></span>
+            </p>
+        <?php else: ?>
+            <p class="flex items-center justify-start align-middle gap-x-1.5 unavailable stock"
+               title="<?= $escaper->escapeHtmlAttr(__('Availability')) ?>">
+                <span class="w-2.5 h-2.5 bg-red-500 rounded-full shrink-0"></span>
+                <span class="text-sm whitespace-nowrap"><?= $escaper->escapeHtml(__('Out of stock')) ?></span>
+            </p>
+        <?php endif; ?>
+        <?php if ($variantCountText !== ''): ?>
+            <span class="text-xs whitespace-nowrap ml-1" style="color:#5c656b;">(<?= $escaper->escapeHtml(__($variantCountText)) ?>)</span>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>

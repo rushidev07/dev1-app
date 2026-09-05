@@ -1,0 +1,169 @@
+<?php
+/**
+ * PDP "Seller Info" tab content - real seller data (Webkul\Marketplace)
+ * plus real seller-level rating/reviews, response time
+ * (Webkul\MpSellerBuyerCommunication) and fulfilled-order count. Only
+ * rendered when the product has a marketplace seller assigned -
+ * details-tabs.phtml hides this tab entirely otherwise.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\SellerInfo;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ProductPage;
+use Magento\Catalog\Model\Product;
+
+/** @var SellerInfo $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+
+/** @var Product $product */
+$product = $productViewModel->getProduct();
+
+$marketplaceHelper = $this->helper('Webkul\Marketplace\Helper\data');
+$ordersHelper       = $this->helper('Webkul\Marketplace\Helper\Orders');
+$responseTimeHelper = $this->helper('Webkul\MpSellerBuyerCommunication\Helper\Data');
+
+$seller    = $marketplaceHelper->getSellerProductDataByProductId($product->getId());
+$hasSeller = isset($seller->getData()[0]) && $seller->getData()[0];
+
+if ($hasSeller) {
+    $sellerObj   = $seller->getData()[0];
+    $sellerId    = (int) $sellerObj['seller_id'];
+    $sellerData  = $marketplaceHelper->getSellerDataBySellerId($sellerId)->getData()[0] ?? [];
+
+    $shopTitle = ($sellerData['shop_title'] ?? '') !== ''
+        ? $sellerData['shop_title']
+        : (($sellerData['name'] ?? '') !== '' ? $sellerData['name'] : 'Seller Name Not Available');
+    $shopUrl           = $sellerData['shop_url'] ?? '';
+    $sellerDescription = $sellerData['company_description'] ?? '';
+    $sellerLogo        = $sellerData['logo_pic'] ?? '';
+    $sellerSinceYear   = !empty($sellerData['created_at']) ? date('Y', strtotime($sellerData['created_at'])) : null;
+
+    $initials = '';
+    foreach (array_slice(preg_split('/\s+/', trim($shopTitle)), 0, 2) as $word) {
+        $initials .= mb_strtoupper(mb_substr($word, 0, 1));
+    }
+
+    $feedTotal   = $marketplaceHelper->getFeedTotal($sellerId);
+    $reviewCount = (int) ($feedTotal['feedcount'] ?? 0);
+    $avgRating   = $reviewCount > 0 ? $marketplaceHelper->getSelleRating($sellerId) : 0.0;
+    $positiveFeedbackPct = $reviewCount > 0 ? (int) round(($avgRating * 100) / 5) : null;
+
+    $ordersFulfilled = (int) $ordersHelper->getSellerOrders($sellerId);
+
+    $avgResponseMinutes = (float) $responseTimeHelper->getResponseTimeOfSeller($sellerId);
+    if ($avgResponseMinutes <= 0) {
+        $avgResponseLabel = null;
+    } elseif ($avgResponseMinutes < 60) {
+        $avgResponseLabel = round($avgResponseMinutes) . 'm';
+    } else {
+        $avgResponseLabel = round($avgResponseMinutes / 60) . 'hr';
+    }
+
+    $viewAllProductsUrl = $shopUrl !== '' ? $marketplaceHelper->getRewriteUrl('marketplace/seller/collection/shop/' . $shopUrl) : '';
+
+    /**
+     * Admin-configured fallback (Stores > Configuration > General > PDP
+     * Seller Info), matched by seller name - only fills in a value when the
+     * real Webkul data for that field is missing, it never overwrites real
+     * data. Rating and review count are only applied together (both blank
+     * or both set) so the two never disagree with each other on the
+     * storefront.
+     */
+    $sellerInfoOverride = $block->getSellerInfoOverride($shopTitle, (string) ($sellerData['name'] ?? ''));
+    if ($sellerInfoOverride) {
+        if (!$sellerSinceYear && trim((string) ($sellerInfoOverride['since_year'] ?? '')) !== '') {
+            $sellerSinceYear = (int) $sellerInfoOverride['since_year'];
+        }
+        if ($reviewCount <= 0
+            && trim((string) ($sellerInfoOverride['rating'] ?? '')) !== ''
+            && trim((string) ($sellerInfoOverride['review_count'] ?? '')) !== ''
+        ) {
+            $avgRating = (float) $sellerInfoOverride['rating'];
+            $reviewCount = (int) $sellerInfoOverride['review_count'];
+            $positiveFeedbackPct = (int) round(($avgRating * 100) / 5);
+        }
+        if ($avgResponseLabel === null && trim((string) ($sellerInfoOverride['response_time'] ?? '')) !== '') {
+            $avgResponseLabel = (string) $sellerInfoOverride['response_time'];
+        }
+        if ($ordersFulfilled <= 0 && trim((string) ($sellerInfoOverride['orders_fulfilled'] ?? '')) !== '') {
+            $ordersFulfilled = (int) $sellerInfoOverride['orders_fulfilled'];
+        }
+    }
+}
+?>
+    <section class="meet-seller-tabs">
+        <h3 class="font-bold text-lg uppercase italic text-ahy-blue border-b-2 border-[#c0392b] inline-block pb-1 mb-4 ">
+            <?= __('Seller Info') ?>
+        </h3>
+        <div class="flex gap-4 items-center pb-2">
+            <?php if ($sellerLogo !== ''): ?>
+                <img src="/media/avatar/<?= $escaper->escapeHtmlAttr($sellerLogo) ?>" alt="<?= $escaper->escapeHtmlAttr(trim($shopTitle)) ?>" class="w-16 h-16 aspect-square object-cover rounded-full">
+            <?php else: ?>
+                <div class="w-16 h-16 rounded-full bg-ahy-blue text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    <?= $escaper->escapeHtml($initials) ?>
+                </div>
+            <?php endif; ?>
+            <div>
+                <div class="font-bold text-ahy-blue text-xl">
+                    <?= $escaper->escapeHtml(trim($shopTitle)) ?>
+                </div>
+                <?php if ($sellerSinceYear): ?>
+                    <div class="text-sm" style="color:#6b7688;">
+                        <?= __('Seller on Everest.com since %1', $sellerSinceYear) ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($reviewCount > 0): ?>
+                    <div class="flex items-center gap-2 pt-1">
+                        <span class="flex items-center" style="gap:2px;">
+                            <?php for ($i = 1; $i <= 5; $i++): ?>
+                                <span style="color: <?= $i <= round($avgRating) ? '#f0b429' : '#d4d4d8' ?>">&#9733;</span>
+                            <?php endfor; ?>
+                        </span>
+                        <span class="text-sm" style="color:#6b7688;">
+                            <?= $escaper->escapeHtml(number_format((float) $avgRating, 1)) ?> (<?= $escaper->escapeHtml((string) $reviewCount) ?> <?= __('seller reviews') ?>)
+                        </span>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if ($sellerDescription !== ''): ?>
+            <div class="prose mt-4 p-4 rounded-lg" style="background-color:#F7F6F5 !important;">
+                <?= /* @noEscape */ $sellerDescription ?>
+            </div>
+        <?php endif; ?>
+
+        <div class="grid grid-cols-3 gap-3 mt-6">
+            <?php if ($positiveFeedbackPct !== null): ?>
+                <div class="rounded-lg p-4 text-center" style="background-color:#FBFAF9 !important;">
+                    <div class="font-bold text-2xl text-ahy-blue"><?= $positiveFeedbackPct ?>%</div>
+                    <div class="text-xs mt-1" style="color:#6b7688;"><?= __('Positive Feedback') ?></div>
+                </div>
+            <?php endif; ?>
+            <?php if ($avgResponseLabel !== null): ?>
+                <div class="rounded-lg p-4 text-center" style="background-color:#FBFAF9 !important;">
+                    <div class="font-bold text-2xl text-ahy-blue"><?= $escaper->escapeHtml($avgResponseLabel) ?></div>
+                    <div class="text-xs mt-1" style="color:#6b7688;"><?= __('Avg. Response Time') ?></div>
+                </div>
+            <?php endif; ?>
+            <?php if ($ordersFulfilled > 0): ?>
+                <div class="rounded-lg p-4 text-center" style="background-color:#FBFAF9 !important;">
+                    <div class="font-bold text-2xl text-ahy-blue"><?= number_format($ordersFulfilled) ?>+</div>
+                    <div class="text-xs mt-1" style="color:#6b7688;"><?= __('Orders Fulfilled') ?></div>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($viewAllProductsUrl !== ''): ?>
+            <div class="text-sm font-semibold mt-4" style="color:#e85d26;">
+                <a href="<?= $escaper->escapeUrl($viewAllProductsUrl) ?>" class="hover:underline underline-offset-6">
+                    <?= __('View All Products by %1', trim($shopTitle)) ?> &rarr;
+                </a>
+            </div>
+        <?php endif; ?>
+    </section>

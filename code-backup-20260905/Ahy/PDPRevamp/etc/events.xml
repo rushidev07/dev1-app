@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--
+    Order placement is observed globally, not per-area: an order can be placed
+    from the storefront, the admin, the REST API or a cron job, and the claim's
+    is_redeemed flag has to be right in every one of those cases.
+
+    The customer register/login bindings live in etc/frontend/events.xml instead,
+    since an admin creating a customer is not someone claiming a popup coupon.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="sales_order_place_after">
+        <observer name="ahy_pdprevamp_mark_exit_coupon_redeemed"
+                  instance="Ahy\PDPRevamp\Observer\MarkExitCouponRedeemed"/>
+    </event>
+</config>

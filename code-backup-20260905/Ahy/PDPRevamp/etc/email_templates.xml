@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Email:etc/email_templates.xsd">
+    <template id="pdprevamp_exit_popup_general_email_template"
+              label="Welcome Discount Code"
+              file="exit_popup_discount.html"
+              type="html"
+              module="Ahy_PDPRevamp"
+              area="frontend"/>
+    <template id="pdprevamp_exit_popup_discount_email"
+              label="Welcome Discount Code (legacy id)"
+              file="exit_popup_discount.html"
+              type="html"
+              module="Ahy_PDPRevamp"
+              area="frontend"/>
+</config>

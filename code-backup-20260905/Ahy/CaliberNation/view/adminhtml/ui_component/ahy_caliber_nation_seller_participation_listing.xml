@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">ahy_caliber_nation_seller_participation_listing.ahy_caliber_nation_seller_participation_listing_data_source</item>
+        </item>
+        <item name="buttons" xsi:type="array">
+            <item name="add" xsi:type="array">
+                <item name="name" xsi:type="string">add</item>
+                <item name="label" xsi:type="string" translate="true">Add Seller</item>
+                <item name="class" xsi:type="string">primary</item>
+                <item name="url" xsi:type="string">*/*/new</item>
+            </item>
+        </item>
+    </argument>
+    <settings>
+        <spinner>seller_participation_columns</spinner>
+        <deps>
+            <dep>ahy_caliber_nation_seller_participation_listing.ahy_caliber_nation_seller_participation_listing_data_source</dep>
+        </deps>
+    </settings>
+
+    <dataSource name="ahy_caliber_nation_seller_participation_listing_data_source"
+                component="Magento_Ui/js/grid/provider">
+        <settings>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Ahy_CaliberNation::seller_pricing</aclResource>
+        <dataProvider name="ahy_caliber_nation_seller_participation_listing_data_source"
+                      class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider">
+            <settings>
+                <requestFieldName>entity_id</requestFieldName>
+                <primaryFieldName>entity_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+
+    <listingToolbar name="listing_top">
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
+        <filters name="listing_filters"/>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+
+    <columns name="seller_participation_columns">
+        <column name="entity_id">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">ID</label>
+                <sorting>desc</sorting>
+            </settings>
+        </column>
+        <column name="seller_id">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Seller ID</label>
+            </settings>
+        </column>
+        <!-- Shop name resolved in the grid collection (shop_title -> shop_url ->
+             customer name), so admins can identify a seller without knowing ids. -->
+        <column name="seller_name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Seller Name</label>
+            </settings>
+        </column>
+        <column name="is_enabled" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <filter>select</filter>
+                <options class="Magento\Config\Model\Config\Source\Yesno"/>
+                <dataType>select</dataType>
+                <label translate="true">Participating</label>
+            </settings>
+        </column>
+        <column name="discount_type" component="Magento_Ui/js/grid/columns/select">
+            <settings>
+                <filter>select</filter>
+                <options class="Ahy\CaliberNation\Model\Config\Source\DiscountType"/>
+                <dataType>select</dataType>
+                <label translate="true">Discount Type</label>
+            </settings>
+        </column>
+        <column name="discount_value" class="Ahy\CaliberNation\Ui\Component\Listing\Column\DecimalValue">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">Discount Value</label>
+            </settings>
+        </column>
+        <column name="updated_at" class="Magento\Ui\Component\Listing\Columns\Date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Updated</label>
+            </settings>
+        </column>
+        <actionsColumn name="actions" class="Ahy\CaliberNation\Ui\Component\Listing\Column\SellerPricingActions">
+            <settings>
+                <indexField>entity_id</indexField>
+            </settings>
+        </actionsColumn>
+    </columns>
+</listing>

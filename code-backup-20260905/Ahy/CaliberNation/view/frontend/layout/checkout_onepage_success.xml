@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <!-- Expose "did this order create a membership?" to the success template. -->
+        <referenceBlock name="checkout.success">
+            <arguments>
+                <argument name="cn_success" xsi:type="object">Ahy\CaliberNation\ViewModel\Checkout\SuccessMembership</argument>
+            </arguments>
+        </referenceBlock>
+    </body>
+</page>

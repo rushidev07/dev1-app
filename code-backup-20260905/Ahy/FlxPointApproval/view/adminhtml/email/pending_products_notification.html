@@ -1,0 +1,12 @@
+<!--@subject New FlxPoint products awaiting approval @-->
+{{template config_path="design/email/header_template"}}
+
+<p>Hello,</p>
+
+<p><strong>{{var pending_count}}</strong> new product(s) from FlxPoint {{depend pending_count}}have{{/depend}} been staged and are waiting for your approval before they go live in the catalog.</p>
+
+<p>
+    <a href="{{var approval_url}}" target="_blank">Review pending products</a>
+</p>
+
+{{template config_path="design/email/footer_template"}}

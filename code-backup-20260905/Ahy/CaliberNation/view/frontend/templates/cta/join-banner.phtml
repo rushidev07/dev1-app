@@ -1,0 +1,41 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+/** @var \Ahy\CaliberNation\ViewModel\JoinCta $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel || !$viewModel->shouldShow()) {
+    return;
+}
+
+/*
+ * The CTA opens the inline signup modal only where a listener for the
+ * "open-caliber-signup" event is actually on the page — currently just the account
+ * registration page, which renders cta/register-signup-modal.phtml. Anywhere else
+ * (cart, etc.) it must be a real link to the landing page, otherwise the click is a
+ * silent no-op. Placements opt in with <argument name="use_modal">true</argument>.
+ */
+$useModal = (bool) $block->getData('use_modal');
+$ctaClass = 'shrink-0 inline-flex items-center justify-center bg-ahy-red hover:bg-ahy-red-light'
+    . ' text-white font-bold rounded-full px-6 h-11 transition-colors';
+?>
+<div class="cn-join-banner flex flex-col sm:flex-row items-center justify-between gap-3
+            bg-ahy-blue text-white rounded-lg px-5 py-4 my-4">
+    <div class="text-sm md:text-base">
+        <span class="font-bold">Members save more.</span>
+        Join Caliber Nation for exclusive pricing, early access and member-only deals.
+    </div>
+    <?php if ($useModal): ?>
+    <button type="button"
+            x-data="{}"
+            @click="$dispatch('open-caliber-signup')"
+            class="<?= /* @noEscape */ $ctaClass ?>">
+        <?= $escaper->escapeHtml(__('Join & Save')) ?>
+    </button>
+    <?php else: ?>
+    <a href="<?= $escaper->escapeUrl($viewModel->getJoinUrl()) ?>"
+       class="<?= /* @noEscape */ $ctaClass ?>">
+        <?= $escaper->escapeHtml(__('Join & Save')) ?>
+    </a>
+    <?php endif; ?>
+</div>

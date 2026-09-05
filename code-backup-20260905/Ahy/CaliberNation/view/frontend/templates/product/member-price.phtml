@@ -1,0 +1,61 @@
+<?php
+/**
+ * Copyright © Ahy consulting All rights reserved.
+ * Caliber Nation member price box for the product detail page.
+ *
+ * Restores the green "CALIBERNATION PRICE" treatment that Ahy_PDPRevamp originally
+ * shipped (and later stripped, back when the member price was a dummy 15%-off stub).
+ * The numbers here come from the REAL pricing engine via MemberProductPrice, so the
+ * additive membership + seller + category + product layers and the global cap all apply.
+ *
+ * CACHING: the price is a marketing teaser, identical for every viewer of a given
+ * product, so it is rendered server-side and is safe to full-page-cache. The label is
+ * always "Calibernation Price" — a statement of what members pay, not a claim that the
+ * viewer is one. Only the soft "Not a member? Join now" line is toggled client-side from
+ * the `caliber-nation-savings` customer-data section, so a briefly stale section merely
+ * shows or hides a link rather than making a wrong claim.
+ *
+ * @var \Magento\Catalog\Block\Product\View $block
+ */
+$viewModel = $block->getData('memberPriceViewModel');
+$product   = $block->getProduct();
+
+if (!$viewModel || !$product || !$viewModel->isEnabled() || !$viewModel->hasMemberPrice($product)) {
+    return;
+}
+
+$memberPrice  = $viewModel->getFormattedMemberPrice($product);
+// $regularPrice = $viewModel->getFormattedRegularPrice($product);
+$savings      = $viewModel->getFormattedSavings($product);
+?>
+<div class="caliber-member-price mt-3 space-y-2"
+     x-data="{ member: false }"
+     @private-content-loaded.window="if ($event.detail.data['caliber-nation-savings']) member = !!$event.detail.data['caliber-nation-savings'].member">
+
+    <?php /* Member price — the headline. Green ties it to the savings language used
+             elsewhere in the PDP, and keeps it visually distinct from the plain
+             catalogue price above. */ ?>
+    <div class="inline-flex items-center gap-3 rounded-lg border border-green-600 bg-green-50 px-4 py-2">
+        <span class="text-[11px] font-bold uppercase tracking-wide text-green-800">
+            <?= $block->escapeHtml(__('Calibernation Price')) ?>
+        </span>
+        <span class="text-3xl font-bold leading-none text-green-700">
+            <?= /* @noEscape */ $memberPrice ?>
+        </span>
+    </div>
+
+    <?php /* Savings badge + join prompt. The prompt is hidden for confirmed members. */ ?>
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="rounded-full bg-green-700 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+            <?= $block->escapeHtml(__('Exclusive Member Savings')) ?>
+        </span>
+        <span class="font-semibold text-green-700"><?= $block->escapeHtml(__('Save %1', $savings)) ?></span>
+        <span x-show="!member" x-cloak class="text-gray-600">
+            <?= $block->escapeHtml(__('Not a member?')) ?>
+            <a href="<?= $block->escapeUrl($block->getUrl('caliber-nation')) ?>"
+               class="font-semibold text-green-700 underline hover:no-underline">
+                <?= $block->escapeHtml(__('Join now')) ?>
+            </a>
+        </span>
+    </div>
+</div>

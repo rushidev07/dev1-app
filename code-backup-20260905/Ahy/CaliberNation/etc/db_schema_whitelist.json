@@ -1,0 +1,133 @@
+{
+    "ahy_caliber_nation_membership": {
+        "column": {
+            "entity_id": true,
+            "customer_id": true,
+            "status": true,
+            "tier": true,
+            "start_date": true,
+            "renewal_date": true,
+            "auto_renew": true,
+            "payment_token_id": true,
+            "is_trial": true,
+            "lifetime_savings": true,
+            "created_at": true,
+            "updated_at": true,
+            "renewal_reminder_sent_at": true,
+            "winback_email_sent_at": true
+        },
+        "index": {
+            "AHY_CALIBER_NATION_MEMBERSHIP_STATUS": true,
+            "AHY_CALIBER_NATION_MEMBERSHIP_RENEWAL_DATE": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AHY_CALIBER_NATION_MEMBERSHIP_CUSTOMER_ID": true,
+            "AHY_CALIBER_NATION_MEMBERSHIP_CSTR_ID_CSTR_ENTT_ENTT_ID": true,
+            "FK_3C750DA66D6518D7E953066F78769116": true
+        }
+    },
+    "ahy_caliber_nation_activity_log": {
+        "column": {
+            "entity_id": true,
+            "customer_id": true,
+            "admin_user_id": true,
+            "action": true,
+            "detail": true,
+            "order_id": true,
+            "created_at": true
+        },
+        "index": {
+            "AHY_CALIBER_NATION_ACTIVITY_LOG_CUSTOMER_ID": true,
+            "AHY_CALIBER_NATION_ACTIVITY_LOG_ACTION": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_caliber_nation_renewal_log": {
+        "column": {
+            "entity_id": true,
+            "membership_id": true,
+            "customer_id": true,
+            "result": true,
+            "amount": true,
+            "payment_token_id": true,
+            "transaction_id": true,
+            "order_id": true,
+            "error_message": true,
+            "created_at": true
+        },
+        "index": {
+            "AHY_CALIBER_NATION_RENEWAL_LOG_MEMBERSHIP_ID": true,
+            "AHY_CALIBER_NATION_RENEWAL_LOG_RESULT": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_caliber_nation_seller_participation": {
+        "column": {
+            "entity_id": true,
+            "seller_id": true,
+            "is_enabled": true,
+            "discount_type": true,
+            "discount_value": true,
+            "is_early_access": true,
+            "early_access_member_start_at": true,
+            "early_access_public_start_at": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "AHY_CALIBER_NATION_SELLER_PARTICIPATION_IS_ENABLED": true,
+            "AHY_CLBR_NTN_SELLER_PARTICIPATION_IS_EARLY_ACCESS": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AHY_CALIBER_NATION_SELLER_PARTICIPATION_SELLER_ID": true
+        }
+    },
+    "ahy_caliber_nation_member_price_rule": {
+        "column": {
+            "entity_id": true,
+            "scope": true,
+            "target_id": true,
+            "discount_type": true,
+            "discount_value": true,
+            "is_active": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "AHY_CALIBER_NATION_MEMBER_PRICE_RULE_SCOPE_TARGET_ID": true,
+            "AHY_CALIBER_NATION_MEMBER_PRICE_RULE_IS_ACTIVE": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_caliber_nation_order_savings": {
+        "column": {
+            "entity_id": true,
+            "order_id": true,
+            "order_item_id": true,
+            "customer_id": true,
+            "product_id": true,
+            "seller_id": true,
+            "regular_price": true,
+            "member_price": true,
+            "paid_price": true,
+            "savings": true,
+            "applied_rules": true,
+            "created_at": true
+        },
+        "index": {
+            "AHY_CALIBER_NATION_ORDER_SAVINGS_CUSTOMER_ID": true,
+            "AHY_CALIBER_NATION_ORDER_SAVINGS_ORDER_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    }
+}

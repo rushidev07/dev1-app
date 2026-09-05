@@ -1,0 +1,106 @@
+<?php
+/**
+ * Mobile product card for search/results.phtml, rendered once per page load
+ * as a static Alpine <template> fragment and looped client-side by x-for.
+ * No PHP variables are needed here — all data comes from the Alpine `product` scope.
+ */
+?>
+                    <div class="relative flex bg-white ahy-mobile-card">
+
+                        <div class="relative shrink-0" style="width:45%">
+                            <div class="absolute top-3 left-3 z-10"
+                                x-show="product.variants && product.variants.length <= 10 && product.variants.length > 0">
+                                <span
+                                    class="rounded border-2 border-ahy-stock-green bg-white px-2 py-0.5 text-xs font-semibold text-ahy-stock-green"
+                                    x-text="(product.variants || []).length + ' Left'"></span>
+                            </div>
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                                @click="trackClick(product, index + 1)" class="block h-full">
+                                <img :src="imgUrl(product.image)" :alt="product.name"
+                                    class="w-full h-full object-contain p-3"
+                                    :style="isFallbackImg(imgUrl(product.image)) ? 'min-height:160px;max-height:200px;opacity:0.45' : 'min-height:160px;max-height:200px'"
+                                    loading="eager" fetchpriority="high"
+                                    @error="handleImgError($event)" :data-original-src="product.image" />
+                            </a>
+                        </div>
+
+                        <div class="flex-1 min-w-0 flex flex-col px-3 py-4">
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                                class="font-bold text-ahy-blue leading-snug line-clamp-2" style="font-size:18px"
+                                x-text="cleanName(product.name)" @click="trackClick(product, index + 1)"></a>
+                            <p class="text-xs text-gray-500 mt-1 line-clamp-1"
+                                x-text="'Sold By ' + (product.brand || 'The Everest Marketplace')"></p>
+                            <div class="mt-2">
+                                <template
+                                    x-if="product.price && product.special_price && product.special_price < product.price">
+                                    <div>
+                                        <div class="text-ahy-red text-sm font-bold">Deal</div>
+                                        <div class="flex items-baseline gap-2">
+                                            <span class="text-2xl font-extrabold text-ahy-blue"
+                                                x-html="hyva.formatPrice(product.special_price)"></span>
+                                            <span class="text-sm text-gray-400 line-through"
+                                                x-html="hyva.formatPrice(product.price)"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template
+                                    x-if="product.price && (!product.special_price || product.special_price >= product.price)">
+                                    <div>
+                                        <span class="text-ahy-red text-sm font-bold" x-show="product.type === 'configurable'">From</span>
+                                        <div class="text-2xl font-extrabold text-ahy-blue"
+                                            x-html="hyva.formatPrice(product.price)"></div>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="text-sm text-gray-900 font-semibold mt-2" x-show="isFreeShipping(product)">FREE Shipping</p>
+                            <div class="flex items-center gap-2 mt-3">
+                                <template x-if="product.type !== 'configurable'">
+                                    <button @click.prevent="addSimpleToCart(product)"
+                                        :class="cartLoading[product.product_id] === true ? 'opacity-60 pointer-events-none' : ''"
+                                        class="flex flex-grow justify-center items-center gap-1.5 border-2 border-ahy-blue text-ahy-blue rounded-full px-3 py-1.5 text-sm font-bold">
+                                        <svg x-show="cartLoading[product.product_id] === true"
+                                            class="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                stroke-width="4" />
+                                            <path class="opacity-75" fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        <svg x-show="cartLoading[product.product_id] !== true"
+                                            class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        </svg>
+                                        <span
+                                            x-text="cartLoading[product.product_id] === true ? 'Adding…' : 'Add'"></span>
+                                    </button>
+                                </template>
+                                <template x-if="product.type === 'configurable'">
+                                    <button @click.prevent="$dispatch('ahy-cfg-modal-open', product)"
+                                        class="flex items-center border-2 border-ahy-blue text-ahy-blue rounded-full px-3 py-1.5 text-sm font-bold">
+                                        Options
+                                    </button>
+                                </template>
+                                <button @click.prevent="addToWishlist(product)"
+                                    :disabled="wishLoading[product.product_id] === true"
+                                    aria-label="Add to Wish List"
+                                    class="shrink-0 w-9 h-9 rounded-full border border-gray-300 bg-white flex items-center justify-center text-ahy-blue hover:text-red-500 transition">
+                                    <template x-if="wishLoading[product.product_id] === true">
+                                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                stroke-width="4" />
+                                            <path class="opacity-75" fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                    </template>
+                                    <template x-if="wishLoading[product.product_id] !== true">
+                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20"
+                                            fill="currentColor">
+                                            <path
+                                                d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z" />
+                                        </svg>
+                                    </template>
+                                </button>
+                            </div>
+                        </div>
+                    </div>

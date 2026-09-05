@@ -1,0 +1,449 @@
+<?php
+/**
+ * Review grid for one discount alert run.
+ *
+ * Follows the core admin grid layout: a Filters toggle and collapsible panel, applied
+ * filter chips, then a toolbar carrying the mass action, record count and pager, and the
+ * grid itself.
+ *
+ * Everything works without JavaScript. The filter panel opens by URL, both disable actions
+ * are real submit buttons, and the pager has a Go button, so JS only adds the confirmation
+ * dialogs, the live selection count and instant pager submits.
+ *
+ * The pager controls sit visually inside the POST form's toolbar but submit to a separate
+ * GET form through the HTML form attribute, because forms cannot be nested.
+ *
+ * @var \Ahy\DiscountAlert\Block\Adminhtml\Run\Items $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+use Ahy\DiscountAlert\Block\Adminhtml\Run\Items;
+
+$run           = $block->getRun();
+$items         = $block->getItems();
+$columns       = $block->getColumns();
+$totalPages    = $block->getTotalPages();
+$currentPage   = $block->getCurrentPage();
+$totalItems    = $block->getTotalItems();
+$actionable    = $block->getActionableCount();
+$revertable    = $block->getRevertableCount();
+$restorable    = $block->getRestorableCount();
+$activeFilters = $block->getActiveFilters();
+$panelOpen     = $block->isFilterPanelOpen();
+$pagerFormId   = 'ahy-da-pager-form';
+
+$jsConfig = [
+    'confirmTitle'    => (string) __('Disable products'),
+    'confirmSingle'   => (string) __('Disable this product? It will no longer be visible on the storefront.'),
+    'confirmMultiple' => (string) __('Disable the selected products? They will no longer be visible on the storefront.'),
+    'emptyMessage'    => (string) __('Select at least one product first.'),
+    'selectedText'    => (string) __('selected'),
+    'revertTitle'     => (string) __('Revert to MSRP'),
+    'revertSingle'    => (string) __('Show MSRP for this product? The discounted price is removed and the MSRP becomes the only price on the storefront.'),
+    'revertMultiple'  => (string) __('Show MSRP for the selected products? Their discounted prices are removed and the MSRP becomes the only price on the storefront.'),
+    'restoreTitle'    => (string) __('Restore discounted price'),
+    'restoreSingle'   => (string) __('Put the discounted price back on this product, as it was when the alert was sent?'),
+    'restoreMultiple' => (string) __('Put the discounted prices back on the selected products, as they were when the alert was sent?'),
+];
+?>
+<div class="admin__data-grid-outer-wrap ahy-da-grid">
+
+    <div class="ahy-da-breadcrumb">
+        <a href="<?= $escaper->escapeUrl($block->getListingUrl()) ?>">
+            &#8249; <?= $escaper->escapeHtml(__('Back to Discount Alerts')) ?>
+        </a>
+    </div>
+
+    <?php if ($run !== null && $run->isTruncated()): ?>
+        <div class="message message-warning">
+            <?= $escaper->escapeHtml(__(
+                'This run flagged %1 products but only the first %2 were recorded, because of the configured maximum per run.',
+                $run->getProductCount(),
+                $run->getItemCount()
+            )) ?>
+        </div>
+    <?php endif; ?>
+
+    <!-- Header: filter toggle -->
+    <div class="ahy-da-header">
+        <a href="<?= $escaper->escapeUrl($block->getFilterToggleUrl()) ?>"
+           class="ahy-da-filter-toggle<?= $panelOpen ? ' _active' : '' ?>">
+            <span><?= $escaper->escapeHtml(__('Filters')) ?></span>
+        </a>
+    </div>
+
+    <!-- Filter panel -->
+    <?php if ($panelOpen): ?>
+        <form action="<?= $escaper->escapeUrl($block->getResetUrl()) ?>" method="get" class="ahy-da-filter-panel">
+            <input type="hidden" name="run_id" value="<?= (int) $block->getRunId() ?>"/>
+            <input type="hidden" name="token" value="<?= $escaper->escapeHtmlAttr($block->getToken()) ?>"/>
+            <input type="hidden" name="<?= $escaper->escapeHtmlAttr(Items::PARAM_SORT) ?>"
+                   value="<?= $escaper->escapeHtmlAttr($block->getSortField()) ?>"/>
+            <input type="hidden" name="<?= $escaper->escapeHtmlAttr(Items::PARAM_DIR) ?>"
+                   value="<?= $escaper->escapeHtmlAttr($block->getSortDirection()) ?>"/>
+            <input type="hidden" name="<?= $escaper->escapeHtmlAttr(Items::PARAM_LIMIT) ?>"
+                   value="<?= (int) $block->getPageSize() ?>"/>
+            <input type="hidden" name="<?= $escaper->escapeHtmlAttr(Items::PARAM_SHOW_FILTERS) ?>" value="1"/>
+
+            <div class="ahy-da-filter-fields">
+                <div class="ahy-da-filter-field">
+                    <label class="admin__field-label" for="ahy-da-f-sku">
+                        <span><?= $escaper->escapeHtml(__('SKU')) ?></span>
+                    </label>
+                    <input type="text" id="ahy-da-f-sku" class="admin__control-text"
+                           name="<?= $escaper->escapeHtmlAttr(Items::PARAM_SKU) ?>"
+                           value="<?= $escaper->escapeHtmlAttr($block->getSkuFilter()) ?>"/>
+                </div>
+
+                <div class="ahy-da-filter-field">
+                    <label class="admin__field-label" for="ahy-da-f-name">
+                        <span><?= $escaper->escapeHtml(__('Product')) ?></span>
+                    </label>
+                    <input type="text" id="ahy-da-f-name" class="admin__control-text"
+                           name="<?= $escaper->escapeHtmlAttr(Items::PARAM_NAME) ?>"
+                           value="<?= $escaper->escapeHtmlAttr($block->getNameFilter()) ?>"/>
+                </div>
+
+                <div class="ahy-da-filter-field">
+                    <label class="admin__field-label" for="ahy-da-f-status">
+                        <span><?= $escaper->escapeHtml(__('Current Status')) ?></span>
+                    </label>
+                    <select id="ahy-da-f-status" class="admin__control-select"
+                            name="<?= $escaper->escapeHtmlAttr(Items::PARAM_STATUS) ?>">
+                        <?php foreach ($block->getStatusOptions() as $value => $label): ?>
+                            <option value="<?= $escaper->escapeHtmlAttr((string) $value) ?>"
+                                <?= $block->getStatusFilter() === (string) $value ? 'selected="selected"' : '' ?>>
+                                <?= $escaper->escapeHtml($label) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="ahy-da-filter-field">
+                    <label class="admin__field-label" for="ahy-da-f-price-state">
+                        <span><?= $escaper->escapeHtml(__('Live Price')) ?></span>
+                    </label>
+                    <select id="ahy-da-f-price-state" class="admin__control-select"
+                            name="<?= $escaper->escapeHtmlAttr(Items::PARAM_PRICE_STATE) ?>">
+                        <?php foreach ($block->getPriceStateOptions() as $value => $label): ?>
+                            <option value="<?= $escaper->escapeHtmlAttr((string) $value) ?>"
+                                <?= $block->getPriceStateFilter() === (string) $value ? 'selected="selected"' : '' ?>>
+                                <?= $escaper->escapeHtml($label) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="ahy-da-filter-field">
+                    <label class="admin__field-label" for="ahy-da-f-new">
+                        <span><?= $escaper->escapeHtml(__('Products')) ?></span>
+                    </label>
+                    <select id="ahy-da-f-new" class="admin__control-select"
+                            name="<?= $escaper->escapeHtmlAttr(Items::PARAM_NEW) ?>">
+                        <?php foreach ($block->getNewOptions() as $value => $label): ?>
+                            <option value="<?= $escaper->escapeHtmlAttr((string) $value) ?>"
+                                <?= $block->getFilterValue(Items::PARAM_NEW) === (string) $value ? 'selected="selected"' : '' ?>>
+                                <?= $escaper->escapeHtml($label) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="ahy-da-filter-field">
+                    <label class="admin__field-label">
+                        <span><?= $escaper->escapeHtml(__('Discount (%)')) ?></span>
+                    </label>
+                    <div class="ahy-da-filter-range">
+                        <span><?= $escaper->escapeHtml(__('from')) ?></span>
+                        <input type="text" class="admin__control-text"
+                               name="<?= $escaper->escapeHtmlAttr(Items::PARAM_DISCOUNT_FROM) ?>"
+                               value="<?= $escaper->escapeHtmlAttr($block->getFilterValue(Items::PARAM_DISCOUNT_FROM)) ?>"/>
+                        <span><?= $escaper->escapeHtml(__('to')) ?></span>
+                        <input type="text" class="admin__control-text"
+                               name="<?= $escaper->escapeHtmlAttr(Items::PARAM_DISCOUNT_TO) ?>"
+                               value="<?= $escaper->escapeHtmlAttr($block->getFilterValue(Items::PARAM_DISCOUNT_TO)) ?>"/>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ahy-da-filter-footer">
+                <a href="<?= $escaper->escapeUrl($block->getResetUrl()) ?>" class="ahy-da-link-cancel">
+                    <?= $escaper->escapeHtml(__('Cancel')) ?>
+                </a>
+                <button type="submit" class="action-secondary">
+                    <span><?= $escaper->escapeHtml(__('Apply Filters')) ?></span>
+                </button>
+            </div>
+        </form>
+    <?php endif; ?>
+
+    <!-- Applied filters -->
+    <?php if ($activeFilters): ?>
+        <div class="ahy-da-chips">
+            <span class="ahy-da-chips-label"><?= $escaper->escapeHtml(__('Active filters:')) ?></span>
+            <?php foreach ($activeFilters as $chip): ?>
+                <span class="ahy-da-chip">
+                    <?= $escaper->escapeHtml($chip['label']) ?>: <strong><?= $escaper->escapeHtml($chip['value']) ?></strong>
+                    <a href="<?= $escaper->escapeUrl($chip['removeUrl']) ?>"
+                       title="<?= $escaper->escapeHtmlAttr(__('Remove this filter')) ?>">&#215;</a>
+                </span>
+            <?php endforeach; ?>
+            <a href="<?= $escaper->escapeUrl($block->getResetUrl()) ?>" class="ahy-da-chips-clear">
+                <?= $escaper->escapeHtml(__('Clear all')) ?>
+            </a>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!$items): ?>
+        <div class="message message-notice">
+            <?php if ($activeFilters): ?>
+                <?= $escaper->escapeHtml(__('No products match the current filters.')) ?>
+            <?php else: ?>
+                <?= $escaper->escapeHtml(__('This alert run has no recorded products.')) ?>
+            <?php endif; ?>
+        </div>
+    <?php else: ?>
+        <form action="<?= $escaper->escapeUrl($block->getResetUrl()) ?>" method="get" class="ahy-da-search">
+            <?php foreach ($block->getStateInputs([Items::PARAM_KEYWORD, Items::PARAM_PAGE]) as $name => $value): ?>
+                <input type="hidden" name="<?= $escaper->escapeHtmlAttr($name) ?>"
+                       value="<?= $escaper->escapeHtmlAttr($value) ?>"/>
+            <?php endforeach; ?>
+            <input type="text"
+                   class="ahy-da-search-input"
+                   name="<?= $escaper->escapeHtmlAttr(Items::PARAM_KEYWORD) ?>"
+                   value="<?= $escaper->escapeHtmlAttr($block->getKeywordFilter()) ?>"
+                   placeholder="<?= $escaper->escapeHtmlAttr(__('Search by keyword')) ?>"/>
+            <button type="submit" class="ahy-da-search-button">
+                <span><?= $escaper->escapeHtml(__('Search')) ?></span>
+            </button>
+        </form>
+
+        <!-- Carries the pager controls rendered in the toolbar below -->
+        <form id="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+              action="<?= $escaper->escapeUrl($block->getResetUrl()) ?>"
+              method="get">
+            <?php foreach ($block->getStateInputs([Items::PARAM_LIMIT, Items::PARAM_PAGE]) as $name => $value): ?>
+                <input type="hidden" name="<?= $escaper->escapeHtmlAttr($name) ?>"
+                       value="<?= $escaper->escapeHtmlAttr($value) ?>"/>
+            <?php endforeach; ?>
+        </form>
+
+        <form id="ahy-da-form"
+              action="<?= $escaper->escapeUrl($block->getDisableUrl()) ?>"
+              method="post">
+            <?= /* @noEscape */ $block->getBlockHtml('formkey') ?>
+
+            <!-- Toolbar: mass action and record count left, pager right -->
+            <div class="ahy-da-toolbar">
+                <div class="ahy-da-toolbar-left">
+                    <button type="submit"
+                            class="action-primary"
+                            data-role="revert-selected"
+                            formaction="<?= $escaper->escapeUrl($block->getRevertToMsrpUrl()) ?>"
+                            <?= $revertable ? '' : 'disabled="disabled"' ?>>
+                        <span><?= $escaper->escapeHtml(__('Show MSRP for Selected')) ?></span>
+                    </button>
+                    <?php if ($restorable): ?>
+                        <button type="submit"
+                                class="action-default"
+                                data-role="restore-selected"
+                                formaction="<?= $escaper->escapeUrl($block->getRestoreSpecialPriceUrl()) ?>">
+                            <span><?= $escaper->escapeHtml(__('Restore Discount')) ?></span>
+                        </button>
+                    <?php endif; ?>
+                    <button type="submit"
+                            class="action-default"
+                            data-role="disable-selected"
+                            <?= $actionable ? '' : 'disabled="disabled"' ?>>
+                        <span><?= $escaper->escapeHtml(__('Disable Selected')) ?></span>
+                    </button>
+                    <span class="ahy-da-selection-count" data-role="selection-count"></span>
+                    <span class="ahy-da-records">
+                        <?= $escaper->escapeHtml(__('%1 records found', $totalItems)) ?>
+                    </span>
+                </div>
+
+                <div class="ahy-da-pager">
+                    <select class="admin__control-select ahy-da-pager-limit"
+                            form="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+                            name="<?= $escaper->escapeHtmlAttr(Items::PARAM_LIMIT) ?>"
+                            data-role="page-size">
+                        <?php foreach ($block->getPageSizes() as $size): ?>
+                            <option value="<?= (int) $size ?>" <?= $block->getPageSize() === $size ? 'selected="selected"' : '' ?>>
+                                <?= (int) $size ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span class="ahy-da-pager-label"><?= $escaper->escapeHtml(__('per page')) ?></span>
+
+                    <?php if ($currentPage > 1): ?>
+                        <a class="ahy-da-pager-arrow"
+                           href="<?= $escaper->escapeUrl($block->getPageUrl($currentPage - 1)) ?>"
+                           title="<?= $escaper->escapeHtmlAttr(__('Previous page')) ?>">&#8249;</a>
+                    <?php else: ?>
+                        <span class="ahy-da-pager-arrow _disabled">&#8249;</span>
+                    <?php endif; ?>
+
+                    <input type="text" class="admin__control-text ahy-da-pager-page"
+                           form="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+                           name="<?= $escaper->escapeHtmlAttr(Items::PARAM_PAGE) ?>"
+                           value="<?= (int) $currentPage ?>"/>
+                    <span class="ahy-da-pager-label"><?= $escaper->escapeHtml(__('of %1', $totalPages)) ?></span>
+
+                    <?php if ($currentPage < $totalPages): ?>
+                        <a class="ahy-da-pager-arrow"
+                           href="<?= $escaper->escapeUrl($block->getPageUrl($currentPage + 1)) ?>"
+                           title="<?= $escaper->escapeHtmlAttr(__('Next page')) ?>">&#8250;</a>
+                    <?php else: ?>
+                        <span class="ahy-da-pager-arrow _disabled">&#8250;</span>
+                    <?php endif; ?>
+
+                    <button type="submit"
+                            class="action-default ahy-da-pager-go"
+                            form="<?= $escaper->escapeHtmlAttr($pagerFormId) ?>"
+                            data-role="pager-go">
+                        <span><?= $escaper->escapeHtml(__('Go')) ?></span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin__data-grid-wrap">
+                <table class="data-grid">
+                    <thead>
+                        <tr>
+                            <th class="data-grid-th data-grid-checkbox-cell">
+                                <div class="data-grid-checkbox-cell-inner">
+                                    <input type="checkbox"
+                                           class="admin__control-checkbox"
+                                           id="ahy-da-select-all"
+                                           data-role="select-all"/>
+                                    <label for="ahy-da-select-all"
+                                           title="<?= $escaper->escapeHtmlAttr(__('Select all on page')) ?>"></label>
+                                </div>
+                            </th>
+                            <?php foreach ($columns as $column): ?>
+                                <?php
+                                $sorted  = $block->isSortedBy($column['field']);
+                                $thClass = 'data-grid-th _sortable';
+                                if ($sorted) {
+                                    $thClass .= $block->getSortDirection() === 'asc' ? ' _ascend' : ' _descend';
+                                }
+                                ?>
+                                <th class="<?= $escaper->escapeHtmlAttr($thClass) ?>">
+                                    <a href="<?= $escaper->escapeUrl($block->getSortUrl($column['field'])) ?>"
+                                       class="data-grid-cell-content">
+                                        <?= $escaper->escapeHtml($column['label']) ?>
+                                    </a>
+                                </th>
+                            <?php endforeach; ?>
+                            <th class="data-grid-th">
+                                <span class="data-grid-cell-content"><?= $escaper->escapeHtml(__('Action')) ?></span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($items as $item): ?>
+                        <?php
+                        $productId   = (int) $item->getProductId();
+                        $canDisable  = $block->isActionable($item);
+                        $canRevert   = $block->canRevert($item);
+                        $canRestore  = $block->canRestore($item);
+                        $selectable  = $canDisable || $canRevert || $canRestore;
+                        $checkboxId  = 'ahy-da-row-' . $productId;
+                        ?>
+                        <tr class="data-row">
+                            <td class="data-grid-checkbox-cell">
+                                <?php if ($selectable): ?>
+                                    <div class="data-grid-checkbox-cell-inner">
+                                        <input type="checkbox"
+                                               class="admin__control-checkbox"
+                                               id="<?= $escaper->escapeHtmlAttr($checkboxId) ?>"
+                                               data-role="row-checkbox"
+                                               name="<?= $escaper->escapeHtmlAttr(Items::FIELD_PRODUCT_IDS) ?>[]"
+                                               value="<?= /* @noEscape */ $productId ?>"/>
+                                        <label for="<?= $escaper->escapeHtmlAttr($checkboxId) ?>"></label>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $escaper->escapeHtml($item->getSku()) ?></td>
+                            <td>
+                                <a class="ahy-da-product-link"
+                                   href="<?= $escaper->escapeUrl($block->getProductEditUrl($productId)) ?>"
+                                   target="_blank"
+                                   title="<?= $escaper->escapeHtmlAttr(__('Edit this product in a new tab')) ?>">
+                                    <?= $escaper->escapeHtml($item->getName() ?: $item->getSku()) ?>
+                                </a>
+                            </td>
+                            <td><?= $escaper->escapeHtml($block->formatPrice($item->getPrice())) ?></td>
+                            <td><?= $escaper->escapeHtml($block->formatPrice($item->getSpecialPrice())) ?></td>
+                            <td>
+                                <span class="<?= $escaper->escapeHtmlAttr($block->getPriceStateClass($item)) ?>">
+                                    <span><?= $escaper->escapeHtml($block->getPriceStateLabel($item)) ?></span>
+                                </span>
+                                <?php if ($block->wasReverted($item)): ?>
+                                    <span class="ahy-da-muted" title="<?= $escaper->escapeHtmlAttr(__('Reverted to MSRP from this page')) ?>">
+                                        <?= $escaper->escapeHtml(__('(reverted)')) ?>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $escaper->escapeHtml($block->formatPercent($item->getDiscountPct())) ?></td>
+                            <td>
+                                <span class="<?= $escaper->escapeHtmlAttr($block->getNewClass($item)) ?>">
+                                    <span><?= $escaper->escapeHtml($block->getNewLabel($item)) ?></span>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="<?= $escaper->escapeHtmlAttr($block->getStatusClass($item)) ?>">
+                                    <span><?= $escaper->escapeHtml($block->getStatusLabel($item)) ?></span>
+                                </span>
+                            </td>
+                            <td class="ahy-da-action-cell">
+                                <?php if ($canRevert): ?>
+                                    <button type="submit"
+                                            class="ahy-da-row-action"
+                                            data-role="revert-single"
+                                            formaction="<?= $escaper->escapeUrl($block->getRevertToMsrpUrl()) ?>"
+                                            name="<?= $escaper->escapeHtmlAttr(Items::FIELD_SINGLE_PRODUCT_ID) ?>"
+                                            value="<?= /* @noEscape */ $productId ?>">
+                                        <?= $escaper->escapeHtml(__('Show MSRP')) ?>
+                                    </button>
+                                <?php endif; ?>
+                                <?php if ($canRestore): ?>
+                                    <button type="submit"
+                                            class="ahy-da-row-action"
+                                            data-role="restore-single"
+                                            formaction="<?= $escaper->escapeUrl($block->getRestoreSpecialPriceUrl()) ?>"
+                                            name="<?= $escaper->escapeHtmlAttr(Items::FIELD_SINGLE_PRODUCT_ID) ?>"
+                                            value="<?= /* @noEscape */ $productId ?>">
+                                        <?= $escaper->escapeHtml(__('Restore Discount')) ?>
+                                    </button>
+                                <?php endif; ?>
+                                <?php if ($canDisable): ?>
+                                    <button type="submit"
+                                            class="ahy-da-row-action"
+                                            data-role="disable-single"
+                                            name="<?= $escaper->escapeHtmlAttr(Items::FIELD_SINGLE_PRODUCT_ID) ?>"
+                                            value="<?= /* @noEscape */ $productId ?>">
+                                        <?= $escaper->escapeHtml(__('Disable')) ?>
+                                    </button>
+                                <?php endif; ?>
+                                <?php if (!$canRevert && !$canRestore && !$canDisable): ?>
+                                    <span class="ahy-da-muted">-</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </form>
+
+        <script type="text/x-magento-init">
+            {
+                "#ahy-da-form": {
+                    "Ahy_DiscountAlert/js/run-items": <?= /* @noEscape */ json_encode($jsConfig) ?>
+                }
+            }
+        </script>
+    <?php endif; ?>
+</div>

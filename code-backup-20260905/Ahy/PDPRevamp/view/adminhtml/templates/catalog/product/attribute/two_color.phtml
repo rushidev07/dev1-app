@@ -1,0 +1,458 @@
+<?php
+/**
+ * @var \Ahy\PDPRevamp\Block\Adminhtml\Attribute\Edit\Options\TwoColor $block
+ *
+ * "Add Swatch" here creates a brand-new attribute option exactly the way the
+ * native "Manage Swatch" grid's own "Add Swatch" button does - it does NOT
+ * introduce any new save logic. A new row's label/color/default fields are
+ * named optionvisual[value][...] / swatchvisual[value][...] / defaultvisual[],
+ * the exact same POST arrays Magento_Swatches' own EavAttribute plugin
+ * already reads on save (see vendor/magento/module-swatches/Model/Plugin/
+ * EavAttribute.php). That plugin copies "optionvisual" into the generic
+ * "option" array Magento's core attribute-option save
+ * (_updateAttributeOption(), module-eav) processes: any key that isn't
+ * numeric is always treated as new and gets inserted with a real option_id,
+ * before the swatch value is attached to it. Magento_Swatches' own
+ * determineSwatchType() only checks the first character of the combined
+ * value ("#" or "/"), so our "hex1,hex2" / "path1,path2" / mixed pairs are
+ * accepted and stored exactly like AI-resolved pairs are. Temp keys are
+ * prefixed (non-numeric) so is_numeric() on them is always false,
+ * guaranteeing they're never mistaken for a real existing option_id.
+ * defaultvisual[] is the exact same radio group name the native grid's own
+ * rows use, so marking a brand-new two-color option as default correctly
+ * competes with every other option on the page, native or not.
+ *
+ * Each color half's actual value (hex OR an uploaded image's relative path)
+ * lives in a plain hidden input - the source of truth submitted on save.
+ * The visible <input type="color"> next to it is transient scratch space
+ * only: browsers reject a non-hex value in a color input outright, so it
+ * can't hold an image path itself. "Upload a file" posts directly to
+ * Magento_Swatches' own vendor/magento/module-swatches/Controller/Adminhtml/
+ * Iframe/Show.php (getUploadUrl()) - the exact endpoint the native "Manage
+ * Swatch" grid's own upload option uses - which moves the file to permanent
+ * storage and returns its relative path immediately, so nothing extra is
+ * needed on save for an uploaded image to become the option's swatch value.
+ *
+ * Existing (already-paired) rows' Admin/store-view label fields are
+ * editable here too, but deliberately NOT under the native grid's own
+ * "optionvisual[value][...]" name - that row is intentionally left in place
+ * in "Manage Swatch" (not removed), and reusing its field name would mean
+ * whichever of the two renders last on the page silently wins on save,
+ * discarding an edit made in the other. Ours instead submits under its own
+ * "ahy_two_color_swatch[<id>][label][<store_id>]" name and is written
+ * directly via NativeColorSwatch::saveOptionLabel() in SaveTwoColorSwatch -
+ * a fully independent read/write path, so editing one can never clobber
+ * the other.
+ */
+$rows = $block->getTwoColorRows();
+$stores = $block->getStoreViews();
+$mediaBaseUrl = $block->getSwatchMediaBaseUrl();
+
+/**
+ * @param string $value hex ("#RRGGBB") or an uploaded image's relative path
+ */
+$faceStyle = static function (string $value) use ($block, $mediaBaseUrl): string {
+    if ($block->isImagePath($value)) {
+        return 'background-image: url(\'' . $mediaBaseUrl . $value . '\'); '
+            . 'background-size: cover; background-position: center;';
+    }
+
+    return 'background-color: ' . $value . ';';
+};
+?>
+<style>
+    /* Same reason as the native grid's #swatch-visual-options-panel rule -
+     * without it, the absolutely-positioned popup menu below would get
+     * clipped by this wrapper's default overflow. */
+    #ahy-two-color-swatch-panel {
+        overflow: visible;
+    }
+    .ahy-two-color-swatch-wrapper {
+        display: inline-block;
+        position: relative;
+        margin-right: 34px;
+    }
+    /*
+     * A native <input type="color"> draws its own swatch preview with
+     * browser-specific internal padding, which breaks down (Firefox in
+     * particular falls back to an empty box) once squeezed to a small
+     * custom size. So the visible box is a plain span with its
+     * background set directly - always renders identically everywhere,
+     * and handles an image background too, which a color input never
+     * could. The real <input type="color"> is only ever used transiently
+     * (see the script below) so it's just hidden entirely, not overlaid.
+     */
+    .ahy-two-color-swatch-face {
+        display: inline-block;
+        position: relative;
+        width: 25px;
+        height: 24px;
+        border: 1px solid #c6c5c3;
+        /* visible, not hidden - :before/:after below extend outside this
+         * box's bounds and would otherwise get clipped, same as
+         * .swatch_window's own "overflow: visible !important" rule. */
+        overflow: visible;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+    /*
+     * The outer bordered box joining the swatch to its arrow is two pseudo-
+     * elements on Magento_Swatches' own .swatch_window, reused here
+     * verbatim (same values) so this reads as one continuous control
+     * instead of a loose color box floating next to a bare arrow character -
+     * see .swatch_window/.swatch_window:before/.swatch_window:after in
+     * vendor/magento/module-swatches/view/adminhtml/web/css/swatches.css.
+     */
+    .ahy-two-color-swatch-face:before {
+        position: absolute;
+        content: '';
+        top: -4px;
+        left: -4px;
+        width: 27px;
+        height: 26px;
+        background: transparent;
+        border-radius: 3px 0 0 3px;
+        border: 3px solid #fff;
+        z-index: 1;
+        outline: 1px solid #adadad;
+    }
+    .ahy-two-color-swatch-face:after {
+        position: absolute;
+        content: '\2193';
+        top: -5px;
+        right: -22px;
+        font-size: 19px;
+        color: #808080;
+        width: 16px;
+        height: 32px;
+        background: #fff;
+        border-radius: 0 3px 3px 0;
+        border: 1px solid #adadad;
+        text-align: center;
+        z-index: 8;
+    }
+    .ahy-two-color-color-input,
+    .ahy-two-color-file-input {
+        display: none;
+    }
+    /* Reuses Magento_Swatches' own popup classes (.swatch_sub-menu_container,
+     * .swatch_row, .swatch_row_name), already loaded on this page by the
+     * native "Manage Swatch" grid, so this menu matches it exactly. */
+    .ahy-two-color-submenu {
+        top: 100%;
+        left: 0;
+    }
+</style>
+<fieldset class="admin__fieldset fieldset">
+    <legend class="legend">
+        <span><?= $block->escapeHtml(__('Two-Color Swatches')) ?></span>
+    </legend><br />
+    <div class="admin__control-table-wrapper" id="ahy-two-color-swatch-panel"
+         data-upload-url="<?= $block->escapeUrl($block->getUploadUrl()) ?>"
+         data-media-base-url="<?= $block->escapeUrl($mediaBaseUrl) ?>">
+        <table class="data-table clearfix" cellspacing="0">
+            <thead>
+            <tr id="ahy-two-color-swatch-header">
+                <th class="col-default"><span><?= $block->escapeHtml(__('Is Default')) ?></span></th>
+                <th><span><?= $block->escapeHtml(__('Color 1')) ?></span></th>
+                <th><span><?= $block->escapeHtml(__('Color 2')) ?></span></th>
+                <th><span><?= $block->escapeHtml(__('Admin')) ?></span></th>
+                <?php foreach ($stores as $store): ?>
+                    <th><span><?= $block->escapeHtml($store->getName()) ?></span></th>
+                <?php endforeach; ?>
+                <th class="col-delete">&nbsp;</th>
+            </tr>
+            </thead>
+            <tbody data-role="ahy-two-color-swatch-container">
+            <?php foreach ($rows as $row): ?>
+                <tr>
+                    <td class="col-default">
+                        <input type="hidden"
+                               name="ahy_two_color_swatch[<?= (int) $row['option_id'] ?>][option_id]"
+                               value="<?= (int) $row['option_id'] ?>"/>
+                        &nbsp;
+                    </td>
+                    <?php foreach (['first', 'second'] as $half): ?>
+                        <td>
+                            <span class="ahy-two-color-swatch-wrapper position-relative">
+                                <span class="ahy-two-color-swatch-face"
+                                      style="<?= $faceStyle($row[$half]) ?>"></span>
+                                <input type="hidden" class="ahy-two-color-value"
+                                       name="ahy_two_color_swatch[<?= (int) $row['option_id'] ?>][<?= $half ?>]"
+                                       value="<?= $block->escapeHtmlAttr($row[$half]) ?>"/>
+                                <input type="color" class="ahy-two-color-color-input" value="#000000"/>
+                                <input type="file" class="ahy-two-color-file-input" accept="image/*"/>
+                                <div class="swatch_sub-menu_container ahy-two-color-submenu">
+                                    <div class="swatch_row position-relative">
+                                        <div class="swatch_row_name ahy-two-color-choose-btn">
+                                            <p><?= $block->escapeHtml(__('Choose a color')) ?></p>
+                                        </div>
+                                    </div>
+                                    <div class="swatch_row">
+                                        <div class="swatch_row_name ahy-two-color-upload-btn">
+                                            <p><?= $block->escapeHtml(__('Upload a file')) ?></p>
+                                        </div>
+                                    </div>
+                                    <div class="swatch_row">
+                                        <div class="swatch_row_name ahy-two-color-clear-btn">
+                                            <p><?= $block->escapeHtml(__('Clear')) ?></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </span>
+                        </td>
+                    <?php endforeach; ?>
+                    <td>
+                        <input type="text" class="input-text required-entry"
+                               name="ahy_two_color_swatch[<?= (int) $row['option_id'] ?>][label][0]"
+                               value="<?= $block->escapeHtmlAttr($row['labels'][0] ?? $row['label']) ?>"/>
+                    </td>
+                    <?php foreach ($stores as $store): ?>
+                        <td>
+                            <input type="text" class="input-text"
+                                   name="ahy_two_color_swatch[<?= (int) $row['option_id'] ?>][label][<?= (int) $store->getId() ?>]"
+                                   value="<?= $block->escapeHtmlAttr($row['labels'][(int) $store->getId()] ?? '') ?>"/>
+                        </td>
+                    <?php endforeach; ?>
+                    <td class="col-delete">&nbsp;</td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+            <tr>
+                <th colspan="<?= 4 + count($stores) ?>" class="col-actions-add">
+                    <button id="ahy-two-color-add-swatch" title="<?= $block->escapeHtml(__('Add Swatch')) ?>"
+                            type="button" class="action- scalable add">
+                        <span><?= $block->escapeHtml(__('Add Swatch')) ?></span>
+                    </button>
+                </th>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+</fieldset>
+
+<script type="text/template" id="ahy-two-color-new-row-template">
+    <tr class="ahy-two-color-new-row">
+        <td class="col-default">
+            <input class="input-radio" type="radio" name="defaultvisual[]" value="__KEY__"/>
+        </td>
+        <?php foreach (['first', 'second'] as $half): ?>
+            <td>
+                <span class="ahy-two-color-swatch-wrapper position-relative">
+                    <span class="ahy-two-color-swatch-face" style="background-color: #000000;"></span>
+                    <input type="hidden" class="ahy-two-color-value ahy-two-color-<?= $half ?>" value="#000000"/>
+                    <input type="color" class="ahy-two-color-color-input" value="#000000"/>
+                    <input type="file" class="ahy-two-color-file-input" accept="image/*"/>
+                    <div class="swatch_sub-menu_container ahy-two-color-submenu">
+                        <div class="swatch_row position-relative">
+                            <div class="swatch_row_name ahy-two-color-choose-btn">
+                                <p><?= $block->escapeHtml(__('Choose a color')) ?></p>
+                            </div>
+                        </div>
+                        <div class="swatch_row">
+                            <div class="swatch_row_name ahy-two-color-upload-btn">
+                                <p><?= $block->escapeHtml(__('Upload a file')) ?></p>
+                            </div>
+                        </div>
+                        <div class="swatch_row">
+                            <div class="swatch_row_name ahy-two-color-clear-btn">
+                                <p><?= $block->escapeHtml(__('Clear')) ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </span>
+                <?php if ($half === 'second'): ?>
+                    <input type="hidden" class="ahy-two-color-hidden"
+                           name="swatchvisual[value][__KEY__]" value="#000000,#000000"/>
+                <?php endif; ?>
+            </td>
+        <?php endforeach; ?>
+        <td>
+            <input type="text" class="input-text required-entry required-unique"
+                   name="optionvisual[value][__KEY__][0]"
+                   placeholder="<?= $block->escapeHtmlAttr(__('New option label')) ?>"/>
+        </td>
+        <?php foreach ($stores as $store): ?>
+            <td>
+                <input type="text" class="input-text"
+                       name="optionvisual[value][__KEY__][<?= (int) $store->getId() ?>]"/>
+            </td>
+        <?php endforeach; ?>
+        <td class="col-delete">
+            <button title="<?= $block->escapeHtml(__('Remove')) ?>" type="button"
+                    class="action- scalable delete ahy-two-color-remove-row">
+                <span><?= $block->escapeHtml(__('Remove')) ?></span>
+            </button>
+        </td>
+    </tr>
+</script>
+
+<script>
+    (function () {
+        'use strict';
+
+        var panel = document.getElementById('ahy-two-color-swatch-panel');
+        var uploadUrl = panel.dataset.uploadUrl;
+        var mediaBaseUrl = panel.dataset.mediaBaseUrl;
+        var container = document.querySelector('[data-role="ahy-two-color-swatch-container"]');
+        var addButton = document.getElementById('ahy-two-color-add-swatch');
+        var template = document.getElementById('ahy-two-color-new-row-template');
+        var counter = 0;
+
+        function closeAllSubmenus() {
+            Array.prototype.forEach.call(
+                document.querySelectorAll('.ahy-two-color-submenu'),
+                function (menu) {
+                    menu.style.display = 'none';
+                }
+            );
+        }
+
+        function isImagePath(value) {
+            return value.charAt(0) === '/';
+        }
+
+        function renderFace(wrapper) {
+            var face = wrapper.querySelector('.ahy-two-color-swatch-face');
+            var value = wrapper.querySelector('.ahy-two-color-value').value;
+
+            if (isImagePath(value)) {
+                face.style.backgroundImage = 'url(\'' + mediaBaseUrl + value + '\')';
+                face.style.backgroundSize = 'cover';
+                face.style.backgroundPosition = 'center';
+                face.style.backgroundColor = '';
+            } else {
+                face.style.backgroundImage = '';
+                face.style.backgroundColor = value;
+            }
+        }
+
+        function setValue(wrapper, value, onChange) {
+            wrapper.querySelector('.ahy-two-color-value').value = value;
+            renderFace(wrapper);
+            onChange();
+        }
+
+        /**
+         * Wires the swatch face / "Choose a color" / "Upload a file" /
+         * "Clear" menu for one .ahy-two-color-swatch-wrapper. onChange fires
+         * after any action changes the hidden value, so callers can also
+         * re-sync a new row's combined hidden field.
+         */
+        function wireSwatchPicker(wrapper, onChange) {
+            var face = wrapper.querySelector('.ahy-two-color-swatch-face');
+            var colorInput = wrapper.querySelector('.ahy-two-color-color-input');
+            var fileInput = wrapper.querySelector('.ahy-two-color-file-input');
+            var submenu = wrapper.querySelector('.ahy-two-color-submenu');
+
+            renderFace(wrapper);
+
+            face.addEventListener('click', function (event) {
+                event.stopPropagation();
+                var isOpen = submenu.style.display === 'block';
+                closeAllSubmenus();
+                submenu.style.display = isOpen ? 'none' : 'block';
+            });
+
+            wrapper.querySelector('.ahy-two-color-choose-btn').addEventListener('click', function (event) {
+                event.stopPropagation();
+                submenu.style.display = 'none';
+                var current = wrapper.querySelector('.ahy-two-color-value').value;
+                if (!isImagePath(current)) {
+                    colorInput.value = current;
+                }
+                colorInput.click();
+            });
+
+            wrapper.querySelector('.ahy-two-color-upload-btn').addEventListener('click', function (event) {
+                event.stopPropagation();
+                submenu.style.display = 'none';
+                fileInput.click();
+            });
+
+            wrapper.querySelector('.ahy-two-color-clear-btn').addEventListener('click', function (event) {
+                event.stopPropagation();
+                submenu.style.display = 'none';
+                setValue(wrapper, '#ffffff', onChange);
+            });
+
+            colorInput.addEventListener('input', function () {
+                setValue(wrapper, colorInput.value, onChange);
+            });
+
+            fileInput.addEventListener('change', function () {
+                var file = fileInput.files[0];
+                if (!file) {
+                    return;
+                }
+
+                var formData = new FormData();
+                formData.append('datafile', file);
+                formData.append('form_key', window.FORM_KEY);
+
+                fetch(uploadUrl, {method: 'POST', body: formData, credentials: 'same-origin'})
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (result) {
+                        fileInput.value = '';
+
+                        if (result.error) {
+                            alert(result.error); // eslint-disable-line no-alert
+                            return;
+                        }
+
+                        var path = result.file_path || '';
+                        if (path.charAt(0) !== '/') {
+                            path = '/' + path;
+                        }
+                        setValue(wrapper, path, onChange);
+                    })
+                    .catch(function () {
+                        fileInput.value = '';
+                        alert('Upload failed.'); // eslint-disable-line no-alert
+                    });
+            });
+        }
+
+        function syncHiddenValue(row) {
+            var first = row.querySelector('.ahy-two-color-first').value;
+            var second = row.querySelector('.ahy-two-color-second').value;
+            row.querySelector('.ahy-two-color-hidden').value = first + ',' + second;
+        }
+
+        document.addEventListener('click', closeAllSubmenus);
+
+        // Existing rows: wire each already-rendered swatch picker.
+        Array.prototype.forEach.call(
+            container.querySelectorAll('.ahy-two-color-swatch-wrapper'),
+            function (wrapper) {
+                wireSwatchPicker(wrapper, function () {});
+            }
+        );
+
+        addButton.addEventListener('click', function () {
+            var key = 'ahy_new_' + (counter++);
+            var html = template.innerHTML.split('__KEY__').join(key);
+            var wrapperEl = document.createElement('tbody');
+            wrapperEl.innerHTML = html.trim();
+            var row = wrapperEl.firstElementChild;
+
+            Array.prototype.forEach.call(
+                row.querySelectorAll('.ahy-two-color-swatch-wrapper'),
+                function (swatchWrapper) {
+                    wireSwatchPicker(swatchWrapper, function () {
+                        syncHiddenValue(row);
+                    });
+                }
+            );
+            row.querySelector('.ahy-two-color-remove-row').addEventListener('click', function () {
+                row.parentNode.removeChild(row);
+            });
+
+            container.appendChild(row);
+            syncHiddenValue(row);
+        });
+    })();
+</script>

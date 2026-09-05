@@ -1,0 +1,61 @@
+<?php
+/**
+ * PDP review-quote card, sourced from the real Yotpo review data via
+ * Ahy\PDPRevamp\Service\YotpoClient (the same service backing the
+ * star/count line and the full "Ratings & Reviews" section). Renders
+ * nothing when a product has no real Yotpo review yet - no fabricated
+ * fallback content.
+ *
+ * No star + average-score + review-count summary line here - the
+ * clickable star/count line just above this block (product-info.phtml)
+ * already shows that, so repeating it here would just duplicate it.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\ReviewQuote;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsSolid;
+
+/** @var ReviewQuote $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsSolid $heroiconsSolid */
+$heroiconsSolid = $viewModels->require(HeroiconsSolid::class);
+
+$product = $block->getProduct();
+
+$yotpoClient = $block->getYotpoClient();
+$topReview = $yotpoClient->getTopReview((int) $product->getId());
+
+if ($topReview === null || $topReview['content'] === '') {
+    return;
+}
+
+$reviewText = $topReview['content'];
+$reviewerName = $topReview['reviewer_name'] . ', ' . __('Verified Buyer');
+$ratingOutOfFive = $topReview['score'] > 0 ? $topReview['score'] : null;
+$filledStars = $ratingOutOfFive !== null ? (int) round($ratingOutOfFive) : 0;
+?>
+<div class="review-quote-card rounded-lg p-3 mt-2" style="background:#f8f6f3;border:1px solid #e7e4de;">
+    <div class="flex items-start gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e85d26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5" style="transform:rotate(180deg);" aria-hidden="true"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></svg>
+        <div class="flex-1">
+            <p class="text-sm leading-relaxed" style="color:#3d3a35;">
+                &ldquo;<?= $block->escapeHtml($reviewText) ?>&rdquo;
+            </p>
+            <div class="flex items-center gap-2 mt-1.5">
+                <?php if ($ratingOutOfFive !== null): ?>
+                    <span class="flex">
+                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                            <?= $heroiconsSolid->starHtml($i <= $filledStars ? '' : 'opacity-25', 14, 14, ['style' => 'color:#fbbf24;']) ?>
+                        <?php endfor; ?>
+                    </span>
+                <?php endif; ?>
+                <span class="text-xs" style="color:#6b7280;">
+                    &mdash; <?= $block->escapeHtml($reviewerName) ?>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>

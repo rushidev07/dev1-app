@@ -1,0 +1,356 @@
+<?php
+/**
+ * PDP "Details" tab section: tab strip (Details / Specifications / Video /
+ * Seller Info) wrapping the product's existing dynamic description
+ * (rendered by pdprevamp.details.description, unchanged - same
+ * fetch/read-more/Alpine cleanup logic as before). Whatever content is
+ * authored into the product's description (including any "Key Features"
+ * grid or promo cards) comes through as-is; only the tab UI and responsive
+ * layout around it are new.
+ *
+ * The two promo cards (right column) are NOT tab content - they stay
+ * visible next to whichever tab is active, so they live here rather than
+ * inside any single tab's template.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\KeyFeatures;
+use Ahy\PDPRevamp\Block\Product\View\ProductVideo;
+use Ahy\PDPRevamp\Block\Product\View\Specifications;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var ViewModelRegistry $viewModels */
+
+$tabs = [
+    'details' => __('Details'),
+    'specifications' => __('Specifications'),
+    'video' => __('Video'),
+    'seller-info' => __('Seller Info'),
+];
+
+/**
+ * Every tab except Seller Info is hidden outright when it has nothing to
+ * show - a tab that opens onto an empty panel is worse than no tab at all.
+ * Seller Info is excluded from this: it always renders something (real
+ * seller data, or a plain "Sold and shipped by Everest." line when no
+ * marketplace seller is assigned - see details-seller-info.phtml), so it's
+ * never actually empty by this module's own design.
+ */
+/** @var CurrentProduct $currentProduct */
+$currentProduct = $viewModels->require(CurrentProduct::class);
+$product = $currentProduct->get();
+
+$keyFeaturesBlock = $block->getChildBlock('pdprevamp.details.key-features');
+$hasKeyFeatures = $keyFeaturesBlock instanceof KeyFeatures
+    && $keyFeaturesBlock->getKeyFeaturesResolver()->getTiles($product, (string) $product->getDescription());
+$hasDetails = trim((string) $product->getDescription()) !== '' || $hasKeyFeatures;
+if (!$hasDetails) {
+    unset($tabs['details']);
+}
+
+$specificationsBlock = $block->getChildBlock('pdprevamp.details.specifications');
+if (!$specificationsBlock instanceof Specifications || !$specificationsBlock->getSpecifications()) {
+    unset($tabs['specifications']);
+}
+
+$videoBlock = $block->getChildBlock('pdprevamp.details.video');
+if (!$videoBlock instanceof ProductVideo || $videoBlock->getVideo() === null) {
+    unset($tabs['video']);
+}
+
+// Whichever tab survives first becomes the one shown by default - 'details'
+// only if it's still there, otherwise the next real tab in this fixed order.
+$defaultTab = array_key_first($tabs) ?? 'seller-info';
+?>
+<section class="pdp-details-tabs pt-8 pb-8" x-data="{ tab: '<?= /* @noEscape */ $defaultTab ?>' }" @pdp-switch-tab.window="tab = $event.detail">
+    <?php /**
+     * Dedicated width hook for this section only. product.detail.page's
+     * ambient .columns wrapper (theme structure.css) already applies
+     * Tailwind's container utility once around every PDP section - this
+     * used to also carry a `container` class, stacking a second
+     * max-width+padding on top of that ambient one and making this section
+     * render narrower than its siblings (trust-row, recently-viewed, etc).
+     * pdp-details-tabs-container is its own class (defined below) so this
+     * section's width can be tuned independently going forward without
+     * touching the shared .container/.columns classes every other PDP
+     * section relies on.
+     */ ?>
+    <div class="pdp-details-tabs-container">
+    <div class="flex border-b border-gray-200 overflow-x-auto pdp-tabs-scroll" role="tablist">
+        <?php foreach ($tabs as $tabId => $tabLabel): ?>
+            <a
+                href="#"
+                role="tab"
+                @click.prevent="tab = '<?= /* @noEscape */ $tabId ?>'"
+                :class="tab === '<?= /* @noEscape */ $tabId ?>' ? 'pdp-details-tab pdp-details-tab--active' : 'pdp-details-tab'"
+                class="whitespace-nowrap"
+            >
+                <?= $block->escapeHtml($tabLabel) ?>
+            </a>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start pt-6">
+        <div class="lg:col-span-2">
+            <?php if (isset($tabs['details'])): ?>
+            <div x-show="tab === 'details'">
+                <div x-data="toggleText()">
+                    <div
+                        class="relative"
+                        x-bind:class="{
+                            'max-h-96 md:max-h-[650px] overflow-hidden': !expanded && getShowCondition(),
+                            'text-ahy-blue overflow-visible': expanded || !getShowCondition()
+                        }"
+                        x-ref="container"
+                        x-bind:style="expanded ? 'height: ' + ($refs.container.offsetHeight + 20) + 'px' : ''"
+                    >
+                        <?= $block->getChildHtml('pdprevamp.details.description') ?>
+                        <?= $block->getChildHtml('pdprevamp.details.key-features') ?>
+                        <div
+                            class="text-primary-500 read-more absolute left-0 right-0 flex justify-center items-end bottom-0 z-10 mx-auto cursor-pointer pb-12 text-center font-bold"
+                            @click="expanded = !expanded"
+                            x-bind:style="expanded ? 'display:none' : 'height: 100px'"
+                            x-show="getShowCondition()"
+                        >
+                            <button x-text="expanded ? 'Read Less' : 'Read More'"
+                                class="test-ahy-blue h-16 w-48 rounded-full bg-ahy-blue text-center text-sm font-bold capitalize text-white hover:bg-[#092233]">
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (isset($tabs['specifications'])): ?>
+            <div x-show="tab === 'specifications'" x-cloak>
+                <?= $block->getChildHtml('pdprevamp.details.specifications') ?>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($tabs['video'])): ?>
+            <div x-show="tab === 'video'" x-cloak>
+                <?= $block->getChildHtml('pdprevamp.details.video') ?>
+            </div>
+            <?php endif; ?>
+            <div x-show="tab === 'seller-info'" x-cloak>
+                <?= $block->getChildHtml('pdprevamp.details.seller-info') ?>
+            </div>
+        </div>
+
+            <div class="lg:col-span-1 flex flex-col gap-0 pt-3 lg:pt-0">
+            <?php /**
+             * Both promo cards are 100% admin-authored Page Builder content
+             * (Content > Blocks) - including the link itself. This wrapper
+             * only forces the rounded-corner clipping the reference design
+             * expects regardless of whatever's inside; it is not a link, so
+             * a block's own content must include its own <a> if it should
+             * be clickable.
+             */ ?>
+            <div class="pdp-seller-promo-card h-full block">
+                <?= $this->getLayout()
+                    ->createBlock('Magento\Cms\Block\Block')
+                    ->setBlockId(\Ahy\PDPRevamp\Setup\Patch\Data\CreateSellerInfoSecondaryPromoBlock::BLOCK_IDENTIFIER)
+                    ->toHtml() ?>
+            </div>
+            <div class="pdp-seller-promo-card h-full block">
+                <?= $this->getLayout()
+                    ->createBlock('Magento\Cms\Block\Block')
+                    ->setBlockId(\Ahy\PDPRevamp\Setup\Patch\Data\CreateSellerInfoPrimaryPromoBlock::BLOCK_IDENTIFIER)
+                    ->toHtml() ?>
+            </div>
+        </div>
+    </div>
+    </div>
+</section>
+<style>
+    /* Adjust max-width/padding here to resize just this section - it's
+       intentionally independent of the shared .container/.columns classes
+       every other PDP section uses, so a change here can't affect them and
+       a change to them can't affect this. No-op by default (full width of
+       the ambient .columns container). */
+    .pdp-details-tabs-container {
+        width: 100%;
+    }
+    @media (max-width: 425px) {
+        .pdp-details-tabs-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+    .pdp-details-tab {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #6b7688;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+    }
+    .pdp-details-tab--active {
+        color: #e85d26;
+        border-bottom-color: #e85d26;
+    }
+    /* overflow-x-auto alone makes overflow-y compute to "auto" too (per
+       spec, when either axis isn't "visible" the other can't stay
+       "visible" either, and setting overflow-y:visible explicitly gets
+       force-converted right back to "auto" by that same rule - not a
+       usable fix). That was clipping the active tab's underline, which
+       used to rely on a negative margin-bottom to poke 1px past its own
+       box and overlap the row's border. Removed that negative margin
+       instead (see .pdp-details-tab above) so the border never extends
+       past the tab's own box in the first place - nothing left to clip. */
+    .pdp-tabs-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+    .pdp-tabs-scroll::-webkit-scrollbar { display: none; }
+    /* Both promo cards are admin-authored Page Builder content (Content >
+       Blocks) - the images themselves are what needs rounding, not a
+       wrapper around them, since Page Builder's own classes control their
+       display per breakpoint. */
+    .pdp-seller-promo-card .pagebuilder-mobile-hidden,
+    .pdp-seller-promo-card .pagebuilder-mobile-only {
+        border-radius: 10px;
+    }
+    .read-more {
+        background-image: linear-gradient(0deg, #fafafa 80%, rgba(255,254,255,0) 100%);
+    }
+    .read-more button {
+        filter: drop-shadow(0px 14px 17.5px rgba(13,47,71,0.38));
+    }
+</style>
+<script>
+    function toggleText() {
+        return {
+            expanded: false,
+            init() {
+                this.removeEmptyPTags();
+                this.removeUnwantedTextFromDescription();
+                this.removeExtraBrTags();
+                this.removeInstallmentNote();
+                this.removeImageTags();
+                this.removeClickHereText();
+                this.removeH5DescriptionText();
+                this.removeIframe();
+            },
+            getShowCondition() {
+                if (window.innerWidth < 767) {
+                    return this.$refs.container.offsetHeight >= 200;
+                } else {
+                    return this.$refs.container.offsetHeight >= 600;
+                }
+            },
+            removeEmptyPTags() {
+                const tabWrapper = document.getElementById('tab_wrapper');
+                if (tabWrapper) {
+                    const paragraphs = tabWrapper.querySelectorAll('p');
+                    paragraphs.forEach(paragraph => {
+                        if (!paragraph.textContent.trim()) {
+                            paragraph.remove();
+                        }
+                    });
+                }
+            },
+            removeImageTags() {
+                const container = this.$refs.container;
+                var isPatriotCooler = window._ahyIsPatriotCooler || false;
+                if (container && isPatriotCooler) {
+                    const imageTags = container.querySelectorAll('img');
+                    if (imageTags.length > 0) {
+                        imageTags.forEach(image => {
+                            if (image) {
+                                image.remove();
+                            }
+                        });
+                    }
+                }
+            },
+            removeExtraBrTags() {
+                const tabWrapper = document.getElementById('tab_wrapper');
+                if (tabWrapper) {
+                    const paragraphs = tabWrapper.querySelectorAll('p');
+                    paragraphs.forEach(paragraph => {
+                        let previousWasBr = false;
+                        const childNodes = Array.from(paragraph.childNodes);
+                        childNodes.forEach(node => {
+                            if (node.nodeName === 'BR') {
+                                if (previousWasBr) {
+                                    node.remove();
+                                } else {
+                                    previousWasBr = true;
+                                }
+                            } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                                previousWasBr = false;
+                            }
+                        });
+                    });
+                }
+            },
+            removeIframe() {
+                const container = this.$refs.container;
+                if (container) {
+                    const popupContainer = container.querySelector('#popupContainer');
+                    if (popupContainer) popupContainer.remove();
+                    const fitmixIframe = container.querySelector('#fitmixWidgetIframeContainer');
+                    if (fitmixIframe) fitmixIframe.remove();
+                    container.querySelectorAll('button[onclick^="myFitmixWidget.setFrame"]').forEach(b => b.remove());
+                    const fitmixScript = document.querySelector('script[src="//static.fittingbox.com/api/v1/fitmix.js"]');
+                    if (fitmixScript) fitmixScript.remove();
+                    const fitmixStyles = container.querySelector('style');
+                    if (fitmixStyles && fitmixStyles.textContent.includes('#fitmixContainer')) fitmixStyles.remove();
+                    container.querySelectorAll('script').forEach(script => {
+                        if (script.textContent.includes('FitMix') || script.textContent.includes('fitmix')) script.remove();
+                    });
+                }
+            },
+            removeH5DescriptionText() {
+                const container = this.$refs.container;
+                if (container) {
+                    container.querySelectorAll('h5').forEach(element => {
+                        if (element.textContent.trim().toUpperCase() === 'DESCRIPTION') element.remove();
+                    });
+                }
+            },
+            removeUnwantedTextFromDescription() {
+                const container = this.$refs.container;
+                if (container) {
+                    const unwantedPhrases = [
+                        "Don't see your size? Shop our authorized retailers",
+                        "Fleet Farm",
+                        "Check out our unboxing on YouTube:",
+                        "Check out the YouTube video for more information:",
+                        "https://youtu.be/",
+                        "Lastly, we include Free Shipping in the continental United States (a $100+ value with today's shipping rates"
+                    ];
+                    container.querySelectorAll('p').forEach(element => {
+                        if (unwantedPhrases.some(phrase => element.textContent.includes(phrase))) element.remove();
+                    });
+                }
+            },
+            removeClickHereText() {
+                const container = this.$refs.container;
+                if (container) {
+                    container.querySelectorAll('*').forEach(element => {
+                        if (element.textContent.includes('Click here to learn more about Maniac Outdoors Mineral Supplement & Attractant')) {
+                            element.textContent = element.textContent.replace('Click here to learn more about Maniac Outdoors Mineral Supplement & Attractant', '');
+                        }
+                    });
+                }
+            },
+            removeInstallmentNote() {
+                const anchors = this.$refs.container.querySelectorAll('a[href="http://www.monsterbass.com/warranty"]');
+                if (anchors) {
+                    anchors.forEach(function(anchor) {
+                        if (anchor.textContent.includes('NOTE: You can also pay in 4 monthly installments when you select SHOP Pay at checkout.')) {
+                            anchor.remove();
+                        }
+                    });
+                }
+            },
+            redirectToLink(url) {
+                const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                if (newWindow) newWindow.opener = null;
+            }
+        }
+    }
+</script>

@@ -1,0 +1,523 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Ahy\PlpRevamp\Block\Category;
+
+use Ahy\PlpRevamp\Model\FeaturedBrandsParser;
+use Magento\Catalog\Block\Category\View;
+use Magento\Catalog\Helper\Category as CategoryHelper;
+use Magento\Catalog\Model\CategoryFactory;
+use Magento\Catalog\Model\Layer\Resolver;
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
+use Magento\Eav\Model\Config as EavConfig;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Registry;
+use Magento\Framework\UrlInterface;
+use Magento\Framework\View\Element\Template;
+use Magento\Review\Model\Rating;
+use Magento\Store\Model\ScopeInterface;
+use Magento\Store\Model\StoreManagerInterface;
+
+class SubcategoryCards extends View
+{
+    /** Subcategories shown when the category leaves the count empty. */
+    private const DEFAULT_SUBCATEGORY_COUNT = 8;
+
+    /** Hard ceiling on the count, whatever the category asks for. */
+    private const MAX_SUBCATEGORY_COUNT = 10;
+
+    /**
+     * Hard ceiling on featured products rendered on the category page.
+     * The source category usually holds more than we want inline; the rest stay
+     * reachable via the "See More" link, which points at that source category.
+     */
+    private const MAX_FEATURED_PRODUCTS = 8;
+
+    private array $labelColorOptionMap = [];
+    private array $productLabelOptionMap = [];
+    private bool $usedFallback = false;
+    private ?\Magento\Catalog\Model\ResourceModel\Product\Collection $featuredProductsCache = null;
+
+    private ?\Magento\Catalog\Model\Category $featuredSourceCategoryCache = null;
+    private function emptyCollection(): \Magento\Catalog\Model\ResourceModel\Product\Collection
+    {
+        return $this->collectionFactory->create()->addFieldToFilter('entity_id', ['in' => [-1]]);
+    }
+
+    public function __construct(
+        Template\Context $context,
+        Resolver $layerResolver,
+        Registry $registry,
+        CategoryHelper $categoryHelper,
+        private readonly CollectionFactory $collectionFactory,
+        private readonly CategoryFactory $categoryFactory,
+        private readonly StoreManagerInterface $storeManager,
+        private readonly Rating $ratingModel,
+        private readonly CategoryCollectionFactory $categoryCollectionFactory,
+        private readonly EavConfig $eavConfig,
+        private readonly ResourceConnection $resourceConnection,
+        private readonly FeaturedBrandsParser $brandsParser,
+        array $data = []
+    ) {
+        parent::__construct($context, $layerResolver, $registry, $categoryHelper, $data);
+    }
+
+    // ---------------------------------------------------------------
+    // Layout check
+    // ---------------------------------------------------------------
+
+    public function isSubcategoryLayoutEnabled(): bool
+    {
+        return (bool)$this->getCurrentCategory()->getData('ahy_use_subcategory_layout');
+    }
+
+    /**
+     * Per-section switch, gated by the master layout switch.
+     *
+     * A NULL value counts as ON: categories that existed before these attributes
+     * were added have no row for them, and they must keep rendering exactly as
+     * they did. Only an explicit "0" turns a section off.
+     */
+    private function isSectionEnabled(string $attributeCode): bool
+    {
+        if (!$this->isSubcategoryLayoutEnabled()) {
+            return false;
+        }
+
+        $value = $this->getCurrentCategory()->getData($attributeCode);
+
+        return $value === null || $value === '' || (bool)$value;
+    }
+
+    public function isSubcategoryCardsEnabled(): bool
+    {
+        return $this->isSectionEnabled('ahy_show_subcategory_cards');
+    }
+
+    public function isFeaturedProductsEnabled(): bool
+    {
+        return $this->isSectionEnabled('ahy_show_featured_products');
+    }
+
+    public function isFeaturedBrandsEnabled(): bool
+    {
+        return $this->isSectionEnabled('ahy_show_featured_brands');
+    }
+
+    // ---------------------------------------------------------------
+    // Child categories — loads ahy_card_image explicitly
+    // ---------------------------------------------------------------
+
+    public function getChildCategories(): \Magento\Catalog\Model\ResourceModel\Category\Collection
+    {
+        $category = $this->getCurrentCategory();
+
+        return $this->categoryCollectionFactory->create()
+            ->addAttributeToSelect(['name', 'url_key', 'image', 'ahy_card_image', 'ahy_card_keywords', 'is_active', 'all_children', 'is_anchor'])
+            ->addAttributeToFilter('is_active', 1)
+            ->addIdFilter($category->getChildren())
+            ->setOrder('position', 'ASC')
+            ->joinUrlRewrite()
+            ->load();
+    }
+
+    /**
+     * Number of subcategory cards to render.
+     *
+     * Empty falls back to DEFAULT_SUBCATEGORY_COUNT (8). An explicit value is clamped
+     * into 1..MAX_SUBCATEGORY_COUNT (10), so 0 or a negative yields 1 and anything
+     * above 10 yields 10. The admin field also validates the 1-10 range up front, so
+     * the clamp here only guards values written directly to the attribute.
+     */
+    public function getSubcategoryCardsCount(): int
+    {
+        $value = trim((string)$this->getCurrentCategory()->getData('ahy_subcategory_cards_count'));
+
+        if ($value === '') {
+            return self::DEFAULT_SUBCATEGORY_COUNT;
+        }
+
+        return min(self::MAX_SUBCATEGORY_COUNT, max(1, (int)$value));
+    }
+
+    /** @deprecated use getChildCategories() */
+    public function getChildrenCategories(): \Magento\Catalog\Model\ResourceModel\Category\Collection
+    {
+        return $this->getChildCategories();
+    }
+
+    // ---------------------------------------------------------------
+    // Featured products config
+    // ---------------------------------------------------------------
+
+    public function getFeaturedTitle(): string
+    {
+        return (string)($this->getCurrentCategory()->getData('ahy_featured_title') ?: 'Featured Products');
+    }
+
+    /**
+     * Admin-configurable line under the Featured Products heading.
+     * Falls back to the previous hardcoded copy when the category leaves it empty.
+     */
+    /**
+     * Blurb rendered under the Featured Products grid. Empty string = hide the block.
+     * Not escaped here — the template decides how to render it.
+     */
+    public function getFeaturedDescription(): string
+    {
+        return trim((string)$this->getCurrentCategory()->getData('ahy_featured_description'));
+    }
+
+    public function getFeaturedSubtitle(): string
+    {
+        return (string)($this->getCurrentCategory()->getData('ahy_featured_subtitle')
+            ?: 'Handpicked products from our collection.');
+    }
+
+    public function getFeaturedSourceId(): int
+    {
+        return (int)$this->getCurrentCategory()->getData('ahy_featured_source_id');
+    }
+
+    public function getFeaturedCount(): int
+    {
+        $configured = (int)($this->getCurrentCategory()->getData('ahy_featured_products_count')
+            ?: self::MAX_FEATURED_PRODUCTS);
+
+        // Clamp to [1, MAX_FEATURED_PRODUCTS]. A larger value configured on the
+        // category is capped rather than rejected, so existing data keeps working.
+        return min(self::MAX_FEATURED_PRODUCTS, max(1, $configured));
+    }
+
+    // ---------------------------------------------------------------
+    // Featured products collection (3-scenario logic)
+    // ---------------------------------------------------------------
+
+    /**
+     * Scenario 1: no ahy_featured_source_id → returns null (section hidden)
+     * Scenario 2: source ID set + source category has products → returns those products
+     * Scenario 3: source ID set + source category empty → returns most-sold marketplace products from current category
+     */
+    public function getFeaturedProducts(): \Magento\Catalog\Model\ResourceModel\Product\Collection
+    {
+        if ($this->featuredProductsCache !== null) {
+            return $this->featuredProductsCache;
+        }
+
+        $featuredSourceId = $this->getFeaturedSourceId();
+        if (!$featuredSourceId) {
+            return $this->emptyCollection();
+        }
+
+        $featuredCount   = $this->getFeaturedCount();
+        $currentCategory = $this->getCurrentCategory();
+
+        // Scenario 2: load from source category
+        $featuredCategory = $this->categoryFactory->create()->load($featuredSourceId);
+        $collection = $this->collectionFactory->create()
+            ->addAttributeToSelect(['name', 'price', 'special_price', 'small_image', 'url_key', 'ahy_product_label', 'ahy_product_label_color'])
+            ->addCategoryFilter($featuredCategory)
+            ->addAttributeToFilter('status', 1)
+            ->addAttributeToFilter('visibility', ['in' => [2, 4]])
+            ->setPageSize($featuredCount)
+            ->setOrder('position', 'ASC');
+
+        $collection->getSelect()
+            ->join(
+                ['stock_status' => $collection->getResource()->getTable('cataloginventory_stock_status')],
+                'stock_status.product_id = e.entity_id AND stock_status.stock_id = 1 AND stock_status.stock_status = 1',
+                []
+            )
+            ->group('e.entity_id');
+
+        // Scenario 3: source category empty — fallback to most-sold marketplace products
+        if ($collection->count() === 0) {
+            $this->usedFallback = true;
+            $collection = $this->collectionFactory->create()
+                ->addAttributeToSelect(['name', 'price', 'special_price', 'small_image', 'url_key', 'ahy_product_label', 'ahy_product_label_color'])
+                ->addCategoryFilter($currentCategory)
+                ->addAttributeToFilter('status', 1)
+                ->addAttributeToFilter('visibility', ['in' => [2, 4]])
+                ->setPageSize($featuredCount);
+
+            $sellerProductIds = $this->getMarketplaceSellerProductIds();
+            if (!empty($sellerProductIds)) {
+                $collection->addFieldToFilter('entity_id', ['in' => $sellerProductIds]);
+            }
+
+            $collection->getSelect()
+                ->joinLeft(
+                    ['soi' => $collection->getResource()->getTable('sales_order_item')],
+                    'soi.product_id = e.entity_id AND soi.parent_item_id IS NULL',
+                    ['total_sold' => 'COALESCE(SUM(soi.qty_ordered), 0)']
+                )
+                ->join(
+                    ['stock_status' => $collection->getResource()->getTable('cataloginventory_stock_status')],
+                    'stock_status.product_id = e.entity_id AND stock_status.stock_id = 1 AND stock_status.stock_status = 1',
+                    []
+                )
+                ->group('e.entity_id')
+                ->order('total_sold DESC');
+        }
+
+        $this->featuredProductsCache = $collection;
+        return $this->featuredProductsCache;
+    }
+
+    public function isUsingFallback(): bool
+    {
+        return $this->usedFallback;
+    }
+
+    // ---------------------------------------------------------------
+    // Marketplace seller filter
+    // ---------------------------------------------------------------
+
+    public function getMarketplaceSellerProductIds(): array
+    {
+        $sellerId = (int)$this->_scopeConfig->getValue(
+            'ahy_plprevamp/featured_products/marketplace_seller_id',
+            ScopeInterface::SCOPE_STORE
+        );
+
+        if (!$sellerId) {
+            return [];
+        }
+
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()
+            ->from($connection->getTableName('marketplace_product'), ['mageproduct_id'])
+            ->where('seller_id = ?', $sellerId)
+            ->where('status = ?', 1);
+
+        return $connection->fetchCol($select);
+    }
+
+    // ---------------------------------------------------------------
+    // URLs
+    // ---------------------------------------------------------------
+
+    /**
+     * Loads and caches the featured source category.
+     * Returns null when no source ID is configured or the category does not exist.
+     */
+    public function getFeaturedSourceCategory(): ?\Magento\Catalog\Model\Category
+    {
+        if ($this->featuredSourceCategoryCache !== null) {
+            return $this->featuredSourceCategoryCache;
+        }
+
+        $featuredSourceId = $this->getFeaturedSourceId();
+        if (!$featuredSourceId) {
+            return null;
+        }
+
+        $category = $this->categoryFactory->create()->load($featuredSourceId);
+
+        // Verify the category actually exists in the DB
+        if (!$category->getId()) {
+            return null;
+        }
+
+        $this->featuredSourceCategoryCache = $category;
+        return $this->featuredSourceCategoryCache;
+    }
+
+     public function getSeeMoreUrl(): string
+    {
+        $featuredCategory = $this->getFeaturedSourceCategory();
+        if ($featuredCategory) {
+            return $featuredCategory->getUrl();
+        }
+
+        // Fallback: parent category with Klevu filter active
+        return $this->getCurrentCategory()->getUrl() . '?klevu_catnav=1';
+    }
+    // ---------------------------------------------------------------
+    // Featured brands
+    // ---------------------------------------------------------------
+
+    public function getFeaturedBrandsTitle(): string
+    {
+        return (string)($this->getCurrentCategory()->getData('ahy_featured_brands_title') ?: 'Featured Brands');
+    }
+
+    /**
+     * Returns the featured brand cards for the current category.
+     *
+     * Prefers the structured `ahy_featured_brands` attribute (name + link + image); falls back to
+     * the legacy comma-separated `ahy_featured_brand_names` so existing categories keep working.
+     *
+     * Every configured brand is returned. The section renders them as one horizontally
+     * scrollable row (.ahy-brand-grid), so the count no longer needs capping; the
+     * "See All" link still points at the All Brands page via getBrandsSeeMoreUrl().
+     *
+     * @return array<int, array{label: string, url: string, image: string}>
+     */
+    public function getFeaturedBrands(): array
+    {
+        $category = $this->getCurrentCategory();
+
+        $rows = $this->brandsParser->parse($category->getData('ahy_featured_brands'));
+        if ($rows === []) {
+            $rows = $this->brandsParser->parseLegacy((string)$category->getData('ahy_featured_brand_names'));
+        }
+
+        $mediaBaseUrl = $this->getMediaBaseUrl();
+        $webBaseUrl   = $this->getStoreBaseUrl();
+
+        return array_map(
+            fn(array $row): array => [
+                'label' => $row['label'],
+                'url'   => $row['url'],
+                'image' => $this->brandsParser->buildImageUrl($row['image'], $mediaBaseUrl, $webBaseUrl),
+            ],
+            $rows
+        );
+    }
+
+    /**
+     * "See All" target for the featured brands section — the All Brands page.
+     */
+    public function getBrandsSeeMoreUrl(): string
+    {
+        return $this->getUrl('allbrands');
+    }
+
+    public function getStoreBaseUrl(): string
+    {
+        return $this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_WEB);
+    }
+
+    public function getMediaBaseUrl(): string
+    {
+        return $this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_MEDIA);
+    }
+
+    // ---------------------------------------------------------------
+    // Fallback image
+    // ---------------------------------------------------------------
+
+    public function getFallbackImageUrl(): string
+    {
+        return $this->getMediaBaseUrl() . 'ahy_plp/everest-fallback-logo.png';
+    }
+
+    // ---------------------------------------------------------------
+    // Product image URL builder
+    // ---------------------------------------------------------------
+
+    public function getProductImageUrl(string $imagePath): string
+    {
+        if (!$imagePath || $imagePath === 'no_selection') {
+            return '';
+        }
+
+        return 'https://static.everest.com/media/catalog/product' . $imagePath;
+    }
+
+    // ---------------------------------------------------------------
+    // Reviews — batch load to avoid N+1
+    // ---------------------------------------------------------------
+
+    /**
+     * Fetch native rating data for all product IDs in one query.
+     *
+     * @param int[] $productIds
+     * @return array<int, array{stars: int, count: int}>
+     */
+    public function getProductRatingsBatch(array $productIds): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $storeId    = (int)$this->storeManager->getStore()->getId();
+        $connection = $this->resourceConnection->getConnection();
+
+        $select = $connection->select()
+            ->from(
+                $connection->getTableName('review_entity_summary'),
+                ['entity_pk_value', 'rating_summary', 'reviews_count']
+            )
+            ->where('entity_pk_value IN (?)', $productIds)
+            ->where('store_id = ?', $storeId)
+            ->where('entity_type = ?', 1);
+
+        $result = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $result[(int)$row['entity_pk_value']] = [
+                'stars' => $row['rating_summary'] > 0 ? (int)round((int)$row['rating_summary'] / 20) : 0,
+                'count' => (int)$row['reviews_count'],
+            ];
+        }
+
+        return $result;
+    }
+
+    // ---------------------------------------------------------------
+    // Product label badge
+    // ---------------------------------------------------------------
+
+    /**
+     * Resolves the option_id stored in ahy_product_label to its badge text.
+     *
+     * The attribute is a dropdown, so the stored value is an option ID. A non-numeric value is
+     * returned as-is so labels typed before the attribute became a select still render.
+     */
+    public function getProductLabelText(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (empty($this->productLabelOptionMap)) {
+            try {
+                $attr = $this->eavConfig->getAttribute(Product::ENTITY, 'ahy_product_label');
+                foreach ($attr->getSource()->getAllOptions() as $opt) {
+                    $this->productLabelOptionMap[(string)$opt['value']] = trim((string)$opt['label']);
+                }
+            } catch (\Exception $e) {
+                // attribute or source unavailable — fall through to the raw value
+            }
+        }
+
+        return $this->productLabelOptionMap[$value] ?? (ctype_digit($value) ? '' : $value);
+    }
+
+    /**
+     * Resolves option_id stored in ahy_product_label_color to a CSS hex color.
+     * Loads option labels once per page request and caches in $labelColorOptionMap.
+     */
+    public function getLabelBgColor(string $optionId): string
+    {
+        $colorMap = [
+            'green'  => '#22c55e',
+            'orange' => '#f97316',
+            'blue'   => '#3b82f6',
+            'red'    => '#ef4444',
+            'dark'   => '#1e3a5f',
+            'teal'   => '#14b8a6',
+        ];
+
+        if (empty($this->labelColorOptionMap)) {
+            try {
+                $attr = $this->eavConfig->getAttribute(Product::ENTITY, 'ahy_product_label_color');
+                foreach ($attr->getSource()->getAllOptions() as $opt) {
+                    $this->labelColorOptionMap[(string)$opt['value']] = strtolower(trim((string)$opt['label']));
+                }
+            } catch (\Exception $e) {
+                // attribute not found — fall through to default
+            }
+        }
+
+        $label = $this->labelColorOptionMap[$optionId] ?? strtolower(trim($optionId));
+
+        return $colorMap[$label] ?? '#22c55e';
+    }
+
+}

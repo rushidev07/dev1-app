@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/config.xsd">
+    <default>
+        <ahy_estateapi>
+            <general>
+                <zip_retry_limit>3</zip_retry_limit>
+                 <enable_restriction>1</enable_restriction>
+            </general>
+        </ahy_estateapi>
+        <!-- Point Webkul Marketplace's seller "order invoiced" email at our own owned template,
+             so it can be edited without modifying the vendor module. -->
+        <marketplace>
+            <email>
+                <order_invoiced_notification_template>ahy_estateapi_order_invoiced_template</order_invoiced_notification_template>
+            </email>
+        </marketplace>
+    </default>
+</config>

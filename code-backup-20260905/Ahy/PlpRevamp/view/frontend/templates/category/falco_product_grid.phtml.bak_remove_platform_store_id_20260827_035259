@@ -1,0 +1,1554 @@
+<?php
+/** @var \Ahy\PlpRevamp\Block\Category\FalcoProductGrid $block */
+$productsApiUrl  = $block->escapeUrl($block->getProductsApiUrl());
+$searchToken     = $block->getSearchToken((int) $block->getPlatformStoreId());
+$categoryName    = $block->getCategoryName();
+$addToCartUrl    = $block->escapeUrl($block->getUrl('checkout/cart/add'));
+$platformStoreId = (int) $block->getPlatformStoreId();
+$yotpoEndpoint   = $block->escapeUrl($block->getYotpoEndpointUrl());
+$caliberEndpoint = $block->escapeUrl($block->getUrl('caliber-nation/pricing/memberprice'));
+?>
+<script>
+var _ahyCatInit = {
+    url:      <?= json_encode($productsApiUrl) ?>,
+    token:    <?= json_encode($searchToken) ?>,
+    category: <?= json_encode($categoryName) ?>,
+    storeId:  <?= (int) $platformStoreId ?>
+};
+var YOTPO_ENDPOINT   = '<?= $yotpoEndpoint ?>';
+var CALIBER_ENDPOINT = '<?= $caliberEndpoint ?>';
+</script>
+
+<div
+    x-data="ahyCategoryResults(_ahyCatInit.url, _ahyCatInit.token, _ahyCatInit.category, _ahyCatInit.storeId)"
+    x-init="init()"
+    x-effect="(() => { let m = document.querySelector('.column.main'); if (m && !loading) m.style.setProperty('min-height', 'auto', 'important'); })()"
+    x-cloak
+    class="w-full"
+>
+
+    <div class="md:hidden bg-ahy-bg border-b border-gray-300" x-show="!loading && results.length > 0"
+         x-data="{ showMobileFilter: false }"
+         x-effect="document.body.style.overflow = showMobileFilter ? 'hidden' : ''">
+
+        <div class="ahy-filters-menu relative z-10 flex justify-between md:items-center gap-3 px-4 py-3">
+            <button @click="showMobileFilter = true"
+                    class="ahy-filters shrink-0 border-2 border-ahy-blue text-ahy-blue uppercase text-xs tracking-widest font-bold py-3 px-4 rounded-full transition duration-300 ease-in-out">
+                Filter By
+            </button>
+
+            <div x-data="{ open: false }" class="ahy-sort relative flex items-center gap-1 text-sm text-ahy-blue">
+                <span>Sort by:</span>
+                <button @click="open = !open" class="font-bold flex items-center gap-1">
+                    <span x-text="sortLabel()" class="line-clamp-1"></span>
+                    <svg class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="open" @click.outside="open = false"
+                     class="absolute right-0 top-full bg-white border border-gray-200 rounded-xl shadow-lg z-50 w-52 py-1">
+                    <button @click="setSort('relevance'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'relevance' ? 'font-bold text-ahy-blue' : ''">Relevance</button>
+                    <button @click="setSort('price_asc'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'price_asc' ? 'font-bold text-ahy-blue' : ''">Price: Low to High</button>
+                    <button @click="setSort('price_desc'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'price_desc' ? 'font-bold text-ahy-blue' : ''">Price: High to Low</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-200 py-1.5 text-center text-xs font-semibold text-ahy-blue md:block hidden" x-show="total > 0">
+            (<span x-text="total"></span> Items)
+        </div>
+
+        <template x-teleport="body">
+        <div class="fixed inset-0 overflow-hidden z-[500]" x-show="showMobileFilter" x-cloak>
+            <div x-show="showMobileFilter"
+                 x-transition:enter="ease-in-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in-out duration-300"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 @click="showMobileFilter = false"
+                 class="absolute inset-0 bg-black/50"></div>
+
+            <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">
+                <div x-show="showMobileFilter"
+                     x-transition:enter="transform transition ease-in-out duration-300"
+                     x-transition:enter-start="translate-x-full"
+                     x-transition:enter-end="translate-x-0"
+                     x-transition:leave="transform transition ease-in-out duration-300"
+                     x-transition:leave-start="translate-x-0"
+                     x-transition:leave-end="translate-x-full"
+                     @keydown.escape.window="showMobileFilter = false"
+                     class="relative w-screen max-w-[769px] h-full bg-white overflow-y-auto flex flex-col shadow-xl">
+
+            <div class="px-4 pt-4 sticky top-0 bg-white z-10">
+                <div class="flex justify-end">
+                    <button @click="showMobileFilter = false"
+                            class="w-8 h-8 flex items-center justify-center text-gray-500 text-xl leading-none">&#x2715;</button>
+                </div>
+                <div class="flex items-center justify-between pb-4">
+                    <button @click="clearAllFilters()" class="text-sm font-semibold text-ahy-blue">Reset</button>
+                    <button @click="showMobileFilter = false" class="text-sm font-semibold text-ahy-blue">Apply</button>
+                </div>
+            </div>
+
+            <div x-show="total > 0" class="pb-3 mb-4 border-b-4 border-ahy-blue" style="margin-inline: 20px">
+                <span class="text-sm font-semibold text-ahy-blue" x-text="'(' + total + ' Items)'"></span>
+            </div>
+
+            <div class="flex-1 px-4 py-2">
+
+                <template x-if="priceRange.min !== null">
+                    <div class="border-t-2 border-white py-4">
+                        <button class="flex items-center justify-between w-full mb-3" @click="priceCollapsed = !priceCollapsed">
+                            <span class="font-bold text-ahy-blue ahy-filter-title">Price</span>
+                            <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="priceCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <ul x-show="!priceCollapsed" class="">
+                            <template x-for="bucket in priceRangeBuckets()" :key="bucket.label">
+                                <li>
+                                    <label style="margin-bottom:0.5rem" class="flex items-center gap-2.5 cursor-pointer hover:bg-white rounded-full px-2 py-2 -mx-2 transition-colors"
+                                           :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-white' : ''"
+                                           @click.prevent="togglePriceRange(bucket)">
+                                        <span class="w-5 h-5 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center"
+                                              :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-ahy-blue border-ahy-blue' : 'bg-white'">
+                                            <svg x-show="activePriceRange && activePriceRange.label === bucket.label" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="ahy-filter-option text-gray-700 flex-1 leading-tight"
+                                              :class="activePriceRange && activePriceRange.label === bucket.label ? 'font-semibold' : ''"
+                                              x-text="bucket.label"></span>
+                                    </label>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+
+                <template x-for="filter in filters" :key="'mf-' + filter.key">
+                    <div class="border-t-2 border-white py-4">
+                        <button class="flex items-center justify-between w-full mb-3" @click="filter.collapsed = !filter.collapsed">
+                            <span class="font-bold text-ahy-blue ahy-filter-title" x-text="filter.label"></span>
+                            <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="filter.collapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <ul x-show="!filter.collapsed" class="">
+                            <template x-for="option in (filter.showAll ? filter.options : filter.options.slice(0,5))" :key="option.value">
+                                <li>
+                                    <label style="margin-bottom:0.5rem" class="flex items-center gap-2.5 cursor-pointer hover:bg-white rounded-full px-2 py-2 -mx-2 transition-colors"
+                                           :class="isFilterActive(filter.key, option.value) ? 'bg-white' : ''"
+                                           @click.prevent="toggleFilter(filter.key, filter.label, option.value)">
+                                        <span class="w-5 h-5 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center"
+                                              :class="isFilterActive(filter.key, option.value) ? 'bg-ahy-blue border-ahy-blue' : 'bg-white'">
+                                            <svg x-show="isFilterActive(filter.key, option.value)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        </span>
+                                        <span class="ahy-filter-option text-gray-700 flex-1"
+                                              :class="isFilterActive(filter.key, option.value) ? 'font-semibold' : ''"
+                                              x-text="option.value"></span>
+                                        <span class="text-sm text-ahy-blue" x-text="'(' + option.count + ')'"></span>
+                                    </label>
+                                </li>
+                            </template>
+                            <li x-show="filter.options.length > 5">
+                                <button class="text-sm font-bold text-ahy-blue mt-1" @click="filter.showAll = !filter.showAll">
+                                    <span x-show="!filter.showAll">See More +</span>
+                                    <span x-show="filter.showAll">See Less –</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+                </div>
+            </div>
+        </div>
+        </template>
+    </div>
+
+    <div id="category-results-layout" class="flex px-4 md:pr-0 lg:pl-6 pt-0 pb-12 ahy-filter-layout">
+
+        <!-- Modal loader -->
+        <div x-show="loading || paginationLoading" x-cloak class="ahy-modal-loader-overlay">
+            <div class="ahy-page-loader" style="margin:0;"></div>
+        </div>
+
+
+        <aside class="hidden md:block ahy-filter-sidebar" x-show="results.length > 0">
+            <div class="">
+
+                <div x-show="loading" class="flex flex-col gap-4 pt-2">
+                    <div class="cat-skel h-4 rounded-full w-2/3"></div>
+                    <div class="h-px bg-gray-200"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-4/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-3/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-4/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-3/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-2/5"></div>
+                    <div class="h-px bg-gray-200 mt-2"></div>
+                    <div class="cat-skel h-4 rounded-full w-2/3"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-4/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-3/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-4/5"></div>
+                    <div class="h-px bg-gray-200 mt-2"></div>
+                    <div class="cat-skel h-4 rounded-full w-2/3"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-4/5"></div>
+                    <div class="cat-skel h-3.5 rounded-full w-3/5"></div>
+                </div>
+
+                <div x-show="!loading && results.length > 0">
+
+                    <div class="pb-3 mb-6 border-b-4 border-ahy-blue">
+                        <span class="text-sm font-semibold text-ahy-blue">
+                            (<span x-text="total"></span> Items)
+                        </span>
+                    </div>
+
+                    <div x-show="activeFilters.length > 0 || activePriceMin !== '' || activePriceMax !== ''" class="mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="font-bold text-ahy-blue ahy-filter-title">Filter By</span>
+                            <button class="text-xs font-semibold text-ahy-blue" @click="clearAllFilters()">Clear all</button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="f in activeFilters" :key="f.key + f.value">
+                                <span class="ahy-filter-chip inline-flex items-center gap-1.5 bg-white text-ahy-blue text-xs px-3 py-1.5 rounded-full cursor-pointer border border-gray-300"
+                                      @click="removeFilter(f.key, f.value)">
+                                    <span x-text="f.value"></span>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </span>
+                            </template>
+                            <template x-if="activePriceMin !== '' || activePriceMax !== ''">
+                                <span class="ahy-filter-chip inline-flex items-center gap-1.5 bg-white text-ahy-blue text-xs px-3 py-1.5 rounded-full cursor-pointer border border-gray-300"
+                                      @click="clearPriceFilter()">
+                                    <span x-text="'Price: ' + (activePriceMin !== '' ? '$' + activePriceMin : '') + (activePriceMin !== '' && activePriceMax !== '' ? ' – ' : '') + (activePriceMax !== '' ? '$' + activePriceMax : '')"></span>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="space-y-0" x-show="filters.length > 0 || priceRange.min !== null">
+
+                        <template x-if="priceRange.min !== null">
+                            <div class="border-t-2 border-white py-4">
+                                <button class="flex items-center justify-between w-full mb-3"
+                                        @click="priceCollapsed = !priceCollapsed">
+                                    <span class="font-bold text-ahy-blue ahy-filter-title">Price</span>
+                                    <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="priceCollapsed ? 'rotate-180' : ''"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                <ul x-show="!priceCollapsed" class="">
+                                    <template x-for="bucket in priceRangeBuckets()" :key="bucket.label">
+                                        <li>
+                                            <label style="margin-bottom:0.5rem" class="flex items-center gap-2.5 cursor-pointer group hover:bg-white rounded-full px-2 py-2 -mx-2 transition-colors"
+                                                   :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-white' : ''"
+                                                   @click.prevent="togglePriceRange(bucket)">
+                                                <span class="w-4 h-4 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center transition-colors"
+                                                      :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-ahy-blue border-ahy-blue' : 'bg-white group-hover:border-ahy-blue'">
+                                                    <svg x-show="activePriceRange && activePriceRange.label === bucket.label" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                </span>
+                                                <span class="ahy-filter-option text-gray-700 flex-1 leading-tight"
+                                                      :class="activePriceRange && activePriceRange.label === bucket.label ? 'font-semibold' : ''"
+                                                      x-text="bucket.label"></span>
+                                            </label>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </template>
+
+                        <template x-for="filter in filters" :key="filter.key">
+                            <div class="border-t-2 border-white py-4">
+                                <button class="flex items-center justify-between w-full mb-3"
+                                        @click="filter.collapsed = !filter.collapsed">
+                                    <span class="font-bold text-ahy-blue ahy-filter-title" x-text="filter.label"></span>
+                                    <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="filter.collapsed ? 'rotate-180' : ''"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+                                <ul x-show="!filter.collapsed" class="">
+                                    <template x-for="option in (filter.showAll ? filter.options : filter.options.slice(0,5))" :key="option.value">
+                                        <li>
+                                            <label style="margin-bottom:0.5rem" class="flex items-center gap-2.5 cursor-pointer group hover:bg-white rounded-full px-2 py-2 -mx-2 transition-colors"
+                                                   :class="isFilterActive(filter.key, option.value) ? 'bg-white' : ''"
+                                                   @click.prevent="toggleFilter(filter.key, filter.label, option.value)">
+                                                <span class="w-4 h-4 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center transition-colors"
+                                                      :class="isFilterActive(filter.key, option.value) ? 'bg-ahy-blue border-ahy-blue' : 'bg-white group-hover:border-ahy-blue'">
+                                                    <svg x-show="isFilterActive(filter.key, option.value)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                </span>
+                                                <span class="ahy-filter-option text-gray-700 flex-1 leading-tight"
+                                                      :class="isFilterActive(filter.key, option.value) ? 'font-semibold' : ''"
+                                                      x-text="option.value"></span>
+                                                <span x-show="option.count !== null" class="text-sm text-ahy-blue shrink-0 ahy-filter-count" x-text="'(' + option.count + ')'"></span>
+                                            </label>
+                                        </li>
+                                    </template>
+                                    <li x-show="filter.options.length > 5" style="margin-top: 8px;">
+                                        <button class="text-sm font-bold text-ahy-blue hover:underline"
+                                                @click="filter.showAll = !filter.showAll">
+                                            <span x-show="!filter.showAll">See More +</span>
+                                            <span x-show="filter.showAll">See Less –</span>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="flex-1 min-w-0">
+
+            <div class="hidden md:flex items-center justify-end mb-5" x-show="!loading && results.length > 0">
+                <div x-data="{ open: false }" class="relative flex items-center gap-1 text-sm text-ahy-blue">
+                    <span>Sort by:</span>
+                    <button @click="open = !open" class="font-bold flex items-center gap-1 ml-1">
+                        <span x-text="sortLabel()"></span>
+                        <svg class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" @click.outside="open = false"
+                         class="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-50 w-52 py-1">
+                        <button @click="setSort('relevance'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'relevance' ? 'font-bold text-ahy-blue' : ''">Relevance</button>
+                        <button @click="setSort('price_asc'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'price_asc' ? 'font-bold text-ahy-blue' : ''">Price: Low to High</button>
+                        <button @click="setSort('price_desc'); open = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50" :class="sort === 'price_desc' ? 'font-bold text-ahy-blue' : ''">Price: High to Low</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hidden text-sm font-semibold text-ahy-blue px-1 mb-3" x-show="!loading && results.length > 0">
+                (<span x-text="total"></span> Items)
+            </div>
+
+            <div x-show="!loading && results.length === 0" class="px-6 py-12 text-center text-gray-500">
+                No records found for this category.
+            </div>
+
+            <!-- ==================== DESKTOP GRID ==================== -->
+            <div x-show="!loading && results.length > 0"
+                 class="hidden md:grid plp-product-grid plp-desktop-grid gap-0.5">
+                <template x-for="(product, index) in sortedResults()" :key="product.sku || product.product_id">
+                    <li class="plp-card"
+                        x-data="{
+                            get hasDiscount() { return product.special_price && parseFloat(product.special_price) < parseFloat(product.price) },
+                            get savingsPct() { return this.hasDiscount ? Math.round(((product.price - product.special_price) / product.price) * 100) : 0 },
+                            get displayPrice() { return this.hasDiscount ? product.special_price : product.price }
+                        }">
+
+                        <!-- Stock badge -->
+                        <div class="plp-stock-badge-wrap"
+                             x-show="product.variants && product.variants.length <= 10 && product.variants.length > 0">
+                            <span class="plp-stock-badge"
+                                  x-text="(product.variants || []).length + ' left'"></span>
+                        </div>
+
+                        <div class="plp-card-wrap">
+                            <!-- Image -->
+                            <div class="plp-card-image">
+                                <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'">
+                                    <img :src="imgUrl(product.image)"
+                                         :alt="product.name"
+                                         width="244" height="244"
+                                         class="plp-card-img"
+                                         :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                         loading="eager"
+                                         fetchpriority="high"
+                                         @error="handleImgError($event)"
+                                         :data-original-src="product.image"/>
+                                </a>
+                                <!-- Mobile-only color count -->
+                                <div class="plp-colors-mobile">
+                                    <template x-if="product.variants && product.variants.length > 0">
+                                        <span x-text="product.variants.length + ' colors'"></span>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Wishlist button -->
+                            <button class="plp-wishlist-btn"
+                                    @click.prevent="addToWishlist(product.product_id)"
+                                    :disabled="wishLoading[product.product_id] === true"
+                                    aria-label="Add to Wish List" type="button">
+                                <template x-if="wishLoading[product.product_id] === true">
+                                    <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                </template>
+                                <template x-if="wishLoading[product.product_id] !== true">
+                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20" fill="currentColor">
+                                        <path d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                    </svg>
+                                </template>
+                            </button>
+
+                            <!-- Content footer -->
+                            <div class="plp-card-content">
+                                <!-- Product name -->
+                                <div class="plp-card-name">
+                                    <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                                       :title="cleanName(product.name)"
+                                       x-text="cleanName(product.name)"></a>
+                                </div>
+
+                                <!-- Seller line -->
+                                <div class="plp-card-seller"
+                                     x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+
+                                <!-- Yotpo stars -->
+                                <div class="plp-rating"
+                                     x-data="{ get _r(){ return $store.yotpoReviews ? $store.yotpoReviews.data[String(product.product_id)] : null } }">
+                                    <div class="plp-rating-stars">
+                                        <template x-for="i in [1,2,3,4,5]" :key="i">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                                 :fill="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                                 :stroke="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                                 stroke-width="1">
+                                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                                            </svg>
+                                        </template>
+                                    </div>
+                                    <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : ''"></span>
+                                </div>
+
+                                <!-- 2-column price grid -->
+                                <div class="plp-price-section">
+                                    <div class="plp-price-grid">
+                                        <!-- Left: CaliberNation -->
+                                        <div class="plp-caliber-col"
+                                             x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                            <div class="plp-caliber-title">CaliberNation Price</div>
+                                            <div class="plp-caliber-value" x-text="_cp ? _cp.formattedMember : '$0.00'"></div>
+                                            <div class="plp-caliber-save">
+                                                <span class="plp-caliber-save-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                                                </span>
+                                                <div class="plp-caliber-save-text">
+                                                    <span x-text="_cp ? 'MEMBERS SAVE ' + _cp.formattedSavings : 'MEMBERS SAVE $0.00'"></span>
+                                                    <span x-text="_cp ? Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : '0% OFF MSRP'"></span>
+                                                </div>
+                                            </div>
+                                            <a class="plp-caliber-join" href="/caliber-nation">JOIN CALIBER ></a>
+                                        </div>
+
+                                        <!-- Right: Normal price -->
+                                        <div class="plp-normal-col">
+                                            <template x-if="hasDiscount">
+                                                <div>
+                                                    <div class="plp-normal-title">Sale Price</div>
+                                                    <div class="plp-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
+                                                    <div class="plp-nonmember-wrap">
+                                                        <span class="plp-nonmember-text">NON-MEMBERS SAVE <span class="plp-pct-inline" x-text="savingsPct + '%'"></span></span>
+                                                        <span class="plp-nonmember-msrp"><span class="plp-pct-block" x-text="savingsPct + '% '"></span>OFF MSRP</span>
+                                                    </div>
+                                                    <div class="plp-msrp-line">
+                                                        MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="!hasDiscount && product.price">
+                                                <div>
+                                                    <div class="plp-normal-title">Price</div>
+                                                    <div class="plp-normal-value" x-html="hyva.formatPrice(product.price)"></div>
+                                                </div>
+                                            </template>
+                                            <template x-if="!product.price">
+                                                <div>
+                                                    <span class="plp-see-options-btn">See Options</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Add to cart / Options button -->
+                                <div class="plp-atc-wrap">
+                                    <!-- FREE Shipping hidden — matches old Klevu behaviour. To re-enable: uncomment below -->
+                                    <!-- <p class="plp-free-shipping" :class="isFreeShipping(product) ? '' : 'plp-invisible'">FREE Shipping</p> -->
+                                    <div class="plp-atc-btn-wrap">
+                                        <template x-if="product.type !== 'configurable'">
+                                            <button class="plp-atc-btn"
+                                                    @click.prevent="addSimpleToCart(product)"
+                                                    :class="cartLoading[product.product_id] === true ? 'plp-btn-loading' : ''">
+                                                <svg x-show="cartLoading[product.product_id] === true" class="animate-spin w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                                <svg x-show="cartLoading[product.product_id] !== true" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                                <span class="md:hidden lg:block" x-text="cartLoading[product.product_id] === true ? 'Adding...' : 'Add to Cart'"></span>
+                                                <span class="hidden md:block lg:hidden" x-text="cartLoading[product.product_id] === true ? '...' : 'Add to Cart'"></span>
+                                            </button>
+                                        </template>
+                                        <template x-if="product.type === 'configurable'">
+                                            <button class="plp-atc-btn"
+                                                    @click.prevent="$dispatch('ahy-open-config-modal', product)">
+                                                <span>Options</span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </template>
+            </div>
+
+            <!-- ==================== MOBILE LIST ==================== -->
+            <div x-show="!loading && results.length > 0" class="md:hidden flex flex-col plp-mobile-list gap-0.5">
+                <template x-for="(product, index) in sortedResults()" :key="'m-' + (product.sku || product.product_id)">
+                    <div class="relative flex bg-white ahy-mobile-card"
+                         x-data="{
+                             get hasDiscount() { return product.special_price && parseFloat(product.special_price) < parseFloat(product.price) },
+                             get savingsPct() { return this.hasDiscount ? Math.round(((product.price - product.special_price) / product.price) * 100) : 0 },
+                             get displayPrice() { return this.hasDiscount ? product.special_price : product.price }
+                         }">
+
+                        <div class="relative shrink-0" style="width:45%">
+                            <div class="absolute top-3 left-3 z-10"
+                                 x-show="product.variants && product.variants.length <= 10 && product.variants.length > 0">
+                                <span class="plp-stock-badge"
+                                      x-text="(product.variants || []).length + ' Left'"></span>
+                            </div>
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'" class="block h-full">
+                                <img :src="imgUrl(product.image)"
+                                     :alt="product.name"
+                                     class="w-full h-full object-contain p-3"
+                                     :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                     style="min-height:160px;max-height:200px"
+                                     loading="eager"
+                                     fetchpriority="high"
+                                     @error="handleImgError($event)"
+                                     :data-original-src="product.image"/>
+                            </a>
+                        </div>
+
+                        <div class="flex-1 min-w-0 flex flex-col px-3 py-4">
+                            <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                               class="font-bold text-ahy-blue leading-snug line-clamp-2" style="font-size:18px"
+                               x-text="cleanName(product.name)"></a>
+
+                            <div class="plp-card-seller"
+                                 x-text="product.brand ? 'Sold by ' + product.brand : 'Sold by The Everest Marketplace'"></div>
+
+                            <!-- Yotpo stars mobile -->
+                            <div class="plp-rating"
+                                 x-data="{ get _r(){ return $store.yotpoReviews ? $store.yotpoReviews.data[String(product.product_id)] : null } }">
+                                <div class="plp-rating-stars">
+                                    <template x-for="i in [1,2,3,4,5]" :key="i">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                             :fill="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                             :stroke="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                             stroke-width="1">
+                                            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                                        </svg>
+                                    </template>
+                                </div>
+                                <span class="plp-rating-count" x-text="_r ? '(' + _r.count + ')' : ''"></span>
+                            </div>
+
+                            <div class="mt-2">
+                                <template x-if="hasDiscount">
+                                    <div x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                        <div class="plp-mobile-price-grid">
+                                            <div class="plp-mobile-caliber">
+                                                <div class="plp-caliber-title">CaliberNation</div>
+                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : '$0.00'"></div>
+                                            </div>
+                                            <div class="plp-mobile-normal">
+                                                <div class="plp-normal-title">Sale Price</div>
+                                                <div class="plp-mobile-normal-value" x-html="hyva.formatPrice(displayPrice)"></div>
+                                            </div>
+                                        </div>
+                                        <div class="plp-mobile-msrp">
+                                            MSRP <span class="line-through" x-html="hyva.formatPrice(product.price)"></span>
+                                            <span class="plp-mobile-save-pct" x-text="savingsPct + '% OFF'"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="!hasDiscount && product.price">
+                                    <div x-data="{ get _cp(){ return caliberPrices[String(product.product_id)] || null } }">
+                                        <div class="plp-mobile-price-grid">
+                                            <div class="plp-mobile-caliber">
+                                                <div class="plp-caliber-title">CaliberNation</div>
+                                                <div class="plp-mobile-caliber-value" x-text="_cp ? _cp.formattedMember : '$0.00'"></div>
+                                            </div>
+                                            <div class="plp-mobile-normal">
+                                                <div class="plp-normal-title">Price</div>
+                                                <div class="plp-mobile-normal-value" x-html="hyva.formatPrice(product.price)"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <p class="plp-free-shipping-mobile" x-show="isFreeShipping(product)">FREE Shipping</p>
+
+                            <div class="plp-mobile-cta-row">
+                                <template x-if="product.type !== 'configurable'">
+                                    <button @click.prevent="addSimpleToCart(product)"
+                                            :class="cartLoading[product.product_id] === true ? 'plp-btn-loading' : ''"
+                                            class="plp-mobile-atc-btn">
+                                        <svg x-show="cartLoading[product.product_id] === true" class="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                        <svg x-show="cartLoading[product.product_id] !== true" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                        <span x-text="cartLoading[product.product_id] === true ? 'Adding...' : 'Add'"></span>
+                                    </button>
+                                </template>
+                                <template x-if="product.type === 'configurable'">
+                                    <button @click.prevent="$dispatch('ahy-open-config-modal', product)"
+                                            class="plp-mobile-atc-btn">
+                                        Options
+                                    </button>
+                                </template>
+                                <button @click.prevent="addToWishlist(product.product_id)"
+                                        :disabled="wishLoading[product.product_id] === true"
+                                        aria-label="Add to Wish List"
+                                        class="plp-mobile-wishlist-btn">
+                                    <template x-if="wishLoading[product.product_id] === true">
+                                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                                    </template>
+                                    <template x-if="wishLoading[product.product_id] !== true">
+                                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20" fill="currentColor">
+                                            <path d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                        </svg>
+                                    </template>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- ==================== PAGINATION ==================== -->
+            <div x-show="!loading && results.length > 0 && totalPages > 1" class="flex justify-center items-center gap-8 pt-10 pb-4">
+                <button aria-label="Previous" :disabled="page <= 1"
+                        @click="page > 1 && goToPage(page - 1)"
+                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200"
+                        :class="page <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:border-ahy-blue'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" class="font-bold text-ahy-blue flex items-center gap-1">
+                        Page <span x-text="page"></span> of <span x-text="totalPages"></span>
+                        <svg class="w-4 h-4 ml-1 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <nav x-show="open" @click.outside="open = false"
+                         class="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-36 max-h-52 overflow-auto py-1">
+                        <template x-for="p in totalPages" :key="p">
+                            <button class="w-full text-center px-4 py-2.5 text-sm hover:bg-gray-50"
+                                    :class="p === page ? 'font-bold text-ahy-blue' : ''"
+                                    @click="goToPage(p); open = false"
+                                    x-text="'Page ' + p"></button>
+                        </template>
+                    </nav>
+                </div>
+
+                <button aria-label="Next" :disabled="page >= totalPages"
+                        @click="page < totalPages && goToPage(page + 1)"
+                        class="bg-white shadow-lg rounded-full w-12 h-12 flex items-center justify-center border border-gray-200"
+                        :class="page >= totalPages ? 'opacity-30 cursor-not-allowed' : 'hover:border-ahy-blue'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- smart-slider.phtml belongs to FalcoSense, not PlpRevamp -->
+
+<script>
+function ahyCategoryResults(productsApiUrl, searchToken, categoryName, platformStoreId) {
+    return {
+        productsApiUrl,
+        searchToken,
+        categoryName,
+        platformStoreId,
+        results: [],
+        caliberPrices: {},
+        caliberMember: false,
+        caliberPricingEnabled: false,
+        cartLoading: {},
+        wishLoading: {},
+        filters: [],
+        apiFacets: [],
+        activeFilters: [],
+        priceRange: { min: null, max: null },
+        activePriceMin: '',
+        activePriceMax: '',
+        activePriceRange: null,
+        priceCollapsed: false,
+        total: 0,
+        page: 1,
+        pageSize: 24,
+        totalPages: 1,
+        sort: 'relevance',
+        loading: true,
+        paginationLoading: false,
+
+        async _refreshToken() {
+            const t = await window.ahyTokenRefresh?.refresh();
+            if (t) this.searchToken = t;
+            return !!t;
+        },
+
+        init() {
+            window.addEventListener('ahy-token-refreshed', e => { this.searchToken = e.detail; });
+            const params = new URLSearchParams(window.location.search);
+            this.page = parseInt(params.get('p') || '1', 10);
+            const sortParam = params.get('sort');
+            if (sortParam) this.sort = sortParam;
+            if (params.get('price_min')) this.activePriceMin = params.get('price_min');
+            if (params.get('price_max')) this.activePriceMax = params.get('price_max');
+            if (this.activePriceMin || this.activePriceMax) {
+                this.activePriceRange = this.priceRangeBuckets().find(b =>
+                    String(b.min) === this.activePriceMin && String(b.max) === this.activePriceMax
+                ) || null;
+            }
+            const reserved = ['p', 'sort', 'price_min', 'price_max'];
+            params.forEach((value, key) => {
+                if (reserved.includes(key)) return;
+                value.split('|').forEach(v => {
+                    if (v) this.activeFilters.push({ key, label: key, value: v });
+                });
+            });
+
+            const startFetch = () => {
+                window.ahyTokenRefresh?.get().then(t => {
+                    if (t) this.searchToken = t;
+                    this.fetch();
+                });
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', startFetch, { once: true });
+            } else {
+                startFetch();
+            }
+        },
+
+        async fetch() {
+            this.loading = true;
+            try {
+                const url = new URL(this.productsApiUrl);
+                url.searchParams.set('search_token', this.searchToken);
+                url.searchParams.set('category', this.categoryName);
+                url.searchParams.set('page', this.page);
+                url.searchParams.set('per_page', this.pageSize);
+                if (this.platformStoreId) url.searchParams.set('platform_store_id', this.platformStoreId);
+
+                const filterMap = {};
+                this.activeFilters.forEach(f => {
+                    if (f.key === 'category') return;
+                    if (!filterMap[f.key]) filterMap[f.key] = [];
+                    filterMap[f.key].push(f.value);
+                });
+                Object.entries(filterMap).forEach(([key, vals]) => url.searchParams.set(key, vals.join('\x1F')));
+                if (this.activePriceMin !== '') url.searchParams.set('price_min', this.activePriceMin);
+                if (this.activePriceMax !== '') url.searchParams.set('price_max', this.activePriceMax);
+                if (this.sort !== 'relevance') url.searchParams.set('sort', this.sort);
+
+                let resp = await fetch(url.toString(), {credentials: 'include', cache: 'no-store'});
+                if (resp.status === 401) {
+                    await this._refreshToken();
+                    url.searchParams.set('search_token', this.searchToken);
+                    resp = await fetch(url.toString(), {credentials: 'include', cache: 'no-store'});
+                }
+                const data = await resp.json();
+
+                if (data.success) {
+                    this.results    = data.data || [];
+                    this.total      = (data.pagination && data.pagination.total) || 0;
+                    this.pageSize   = (data.pagination && data.pagination.per_page) || 24;
+                    this.totalPages = Math.max(1, Math.ceil(this.total / this.pageSize));
+                    this.apiFacets  = data.facets || [];
+                    this.buildFilters();
+
+                    // Fetch Yotpo ratings for loaded products
+                    this.$nextTick(() => {
+                        if (window.Alpine && Alpine.store('yotpoReviews') && this.results.length) {
+                            Alpine.store('yotpoReviews').fetch(
+                                this.results.map(p => String(p.product_id)),
+                                YOTPO_ENDPOINT
+                            );
+                        }
+                    });
+
+                    // Fetch CaliberNation member prices
+                    if (this.results.length) {
+                        const _caliberIds = this.results.map(p => p.product_id).join(',');
+                        fetch(CALIBER_ENDPOINT + '?ids=' + _caliberIds, { credentials: 'include' })
+                            .then(r => r.json())
+                            .then(d => {
+                                if (d.pricing_enabled) {
+                                    this.caliberPricingEnabled = true;
+                                    this.caliberMember = d.is_member;
+                                    this.caliberPrices = d.prices || {};
+                                }
+                            })
+                            .catch(e => console.error('[CaliberNation] price fetch error', e));
+                    }
+                } else {
+                    console.error('[SmartSearch] Category API error:', data);
+                }
+            } catch(e) {
+                console.error('[SmartSearch] Category fetch error', e);
+            }
+            this.loading = false;
+        },
+
+        buildFilters() {
+            if (this.apiFacets.length === 0) return;
+            const priceFacet = this.apiFacets.find(f => f.key === 'price');
+            if (priceFacet) {
+                this.priceRange = { min: priceFacet.min ?? null, max: priceFacet.max ?? null };
+            }
+            const prevState = {};
+            this.filters.forEach(f => { prevState[f.key] = { collapsed: f.collapsed, showAll: f.showAll }; });
+            this.filters = this.apiFacets
+                .filter(f => f.key !== 'price' && f.key !== 'category')
+                .map(f => ({
+                    key:       f.key,
+                    label:     f.key === 'brand' ? 'Shop By Brand' : f.label,
+                    collapsed: prevState[f.key]?.collapsed ?? false,
+                    showAll:   prevState[f.key]?.showAll ?? false,
+                    options:   (f.options || []).map(o => ({ value: o.value, count: o.count })).sort((a, b) => {
+                        const aA = this.activeFilters.some(af => af.key === f.key && af.value === a.value) ? -1 : 1;
+                        const bA = this.activeFilters.some(af => af.key === f.key && af.value === b.value) ? -1 : 1;
+                        return aA - bA;
+                    }),
+                }));
+        },
+
+        sortedResults() {
+            // API handles sort, price_min, price_max server-side.
+            // No client-side re-filtering — keeps item count and pagination in sync.
+            return this.results;
+        },
+
+        _writeUrl() {
+            const params = new URLSearchParams();
+            if (this.page > 1) params.set('p', this.page);
+            if (this.sort !== 'relevance') params.set('sort', this.sort);
+            if (this.activePriceMin !== '') params.set('price_min', this.activePriceMin);
+            if (this.activePriceMax !== '') params.set('price_max', this.activePriceMax);
+            const filterMap = {};
+            this.activeFilters.forEach(f => {
+                if (!filterMap[f.key]) filterMap[f.key] = [];
+                filterMap[f.key].push(f.value);
+            });
+            Object.entries(filterMap).forEach(([key, vals]) => params.set(key, vals.join('|')));
+            const qs = params.toString();
+            const newUrl = window.location.pathname + (qs ? '?' + qs : '');
+            window.history.replaceState(null, '', newUrl);
+        },
+
+        _scrollToResults() {
+            const el = document.querySelector('.column.main');
+            if (!el) return;
+            const y = Math.max(0, el.getBoundingClientRect().top + window.pageYOffset);
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        },
+
+        toggleFilter(key, label, value) {
+            const idx = this.activeFilters.findIndex(f => f.key === key && f.value === value);
+            if (idx >= 0) this.activeFilters.splice(idx, 1);
+            else this.activeFilters.push({ key, label, value });
+            this.page = 1;
+            this._writeUrl();
+            this._scrollToResults();
+            this.fetch();
+        },
+
+        removeFilter(key, value) {
+            this.activeFilters = this.activeFilters.filter(f => !(f.key === key && f.value === value));
+            this.page = 1;
+            this._writeUrl();
+            this._scrollToResults();
+            this.fetch();
+        },
+
+        applyPriceFilter() { this.page = 1; this._writeUrl(); this._scrollToResults(); this.fetch(); },
+        clearPriceFilter() { this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._writeUrl(); this._scrollToResults(); this.fetch(); },
+        clearAllFilters() { this.activeFilters = []; this.activePriceMin = ''; this.activePriceMax = ''; this.activePriceRange = null; this.page = 1; this._writeUrl(); this._scrollToResults(); this.fetch(); },
+
+        priceRangeBuckets() {
+            if (this.priceRange.min === null) return [];
+            const all = [
+                { label: 'Under $50',     min: '',   max: 50   },
+                { label: '$50 – $100',    min: 50,   max: 100  },
+                { label: '$100 – $250',   min: 100,  max: 250  },
+                { label: '$250 – $500',   min: 250,  max: 500  },
+                { label: '$500 – $1,000', min: 500,  max: 1000 },
+                { label: 'Over $1,000',   min: 1000, max: ''   },
+            ];
+            return all.filter(b => {
+                const lo = b.min === '' ? 0 : b.min;
+                const hi = b.max === '' ? Infinity : b.max;
+                return lo < this.priceRange.max && hi > this.priceRange.min;
+            });
+        },
+
+        togglePriceRange(bucket) {
+            if (this.activePriceRange && this.activePriceRange.label === bucket.label) {
+                this.activePriceRange = null; this.activePriceMin = ''; this.activePriceMax = '';
+            } else {
+                this.activePriceRange = bucket;
+                this.activePriceMin = bucket.min === '' ? '' : String(bucket.min);
+                this.activePriceMax = bucket.max === '' ? '' : String(bucket.max);
+            }
+            this.applyPriceFilter();
+        },
+
+        isFilterActive(key, value) { return this.activeFilters.some(f => f.key === key && f.value === value); },
+
+        goToPage(p) { this.page = p; this._writeUrl(); this.paginationLoading = true; this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollToResults()); }); },
+        setSort(val) {
+            this.sort = val; this.page = 1; this._writeUrl(); this.fetch();
+        },
+        sortLabel() {
+            return { relevance: 'Relevance', price_asc: 'Price: Low to high', price_desc: 'Price: High to low' }[this.sort] || 'Relevance';
+        },
+
+        FREE_SHIPPING_SELLERS: ['The Everest Marketplace', 'The Everest Collection'],
+        isFreeShipping(product) {
+            return this.FREE_SHIPPING_SELLERS.includes(product.brand || 'The Everest Marketplace');
+        },
+        cleanName(name) {
+            if (!name) return '';
+            const d = document.createElement('textarea');
+            d.innerHTML = name;
+            return d.value;
+        },
+
+        FALLBACK_IMG: 'https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png',
+        isFallbackImg(image) {
+            return this.imgUrl(image) === this.FALLBACK_IMG;
+        },
+        imgUrl(image) {
+            if (!image || image.includes('no_selection')) return this.FALLBACK_IMG;
+            const falcosenseBase = 'https://static.everest.com/media/falcosense/800x800';
+            if (image.includes('/falcosense/')) {
+                const fm = image.match(/\/falcosense\/[^/]+\/(?:.*\/)?([^/]+\/[^/]+\/[^/]+)$/);
+                return fm ? falcosenseBase + '/' + fm[1] : image;
+            }
+            let path = image.startsWith('http') ? image.replace(/^https?:\/\/[^/]+/, '') : image;
+            path = path.replace(/\/cache\/[^/]+\//, '/');
+            const m = path.match(/\/catalog\/product\/(.+)$/);
+            if (m) return falcosenseBase + '/' + m[1];
+            const filename = path.split('/').pop();
+            if (!filename) return this.FALLBACK_IMG;
+            if (filename.length >= 2) {
+                return falcosenseBase + '/' + filename[0] + '/' + filename[1] + '/' + filename;
+            }
+            return falcosenseBase + '/' + path.replace(/^\/+/, '');
+        },
+        handleImgError(event) {
+            const el = event.target;
+            if (el.dataset.imgFailed) return;
+            el.dataset.imgFailed = '1';
+            el.src = this.FALLBACK_IMG;
+            el.style.opacity = '0.45';
+        },
+
+        async addSimpleToCart(product) {
+            const pid = product.product_id;
+            this.cartLoading = { ...this.cartLoading, [pid]: true };
+            try {
+                const params = new URLSearchParams({ product: pid, qty: 1, form_key: hyva.getFormKey() });
+                const resp = await fetch('<?= $addToCartUrl ?>', {
+                    method: 'POST',
+                    body: params,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (resp.ok || resp.redirected) {
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                    window.dispatchEvent(new CustomEvent('toggle-cart'));
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{type: 'success', text: 'Product added to cart.'}], 3000);
+                }
+            } catch(e) {
+                console.error('[SmartSearch] Add to cart failed', e);
+            } finally {
+                this.cartLoading = { ...this.cartLoading, [pid]: false };
+            }
+        },
+
+        async addToWishlist(productId) {
+            const pid = productId;
+            this.wishLoading = { ...this.wishLoading, [pid]: true };
+            try {
+                const resp = await window.fetch(window.BASE_URL + 'wishlist/index/add/', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body: 'form_key=' + hyva.getFormKey() + '&product=' + pid + '&uenc=' + hyva.getUenc(),
+                    credentials: 'include',
+                });
+                if (resp.redirected) { window.location.href = resp.url; return; }
+                if (resp.ok) {
+                    const data = await resp.json().catch(() => null);
+                    const msg = data && data.success ? 'Product added to Wish List.' : (data && data.error_message) || 'Could not add to wishlist.';
+                    const type = data && data.success ? 'success' : 'error';
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{ type, text: msg }], 5000);
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                }
+            } catch(e) { console.error('[SmartSearch] wishlist error', e); }
+            finally { this.wishLoading = { ...this.wishLoading, [pid]: false }; }
+        },
+    };
+}
+
+document.addEventListener('alpine:init', function() {
+    if (typeof Alpine !== 'undefined') { window._ssAlpine = Alpine; }
+});
+document.addEventListener('alpine:initialized', function() {
+    var el = document.querySelector('[x-data^="ahyCategoryResults"]');
+    if (!el || !el.hasAttribute('x-cloak')) return;
+    if (el._x_dataStack) {
+        el.removeAttribute('x-cloak');
+    } else if (window._ssAlpine) {
+        window._ssAlpine.initTree(el);
+    }
+});
+</script>
+
+<style>
+    /* Everest GIF page loader */
+    .ahy-page-loader {
+        background: url(/media/icons/everest-loading-icon.gif) no-repeat center;
+        height: 100px;
+        width: 100px;
+        margin: 80px auto;
+        position: relative;
+    }
+
+    /* Modal loader overlay */
+    .ahy-modal-loader-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #efeadd;
+    }
+
+    /* Prevent CLS */
+    .catalog-category-view .column.main { min-height: 4500px; }
+
+    .ahy-filter-title {
+        font-size: 1.125rem !important;
+        line-height: 1.75rem !important;
+        font-weight: 600 !important;
+    }
+    .ahy-filter-chip:hover { background-color: rgb(237, 234, 234) !important; }
+    .ahy-filter-option {
+        font-size: 13px !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+    @media (min-width: 768px) {
+        .ahy-filter-sidebar { width: 200px !important; padding-right: 12px; flex-shrink: 0; }
+        .ahy-filter-layout { gap: 1.25rem !important; }
+        .ahy-filter-sidebar label { gap: 0.375rem !important; }
+    }
+    @media (min-width: 1024px) {
+        .ahy-filter-count { margin-left: 1.5rem !important; }
+        .ahy-filter-sidebar { width: 285px !important; padding-right: 24px; flex-shrink: 0; }
+        .ahy-filter-layout { gap: 3rem !important; }
+        .ahy-filter-sidebar label { gap: 0.625rem !important; }
+    }
+    .catalog-category-view .columns { column-gap: 0 !important; row-gap: 0 !important; }
+    @media (min-width: 426px) {
+        .catalog-category-view .column.main { padding-left: 0 !important; padding-right: 0 !important; }
+    }
+    .page-layout-2columns-left .columns,
+    .page-layout-2columns-right .columns,
+    .page-layout-3columns .columns { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .page-layout-2columns-left .columns .main,
+    .page-layout-3columns .columns .main { grid-column-start: 1 !important; }
+    .ahy-mobile-card { margin-left:50%; width:100vw; transform:translateX(-50%); }
+    @media (min-width:640px) {
+        .ahy-mobile-card { margin-left:auto; width:100%; transform:none; max-width:640px; }
+        .ahy-filters {flex-grow: 1; max-width: 300px;}
+    }
+    @media (max-width: 640px){
+        .ahy-filters-menu {width:100vw;transform:translateX(-50%);margin-left:50%;}
+        .ahy-filters {flex-grow: 1; max-width: 300px;}
+    }
+    .catalog-category-view .wishlist-widget { display: none !important; }
+    .sidebar.sidebar-additional { display: none; }
+
+    /* ==================== PLP Card Styles ==================== */
+
+    /* Card */
+    .plp-card {
+        position: relative;
+        padding: 0;
+        list-style: none;
+    }
+    .plp-card-wrap {
+        background: white;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        position: relative;
+    }
+
+    /* Stock badge */
+    .plp-stock-badge-wrap {
+        position: absolute;
+        left: 24px;
+        top: 28px;
+        z-index: 10;
+    }
+    .plp-stock-badge {
+        border: 2px solid #22c55e;
+        background: white;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #22c55e;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    /* Image */
+    .plp-card-image {
+        position: relative;
+    }
+    .plp-card-img {
+        width: 100%;
+        object-fit: contain;
+        padding: 12px;
+        max-width: 244px;
+        height: 244px;
+        margin: 0 auto;
+        display: block;
+    }
+
+    /* Wishlist */
+    .plp-wishlist-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: white;
+        border: 1px solid #d1d5db;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        z-index: 10;
+        cursor: pointer;
+        color: #0d2f47;
+        padding: 0;
+    }
+    .plp-wishlist-btn:hover {
+        color: #dc2626;
+    }
+
+    /* Card content */
+    .plp-card-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        padding: 8px 0 0;
+        min-width: 0;
+    }
+    .plp-card-name,
+    .plp-card-seller,
+    .plp-rating {
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    /* Product name */
+    .plp-card-name a {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 1.125rem;
+        font-weight: 800;
+        color: #0d2f47;
+        line-height: normal;
+        height: 3.4rem;
+        text-decoration: none;
+    }
+
+    /* Seller */
+    .plp-card-seller {
+        font-size: 0.75rem;
+        color: #6b7280;
+        font-weight: 500;
+        height: 1rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Rating */
+    .plp-rating {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        margin-bottom: 4px;
+    }
+    .plp-rating-stars {
+        display: flex;
+        gap: 2px;
+    }
+    .plp-rating-count {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    /* Price section */
+    .plp-price-section {
+        margin-top: 4px;
+        padding: 1rem 1.5rem 0.75rem;
+    }
+    .plp-price-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .plp-caliber-col {
+        border-right: 1px solid #e5e7eb;
+        padding-right: 12px;
+    }
+    .plp-caliber-title {
+        font-size: 0.7rem;
+        color: #dc2626;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+    .plp-normal-title {
+        font-size: 0.9rem;
+        color: #12334b;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        padding-left: 0.5rem;
+    }
+    .plp-caliber-value {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: #dc2626;
+    }
+    .plp-normal-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #12334b;
+        padding-left: 0.5rem;
+        letter-spacing: 0.5px;
+    }
+    .plp-caliber-save {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        background: #dcfce7;
+        padding: 0.3rem 0.5rem;
+        border-radius: 6px;
+        min-height: 3rem;
+        justify-content: center;
+    }
+    .plp-caliber-save-icon {
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+    .plp-caliber-save-icon svg {
+        transform: scaleX(-1);
+    }
+    .plp-caliber-save-text {
+        font-size: 0.65rem;
+        color: #166534;
+        font-weight: 600;
+        display: flex;
+        flex-direction: column;
+    }
+    .plp-caliber-save-text span:first-child {
+        font-size: 0.6rem;
+        white-space: nowrap;
+    }
+    .plp-caliber-save-text span:last-child {
+        font-size: 0.72rem;
+    }
+    .plp-caliber-join {
+        font-size: 0.7rem;
+        color: #dc2626;
+        font-weight: 700;
+        text-decoration: none;
+        margin-top: 4px;
+        display: block;
+        text-align: center;
+    }
+    .plp-nonmember-wrap {
+        font-size: 0.65rem;
+        color: #ffffff;
+        font-weight: 600;
+        background: #D30100;
+        padding: 2px 6px;
+        border-radius: 6px;
+        margin-top: 4px;
+        text-align: center;
+        width: 9rem;
+    }
+    .plp-nonmember-text,
+    .plp-nonmember-msrp {
+        font-size: inherit;
+        color: inherit;
+        font-weight: inherit;
+    }
+    .plp-msrp-line {
+        font-size: 0.65rem;
+        color: #6b7280;
+        margin-top: 2px;
+        padding-left: 0.5rem;
+    }
+    .plp-see-options-btn {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        border-radius: 9999px;
+        background: transparent;
+        color: #0d2f47;
+        font-size: 0.875rem;
+        padding: 6px 10px;
+        font-weight: 700;
+        border: 2px solid #0d2f47;
+    }
+
+    .plp-pct-block { display: none; }
+
+    /* CTA */
+    .plp-atc-wrap {
+        margin-top: auto;
+        padding: 1rem 1.5rem 2rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .plp-atc-btn-wrap {
+        width: 100%;
+    }
+    .plp-atc-btn {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        border-radius: 9999px;
+        background: #0d2f47;
+        color: #ffffff;
+        font-size: 0.875rem;
+        padding: 6px 10px;
+        font-weight: 700;
+        border: 0;
+        cursor: pointer;
+    }
+    .plp-atc-btn:hover {
+        background: #12334b;
+    }
+    .plp-btn-loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    .plp-atc-btn svg { width: 16px !important; height: 16px !important; flex-shrink: 0; }
+    .plp-free-shipping {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0d2f47;
+        white-space: nowrap;
+        margin: 0;
+    }
+    .plp-invisible {
+        visibility: hidden;
+    }
+
+    /* Colors mobile */
+    .plp-colors-mobile { display: none; }
+    @media (max-width: 767px) {
+        .plp-colors-mobile {
+            display: flex;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: #0d2f47;
+            height: 18px;
+        }
+    }
+
+    /* ==================== Mobile card styles ==================== */
+    .plp-mobile-price-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .plp-mobile-caliber-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #dc2626;
+    }
+    .plp-mobile-normal-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #0d2f47;
+    }
+    .plp-mobile-msrp {
+        font-size: 0.7rem;
+        color: #6b7280;
+        margin-top: 2px;
+    }
+    .plp-mobile-save-pct {
+        font-size: 0.7rem;
+        color: #166534;
+        font-weight: 600;
+        margin-left: 4px;
+    }
+    .plp-free-shipping-mobile {
+        font-size: 0.875rem;
+        color: #111827;
+        font-weight: 600;
+        margin-top: 8px;
+        margin-bottom: 0;
+    }
+    .plp-mobile-cta-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+    }
+    .plp-mobile-atc-btn {
+        display: flex;
+        flex-grow: 1;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        border: 0;
+        color: #ffffff;
+        background: #0d2f47;
+        border-radius: 9999px;
+        padding: 6px 12px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .plp-mobile-wishlist-btn {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 1px solid #d1d5db;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0d2f47;
+        cursor: pointer;
+        padding: 0;
+    }
+    .plp-mobile-wishlist-btn:hover {
+        color: #dc2626;
+    }
+    /* SVG size fix — Tailwind w-* classes may not be compiled; set explicit sizes */
+    .plp-mobile-atc-btn svg { width: 14px !important; height: 14px !important; flex-shrink: 0; }
+    .plp-mobile-wishlist-btn svg { width: 16px !important; height: 16px !important; flex-shrink: 0; }
+    .plp-wishlist-btn svg { width: 20px !important; height: 20px !important; }
+
+    /* ==================== Responsive breakpoints ==================== */
+
+    /* Mobile: vertical desktop-style grid, hide horizontal list — all sizes ≤767px */
+    @media (max-width: 767px) {
+        .plp-desktop-grid {
+            display: grid !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        .plp-mobile-list { display: none !important; }
+        .plp-card {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+        .plp-card-wrap {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        .plp-card-img      { height: 200px !important; max-width: 200px !important; }
+        .plp-card-name a   { font-size: 1rem !important; }
+        .plp-atc-wrap      { flex-direction: column; align-items: stretch; padding: 0.75rem 1.5rem 1.5rem; }
+        .plp-free-shipping { text-align: center; }
+        .plp-caliber-value { font-size: 1.5rem !important; }
+        .plp-normal-value  { font-size: 1.25rem !important; }
+        #category-results-layout {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+        #category-results-layout > div:not(.ahy-modal-loader-overlay) {
+            min-width: 0 !important;
+            width: 100% !important;
+        }
+    }
+    /* 2 cols at 640-767px */
+    @media (min-width: 640px) and (max-width: 767px) {
+        .plp-desktop-grid { grid-template-columns: 1fr 1fr !important; }
+        .plp-card-img { height: 160px !important; max-width: 100% !important; }
+        .plp-caliber-value { font-size: 1.2rem !important; }
+        .plp-normal-value  { font-size: 1rem !important; }
+        .plp-price-section { padding: 0.75rem !important; }
+    }
+    /* 1 col below 640px */
+    @media (max-width: 639px) {
+        .plp-desktop-grid { grid-template-columns: 1fr !important; }
+    }
+
+    /* Overflow containment + full-bleed cards: ≤425px */
+    @media (max-width: 425px) {
+        .columns { padding-left: 0 !important; padding-right: 0 !important; }
+        #category-results-layout { overflow-x: hidden !important; }
+        #category-results-layout > div:not(.ahy-modal-loader-overlay) { overflow-x: hidden !important; }
+    }
+
+    /* Grid columns — matches Klevu breakpoints from catnav-styles.css:
+       ≥1537px: 3 cols, 1025-1536px: 2 cols, ≤1024px: 1 col (sidebar) */
+    .plp-product-grid {
+        grid-template-columns: 1fr 1fr; /* 2 cols base (768px+) */
+    }
+    @media (min-width: 1537px) {
+        .plp-product-grid {
+            grid-template-columns: 1fr 1fr 1fr !important; /* 3 cols */
+        }
+    }
+    /* 1 column: 768-1023px (sidebar present, too narrow for 2-col) */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .plp-card {
+            grid-column: 1 / -1 !important;
+        }
+    }
+
+</style>

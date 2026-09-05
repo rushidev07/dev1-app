@@ -1,0 +1,30 @@
+<?php
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+/** @var \Ahy\CaliberNation\ViewModel\RenewalPrompt $viewModel */
+$viewModel = $block->getData('view_model');
+if (!$viewModel || !$viewModel->shouldShow()) {
+    return;
+}
+?>
+<div class="cn-renewal-prompt flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4
+            bg-[#fdf4f4] border border-[#f1d5d5] border-l-4 border-l-ahy-red rounded-xl px-5 py-4 my-4">
+    <div class="flex items-center gap-3">
+        <span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-ahy-red text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+        </span>
+        <p class="text-ahy-blue text-sm md:text-base leading-snug">
+            <?= $escaper->escapeHtml($viewModel->getMessage()) ?>
+        </p>
+    </div>
+    <a href="<?= $escaper->escapeUrl($viewModel->getRenewUrl()) ?>"
+       class="shrink-0 self-center sm:self-auto inline-flex items-center justify-center bg-ahy-red
+              hover:bg-ahy-red-light text-white font-bold rounded-full px-6 h-11 transition-colors">
+        <?= $escaper->escapeHtml(__('Renew Membership')) ?>
+    </a>
+</div>

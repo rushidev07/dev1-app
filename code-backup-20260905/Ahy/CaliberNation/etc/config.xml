@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <caliber_nation>
+            <general>
+                <!-- Master switch. On by default so an installed program runs as-is;
+                     set to No in admin to turn the whole program off. -->
+                <enabled>1</enabled>
+                <!-- SKU of the membership virtual product (created by data patch). -->
+                <membership_sku>caliber-nation-annual</membership_sku>
+                <!-- Member customer group id — written by the CreateCaliberMemberGroup patch. -->
+                <member_group_id></member_group_id>
+            </general>
+            <membership>
+                <!-- Annual membership price. Change via Stores > Configuration > Caliber Nation > Membership Settings. -->
+                <price>99.99</price>
+                <!-- Bonus month feature is off by default until the business enables it. -->
+                <trial_enabled>0</trial_enabled>
+                <trial_months>1</trial_months>
+                <!-- Failed auto-renewal charges tolerated before the membership expires.
+                     The cron retries daily, so 3 = expires on the third failed day. -->
+                <max_renewal_attempts>3</max_renewal_attempts>
+            </membership>
+            <email>
+                <!-- Uses Magento's built-in "general" email identity by default.
+                     Change via Stores > Configuration > Caliber Nation > Email Settings. -->
+                <sender>general</sender>
+            </email>
+            <pricing>
+                <!-- Additive member-pricing engine. Off by default until pricing is configured. -->
+                <enabled>0</enabled>
+                <base_discount_type>percent</base_discount_type>
+                <base_discount_value>0</base_discount_value>
+                <cap_type>percent</cap_type>
+                <cap_value>0</cap_value>
+            </pricing>
+            <winback>
+                <!-- Day-31 discounted renewal for lapsed members. Off by default. -->
+                <enabled>0</enabled>
+                <days_threshold>30</days_threshold>
+                <discount_type>percent</discount_type>
+                <discount_value>20</discount_value>
+            </winback>
+            <messaging>
+                <renewal_prompt_heading>Your Caliber Nation membership has expired</renewal_prompt_heading>
+                <renewal_prompt_body>Renew now to keep saving on every order.</renewal_prompt_body>
+                <savings_message>Members save on eligible products across the marketplace.</savings_message>
+                <average_savings_intro>Members save an average of</average_savings_intro>
+                <average_savings_static>0</average_savings_static>
+                <earlybird_message></earlybird_message>
+            </messaging>
+            <early_access>
+                <!-- Early-access / early-bird feature. Off by default until dates and copy are configured. -->
+                <enabled>0</enabled>
+                <member_badge_text>Early Access — You're in! Members get this deal first.</member_badge_text>
+                <non_member_badge_text>Members get early access. Join Caliber Nation to unlock early access.</non_member_badge_text>
+            </early_access>
+            <landing>
+                <!-- Headline figures on the landing page's stats band. Numbers only;
+                     formatting (currency / commas / %) is applied by the ViewModel.
+                     stat_monthly_cost empty = derive it from the annual price. -->
+                <stat_avg_savings>3500</stat_avg_savings>
+                <stat_monthly_cost></stat_monthly_cost>
+                <stat_max_discount>90</stat_max_discount>
+            </landing>
+            <early_cancellation>
+                <enabled>1</enabled>
+                <refund_window_days>30</refund_window_days>
+            </early_cancellation>
+            <cancellation>
+                <send_email>1</send_email>
+                <confirmation_message></confirmation_message>
+            </cancellation>
+            <emails>
+                <!-- Lifecycle emails. Sent via the daily cron; disabled delivery on local (logged). -->
+                <expiry_enabled>1</expiry_enabled>
+                <renewal_reminder_enabled>1</renewal_reminder_enabled>
+                <renewal_reminder_days>7</renewal_reminder_days>
+                <winback_enabled>1</winback_enabled>
+            </emails>
+        </caliber_nation>
+    </default>
+</config>

@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
+    <router id="standard">
+        <route id="smartsearch" frontName="smartsearch">
+            <module name="FalcoSense_Search"/>
+        </route>
+        <!--
+            Overrides Magento_CatalogSearch's own "catalogsearch" route so
+            /catalogsearch/result/ resolves to FalcoSense\Search\Controller\Result\Index
+            instead of the stock Magento\CatalogSearch\Controller\Result\Index, which
+            unconditionally loads a full (150k+ row) product collection via the search
+            engine before layout even renders — dead weight now that this page's visible
+            results come from FalcoSense's own platform API, not that collection.
+        -->
+        <route id="catalogsearch" frontName="catalogsearch">
+            <module name="FalcoSense_Search" before="Magento_CatalogSearch"/>
+        </route>
+        <!--
+            Dedicated short "fs/search" URL for the header search form's results
+            page, so the visible address bar reads /fs/search?q=... instead of
+            /catalogsearch/result/?q=.... Resolves to the existing (previously
+            unused) FalcoSense\Search\Controller\Search\Index — see
+            view/frontend/layout/fs_search_index.xml for the matching layout.
+        -->
+           <!-- <route id="fs" frontName="fs"> -->
+        <route id="fs_search" frontName="fs">
+            <module name="FalcoSense_Search"/>
+        </route>
+    </router>
+</config>

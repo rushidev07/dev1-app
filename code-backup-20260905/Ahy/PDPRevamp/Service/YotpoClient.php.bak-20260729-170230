@@ -1,0 +1,310 @@
+<?php
+
+namespace Ahy\PDPRevamp\Service;
+
+use Ahy\PDPRevamp\Logger\Logger as YotpoApiLogger;
+use GuzzleHttp\ClientFactory;
+use GuzzleHttp\Exception\GuzzleException;
+use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Serialize\Serializer\Json;
+use Magento\Review\Model\Review as ReviewModel;
+use Yotpo\Yotpo\Model\Config as YotpoConfig;
+
+/**
+ * Single entry point for every Yotpo API call made from the storefront
+ * (reviews, review submission, review votes). Centralizing the calls here
+ * keeps the app key/secret out of client-side JS and lets every PDP surface
+ * (star/count line, full reviews section, review-quote card) share one
+ * cached, authenticated client instead of each hitting Yotpo directly.
+ */
+class YotpoClient
+{
+    private const WIDGET_API_BASE = 'https://api-cdn.yotpo.com/v1/widget/';
+    private const API_BASE = 'https://api.yotpo.com/';
+
+    private const CACHE_TAG = 'ahy_yotpo_api';
+    private const CACHE_TTL = 900; // 15 minutes
+
+    /** @var ClientFactory */
+    private $clientFactory;
+
+    /** @var YotpoConfig */
+    private $yotpoConfig;
+
+    /** @var CacheInterface */
+    private $cache;
+
+    /** @var Json */
+    private $serializer;
+
+    /** @var YotpoApiLogger */
+    private $logger;
+
+    /** @var ResourceConnection */
+    private $resourceConnection;
+
+    public function __construct(
+        ClientFactory $clientFactory,
+        YotpoConfig $yotpoConfig,
+        CacheInterface $cache,
+        Json $serializer,
+        YotpoApiLogger $logger,
+        ResourceConnection $resourceConnection
+    ) {
+        $this->clientFactory = $clientFactory;
+        $this->yotpoConfig = $yotpoConfig;
+        $this->cache = $cache;
+        $this->serializer = $serializer;
+        $this->logger = $logger;
+        $this->resourceConnection = $resourceConnection;
+    }
+
+    /**
+     * Fetch reviews + bottomline (average score, total review count) for a
+     * product. Yotpo is the source of truth; when it has nothing yet for
+     * this product (not configured, API error, or simply no reviews
+     * synced there), fall back to Magento's own native review data so the
+     * storefront isn't left empty while a product's reviews haven't made
+     * it into Yotpo.
+     */
+    public function getReviews(int $productId, int $perPage = 150): array
+    {
+        $cacheKey = 'ahy_yotpo_reviews_' . $productId . '_' . $perPage;
+        $cached = $this->cache->load($cacheKey);
+        if ($cached) {
+            return $this->serializer->unserialize($cached);
+        }
+
+        $data = $this->fetchFromYotpo($productId, $perPage);
+
+        if (empty($data['response']['reviews'])) {
+            $data = $this->getNativeReviewsFallback($productId, $perPage);
+        }
+
+        $this->cache->save(
+            $this->serializer->serialize($data),
+            $cacheKey,
+            [self::CACHE_TAG],
+            self::CACHE_TTL
+        );
+
+        return $data;
+    }
+
+    /**
+     * Yotpo API call in isolation, so getReviews() can layer the native
+     * fallback on top without duplicating the try/catch handling.
+     */
+    private function fetchFromYotpo(int $productId, int $perPage): array
+    {
+        $appKey = $this->getAppKey();
+        if (!$appKey) {
+            return [];
+        }
+
+        try {
+            $client = $this->clientFactory->create();
+            $response = $client->request(
+                'GET',
+                self::WIDGET_API_BASE . $appKey . '/products/' . $productId . '/reviews.json',
+                [
+                    'query' => ['per_page' => $perPage],
+                    'headers' => ['Accept' => 'application/json'],
+                ]
+            );
+
+            return $this->serializer->unserialize((string) $response->getBody());
+        } catch (GuzzleException $exception) {
+            $this->logger->error('getReviews failed for product ' . $productId . ': ' . $exception->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Builds a Yotpo-shaped reviews response (same "response.reviews" /
+     * "response.bottomline" structure as the real API) from Magento's own
+     * approved product reviews, so every consumer of getReviews() /
+     * getBottomline() / getTopReview() works the same regardless of which
+     * source the data came from.
+     */
+    private function getNativeReviewsFallback(int $productId, int $perPage): array
+    {
+        $connection = $this->resourceConnection->getConnection();
+
+        $select = $connection->select()
+            ->from(['r' => $connection->getTableName('review')], ['review_id', 'created_at'])
+            ->join(
+                ['re' => $connection->getTableName('review_entity')],
+                're.entity_id = r.entity_id',
+                []
+            )
+            ->join(
+                ['rd' => $connection->getTableName('review_detail')],
+                'rd.review_id = r.review_id',
+                ['detail', 'nickname', 'title']
+            )
+            ->joinLeft(
+                ['rov' => $connection->getTableName('rating_option_vote')],
+                'rov.review_id = r.review_id',
+                ['avg_percent' => new \Zend_Db_Expr('AVG(rov.percent)')]
+            )
+            ->where('re.entity_code = ?', 'product')
+            ->where('r.entity_pk_value = ?', $productId)
+            ->where('r.status_id = ?', ReviewModel::STATUS_APPROVED)
+            ->group('r.review_id')
+            ->order('r.created_at DESC')
+            ->limit($perPage);
+
+        $rows = $connection->fetchAll($select);
+
+        $reviews = [];
+        foreach ($rows as $row) {
+            $percent = $row['avg_percent'] !== null ? (float) $row['avg_percent'] : null;
+
+            $reviews[] = [
+                'content' => (string) $row['detail'],
+                'title' => (string) $row['title'],
+                'score' => $percent !== null ? round($percent / 20, 1) : 0,
+                'votes_up' => 0,
+                'created_at' => (new \DateTime($row['created_at']))->format(\DateTime::ATOM),
+                'user' => ['display_name' => (string) $row['nickname']],
+            ];
+        }
+
+        // Bottomline totals reflect every approved review for the product,
+        // not just the (possibly perPage=1, for quick bottomline-only
+        // calls) page of reviews fetched above.
+        $totalsSelect = $connection->select()
+            ->from(['r' => $connection->getTableName('review')], [])
+            ->join(
+                ['re' => $connection->getTableName('review_entity')],
+                're.entity_id = r.entity_id',
+                []
+            )
+            ->joinLeft(
+                ['rov' => $connection->getTableName('rating_option_vote')],
+                'rov.review_id = r.review_id',
+                []
+            )
+            ->where('re.entity_code = ?', 'product')
+            ->where('r.entity_pk_value = ?', $productId)
+            ->where('r.status_id = ?', ReviewModel::STATUS_APPROVED)
+            ->columns([
+                'total_review' => new \Zend_Db_Expr('COUNT(DISTINCT r.review_id)'),
+                'average_percent' => new \Zend_Db_Expr('AVG(rov.percent)'),
+            ]);
+        $totals = $connection->fetchRow($totalsSelect);
+
+        $averagePercent = $totals['average_percent'] !== null ? (float) $totals['average_percent'] : null;
+
+        return [
+            'response' => [
+                'reviews' => $reviews,
+                'bottomline' => [
+                    'average_score' => $averagePercent !== null ? round($averagePercent / 20, 1) : 0,
+                    'total_review' => (int) ($totals['total_review'] ?? 0),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Just the bottomline (average score, review count) for a single
+     * product, without the review list - used by grids/carousels that show
+     * many products' star ratings at once and don't need full review text.
+     *
+     * @return array{average_score: float, total_reviews: int}
+     */
+    public function getBottomline(int $productId): array
+    {
+        $data = $this->getReviews($productId, 1);
+        $bottomline = $data['response']['bottomline'] ?? [];
+
+        return [
+            'average_score' => (float) ($bottomline['average_score'] ?? 0),
+            'total_reviews' => (int) ($bottomline['total_review'] ?? 0),
+        ];
+    }
+
+    /**
+     * Return just the top (most recent, highest-voted) real review for a
+     * product, or null when there are none yet - no fabricated fallback.
+     */
+    public function getTopReview(int $productId): ?array
+    {
+        $data = $this->getReviews($productId, 20);
+        $reviews = $data['response']['reviews'] ?? [];
+        if (empty($reviews)) {
+            return null;
+        }
+
+        usort($reviews, static function (array $a, array $b): int {
+            return ($b['votes_up'] ?? 0) <=> ($a['votes_up'] ?? 0);
+        });
+
+        $top = $reviews[0];
+
+        return [
+            'content' => $top['content'] ?? '',
+            'score' => (float) ($top['score'] ?? 0),
+            'reviewer_name' => $top['user']['display_name'] ?? __('Verified Buyer'),
+        ];
+    }
+
+    /**
+     * Submit a new review on behalf of a storefront customer.
+     */
+    public function createReview(array $payload): array
+    {
+        $appKey = $this->getAppKey();
+        if (!$appKey) {
+            return ['status' => ['message' => 'Yotpo is not configured']];
+        }
+
+        $payload['appkey'] = $appKey;
+
+        try {
+            $client = $this->clientFactory->create();
+            $response = $client->request(
+                'POST',
+                self::API_BASE . 'v1/widget/reviews',
+                [
+                    'json' => $payload,
+                    'headers' => ['Accept' => 'application/json'],
+                ]
+            );
+
+            return $this->serializer->unserialize((string) $response->getBody());
+        } catch (GuzzleException $exception) {
+            $this->logger->error('createReview failed: ' . $exception->getMessage());
+            return ['status' => ['message' => 'Something went wrong. Please try again.']];
+        }
+    }
+
+    /**
+     * Vote a review up or down.
+     */
+    public function voteReview(string $reviewId, string $voteType, bool $unvote = false): array
+    {
+        try {
+            $client = $this->clientFactory->create();
+            $uri = self::API_BASE . 'reviews/' . $reviewId . '/vote/' . $voteType;
+            if ($unvote) {
+                $uri .= '/true';
+            }
+            $response = $client->request('POST', $uri, ['headers' => ['Accept' => 'application/json']]);
+
+            return $this->serializer->unserialize((string) $response->getBody());
+        } catch (GuzzleException $exception) {
+            $this->logger->error('voteReview failed for review ' . $reviewId . ': ' . $exception->getMessage());
+            return ['status' => ['message' => 'Something went wrong. Please try again.']];
+        }
+    }
+
+    private function getAppKey(): ?string
+    {
+        $appKey = $this->yotpoConfig->getAppKey();
+        return $appKey ?: null;
+    }
+}

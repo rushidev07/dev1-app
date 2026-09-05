@@ -1,0 +1,103 @@
+<?php
+/**
+ * Zero-results "popular products / popular searches" panel for
+ * html/header/search-form.phtml's #ahyModal search results. Rendered as a
+ * child block in the exact same DOM position it previously occupied inline,
+ * so it still inherits imgUrl()/isFallbackImg()/handleImgError()/searchExact()
+ * from the parent ahyModalSearch() scope via normal DOM-based scope resolution.
+ */
+?>
+            <!-- No results + popular products -->
+            <div x-show="!loading && results.length === 0 && searchQuery" style="width:100%; padding:20px 0; box-sizing:border-box;">
+                <p class="text-xl sm:text-2xl lg:text-3xl font-bold leading-snug mb-6 sm:mb-8" style="color:#1d1d1f;">
+                    Sorry, no matches were found.<br>Try a new search or use our suggestions.
+                </p>
+                <div x-show="popularProducts.length > 0">
+                    <h2 style="font-size:17px; font-weight:700; color:#1d1d1f; margin-bottom:16px;">Discover products that people are loving right now</h2>
+                    <!-- Carousel wrapper: positions prev/next buttons absolutely -->
+                    <div class="pop-wrap">
+                        <!-- Prev button — desktop/tablet only, shown after scrolling right -->
+                        <button type="button"
+                                class="pop-nav-btn pop-nav-btn-prev"
+                                x-show="!isMobile && popularScrollPos > 10"
+                                @click="_popScrollPrev()"
+                                aria-label="Scroll left">
+                            <svg width="22" height="22" fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <!-- Next button — desktop/tablet only, hidden when at end -->
+                        <button type="button"
+                                class="pop-nav-btn pop-nav-btn-next"
+                                x-show="!isMobile && popularScrollPos < popularScrollMax - 10"
+                                @click="_popScrollNext()"
+                                aria-label="Scroll right">
+                            <svg width="22" height="22" fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <!-- Scroll container -->
+                        <div class="pop-cards-row"
+                             x-ref="popScroll"
+                             @scroll="_popScrollUpdate($el)"
+                             @mousedown="_popDragStart($event, $el)"
+                             @dragstart.prevent
+                             @click.capture="if(_popDragMoved){ $event.preventDefault(); $event.stopPropagation(); _popDragMoved=false; }">
+                            <template x-for="product in popularProducts" :key="'pop-' + (product.sku || product.product_id)">
+                                <a :href="product.url_key ? '/' + product.url_key + '.html' : '#'"
+                                   class="pop-card no-underline hover:shadow-md transition-shadow duration-200"
+                                   draggable="false"
+                                   style="background:#fff; border-radius:12px; border:1px solid #d2d2d7; display:flex; flex-direction:column; overflow:hidden;">
+                                    <!-- Image -->
+                                    <div style="flex:1; display:flex; align-items:center; justify-content:center; padding:24px; min-height:160px;">
+                                        <img :src="imgUrl(product.image)"
+                                             :alt="product.name"
+                                             class="object-contain"
+                                             :style="{ opacity: isFallbackImg(product.image) ? 0.45 : 1 }"
+                                             draggable="false"
+                                             loading="eager"
+                                             fetchpriority="high"
+                                             @error="handleImgError($event)"
+                                             :data-original-src="product.image"
+                                             style="max-width:130px; max-height:130px; width:100%; height:auto; pointer-events:none;"/>
+                                    </div>
+                                    <!-- Name + Price -->
+                                    <div style="padding:8px 12px 14px; display:flex; flex-direction:column; gap:4px;">
+                                        <p class="line-clamp-2" style="font-size:12px; color:#1d1d1f; line-height:1.4; margin:0;" x-text="product.name"></p>
+                                        <template x-if="product.special_price && product.special_price < product.price">
+                                            <div class="flex items-baseline gap-2" style="margin-top:4px;">
+                                                <span class="text-xs text-gray-400 line-through" x-text="'$' + parseFloat(product.price).toFixed(2)"></span>
+                                                <span class="text-sm font-bold text-gray-900" x-text="'$ ' + parseFloat(product.special_price).toFixed(2)"></span>
+                                            </div>
+                                        </template>
+                                        <template x-if="!product.special_price || product.special_price >= product.price">
+                                            <div>
+                                                <template x-if="product.type === 'configurable'">
+                                                    <p class="text-sm text-gray-800">
+                                                        <span class="font-normal text-xs">Starting at </span>
+                                                        <span class="font-bold" x-text="'$ ' + parseFloat(product.price || 0).toFixed(2)"></span>
+                                                    </p>
+                                                </template>
+                                                <template x-if="product.type !== 'configurable' && product.price">
+                                                    <span class="text-sm font-bold text-gray-900" x-text="'$ ' + parseFloat(product.price).toFixed(2)"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </a>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <!-- Popular Searches -->
+                <div x-show="popularSearches.length > 0" style="margin-top:32px;">
+                    <h2 style="font-size:17px; font-weight:700; color:#1d1d1f; margin-bottom:16px;">Popular Searches</h2>
+                    <div class="popular-searches-row">
+                        <template x-for="term in popularSearches" :key="term">
+                            <button type="button"
+                                    @click="searchExact(term)"
+                                    style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border:1px solid #d2d2d7; border-radius:999px; background:#fff; color:#1d1d1f; font-size:13px; white-space:nowrap; transition:box-shadow 0.2s; cursor:pointer;"
+                                    onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'"
+                                    onmouseout="this.style.boxShadow='none'">
+                                <span x-text="term"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>

@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Framework\Console\CommandList">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="ahyPdpGenerateAiDescriptors" xsi:type="object">Ahy\PDPRevamp\Console\Command\GenerateAiDescriptors</item>
+                <item name="ahyPdpGenerateAiColorHex" xsi:type="object">Ahy\PDPRevamp\Console\Command\GenerateAiColorHex</item>
+                <item name="ahyPdpImportColorHexMapping" xsi:type="object">Ahy\PDPRevamp\Console\Command\ImportColorHexMapping</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Catalog\Controller\Adminhtml\Product\Initialization\Helper">
+        <plugin name="ahyPdpRevampSaveVariantColorHex"
+                type="Ahy\PDPRevamp\Plugin\Catalog\Controller\Adminhtml\Product\Initialization\Helper\SaveVariantColorHex"
+                sortOrder="70"/>
+        <plugin name="ahyPdpRevampClearEmptyKeyFeatures"
+                type="Ahy\PDPRevamp\Plugin\Catalog\Controller\Adminhtml\Product\Initialization\Helper\ClearEmptyKeyFeatures"
+                sortOrder="72"/>
+    </type>
+    <!-- Registers the two manual-fallback link types (see
+         Setup\Patch\Data\CreateManualCarouselLinkTypes) with Magento's own
+         product-link save/read machinery (ProductLink\Repository), which
+         only recognizes link type codes present in this map - a row in
+         catalog_product_link_type alone is not enough. -->
+    <type name="Magento\Catalog\Model\Product\LinkTypeProvider">
+        <arguments>
+            <argument name="linkTypes" xsi:type="array">
+                <item name="ahy_manual_cab" xsi:type="const">Ahy\PDPRevamp\Setup\Patch\Data\CreateManualCarouselLinkTypes::LINK_TYPE_MANUAL_CAB</item>
+                <item name="ahy_manual_asav" xsi:type="const">Ahy\PDPRevamp\Setup\Patch\Data\CreateManualCarouselLinkTypes::LINK_TYPE_MANUAL_ASAV</item>
+                <item name="ahy_manual_fbt" xsi:type="const">Ahy\PDPRevamp\Setup\Patch\Data\CreateManualFbtLinkType::LINK_TYPE_MANUAL_FBT</item>
+            </argument>
+        </arguments>
+    </type>
+    <!-- Second registry (beyond LinkTypeProvider above) Magento's product-link
+         read/write flow requires for a custom link type - without this, the
+         admin product edit page throws "The collection provider isn't
+         registered" as soon as a product has any saved manual link. -->
+    <virtualType name="AhyManualCabCollectionProvider" type="Ahy\PDPRevamp\Model\ProductLink\CollectionProvider\ManualCarousel">
+        <arguments>
+            <argument name="linkTypeId" xsi:type="const">Ahy\PDPRevamp\Setup\Patch\Data\CreateManualCarouselLinkTypes::LINK_TYPE_MANUAL_CAB</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="AhyManualAsavCollectionProvider" type="Ahy\PDPRevamp\Model\ProductLink\CollectionProvider\ManualCarousel">
+        <arguments>
+            <argument name="linkTypeId" xsi:type="const">Ahy\PDPRevamp\Setup\Patch\Data\CreateManualCarouselLinkTypes::LINK_TYPE_MANUAL_ASAV</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="AhyManualFbtCollectionProvider" type="Ahy\PDPRevamp\Model\ProductLink\CollectionProvider\ManualCarousel">
+        <arguments>
+            <argument name="linkTypeId" xsi:type="const">Ahy\PDPRevamp\Setup\Patch\Data\CreateManualFbtLinkType::LINK_TYPE_MANUAL_FBT</argument>
+        </arguments>
+    </virtualType>
+    <type name="Magento\Catalog\Model\ProductLink\CollectionProvider">
+        <arguments>
+            <argument name="providers" xsi:type="array">
+                <item name="ahy_manual_cab" xsi:type="object">AhyManualCabCollectionProvider</item>
+                <item name="ahy_manual_asav" xsi:type="object">AhyManualAsavCollectionProvider</item>
+                <item name="ahy_manual_fbt" xsi:type="object">AhyManualFbtCollectionProvider</item>
+            </argument>
+        </arguments>
+    </type>
+    <virtualType name="Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Pool">
+        <arguments>
+            <argument name="modifiers" xsi:type="array">
+                <item name="ahyVariantColorColumn" xsi:type="array">
+                    <item name="class" xsi:type="string">Ahy\PDPRevamp\Ui\DataProvider\Product\Form\Modifier\VariantColorColumn</item>
+                    <item name="sortOrder" xsi:type="number">150</item>
+                </item>
+                <item name="ahyKeyFeatures" xsi:type="array">
+                    <item name="class" xsi:type="string">Ahy\PDPRevamp\Ui\DataProvider\Product\Form\Modifier\KeyFeatures</item>
+                    <item name="sortOrder" xsi:type="number">160</item>
+                </item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <!-- Exit Intent -->
+    <type name="Magento\SalesRule\Model\Utility">
+        <plugin name="ahyPdpRevampEnforceCouponExpiry"
+                type="Ahy\PDPRevamp\Plugin\SalesRule\EnforceCouponExpiryPlugin"
+                sortOrder="10"/>
+    </type>
+    <type name="Ahy\PDPRevamp\Model\ResourceModel\ExitCouponClaim\Collection">
+        <arguments>
+            <argument name="mainTable" xsi:type="string">ahy_pdprevamp_exit_coupon</argument>
+            <argument name="resourceModel" xsi:type="string">Ahy\PDPRevamp\Model\ResourceModel\ExitCouponClaim</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Framework\View\Element\UiComponent\DataProvider\CollectionFactory">
+        <arguments>
+            <argument name="collections" xsi:type="array">
+                <item name="ahy_pdprevamp_exit_coupon_listing_data_source" xsi:type="string">Ahy\PDPRevamp\Model\ResourceModel\ExitCouponClaim\Collection</item>
+                <item name="mpsmtp_emails_log_grid_data_source" xsi:type="string">Mageplaza\Smtp\Model\ResourceModel\Log\Grid\Collection</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Customer\CustomerData\Customer">
+        <plugin name="ahyPdpRevampAddEmailToCustomerSection"
+                type="Ahy\PDPRevamp\Plugin\Customer\CustomerData\AddEmailToCustomerSection"/>
+    </type>
+    <type name="Ahy\PDPRevamp\Logger\Logger">
+        <arguments>
+            <argument name="name" xsi:type="string">PDPRevamp</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="system" xsi:type="object">Ahy\PDPRevamp\Logger\Handler</item>
+            </argument>
+        </arguments>
+    </type>
+    <!-- caption PDP -->
+    <type name="Magento\Catalog\Model\ResourceModel\Product\Gallery">
+        <plugin name="ahyPdpRevampAddCaptionColumn"
+                type="Ahy\PDPRevamp\Plugin\Gallery\AddCaptionColumn"/>
+    </type>
+</config>

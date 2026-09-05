@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Email:etc/email_templates.xsd">
+
+    <template id="caliber_nation_welcome"
+              label="Caliber Nation - Welcome / Membership Confirmed"
+              file="welcome.html"
+              type="html"
+              module="Ahy_CaliberNation"
+              area="frontend"/>
+
+    <template id="caliber_nation_renewal"
+              label="Caliber Nation - Renewal Confirmation / Receipt"
+              file="renewal.html"
+              type="html"
+              module="Ahy_CaliberNation"
+              area="frontend"/>
+
+    <template id="caliber_nation_cancellation"
+              label="Caliber Nation - Cancellation Confirmation"
+              file="cancellation.html"
+              type="html"
+              module="Ahy_CaliberNation"
+              area="frontend"/>
+
+    <template id="caliber_nation_expiry"
+              label="Caliber Nation - Membership Expired"
+              file="expiry.html"
+              type="html"
+              module="Ahy_CaliberNation"
+              area="frontend"/>
+
+    <template id="caliber_nation_renewal_reminder"
+              label="Caliber Nation - Upcoming Renewal Reminder"
+              file="renewal-reminder.html"
+              type="html"
+              module="Ahy_CaliberNation"
+              area="frontend"/>
+
+    <template id="caliber_nation_winback"
+              label="Caliber Nation - Win-back Offer"
+              file="winback.html"
+              type="html"
+              module="Ahy_CaliberNation"
+              area="frontend"/>
+
+</config>

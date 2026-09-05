@@ -1,0 +1,62 @@
+<?php
+/** @var \Magento\Backend\Block\Template $block */
+/** @var \Magento\Framework\Escaper $escaper */
+$postUrl = $block->getUrl('ahy_plprevamp/keywordsimport/upload');
+?>
+<div class="admin__page-section">
+    <div class="admin__page-section-title">
+        <span class="title"><?= $escaper->escapeHtml(__('Upload File')) ?></span>
+    </div>
+
+    <form action="<?= $escaper->escapeUrl($postUrl) ?>" method="post" enctype="multipart/form-data">
+        <?= $block->getBlockHtml('formkey') ?>
+
+        <fieldset class="admin__fieldset">
+            <div class="admin__field _required">
+                <label class="admin__field-label" for="import_file">
+                    <span><?= $escaper->escapeHtml(__('CSV File')) ?></span>
+                </label>
+                <div class="admin__field-control">
+                    <input type="file"
+                           id="import_file"
+                           name="import_file"
+                           accept=".csv"
+                           required
+                           class="admin__control-file"/>
+                    <div class="admin__field-note">
+                        <?= $escaper->escapeHtml(__('Required: category_id, plus keywords and/or featured_description. Optional: category_name, store_id.')) ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin__field">
+                <div class="admin__field-control">
+                    <button type="submit" class="action-primary">
+                        <span><?= $escaper->escapeHtml(__('Import')) ?></span>
+                    </button>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+</div>
+
+<div class="admin__page-section">
+    <div class="admin__page-section-title">
+        <span class="title"><?= $escaper->escapeHtml(__('Example')) ?></span>
+    </div>
+    <fieldset class="admin__fieldset">
+        <div class="admin__field">
+            <div class="admin__field-control">
+<pre class="admin__field-note" style="margin:0;padding:12px;background:#f5f5f5;border:1px solid #adadad;line-height:1.6;">category_id,category_name,keywords,featured_description
+3249,Shirts,"Tees, polos","Built for real adventure."
+3229,Hats,"Caps, beanies",</pre>
+                <div class="admin__field-note">
+                    <?= $escaper->escapeHtml(__('A column left out of the header is not touched. A column left blank clears the value.')) ?>
+                </div>
+                <div class="admin__field-note">
+                    <?= $escaper->escapeHtml(__('Run bin/magento ahy:plp:card-keywords:export for a ready-made file with every category and its current values.')) ?>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+</div>

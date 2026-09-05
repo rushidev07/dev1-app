@@ -1,0 +1,536 @@
+<?php
+/**
+ * Configurable-product options modal for the category and search results
+ * pages. Triggered by dispatching the `ahy-cfg-modal-open` window event with
+ * the product stub as detail — see category/product-card-desktop.phtml and
+ * category/product-card-mobile.phtml (shared by both pages).
+ *
+ * Deliberately uses its own event name and Alpine component name
+ * (ahySmartSearchCfgModal, not ahyCfgModal) rather than the shared
+ * `ahy-open-config-modal` event/`ahyCfgModal()` function that slider/results.phtml,
+ * slider/smart-slider.phtml, html/header/search-form.phtml, and a legacy
+ * Magento_Theme-level template override also use — those still coexist on the
+ * page today (a separate, pre-existing cleanup item), and since JS function
+ * declarations with the same name overwrite each other globally, sharing a
+ * name meant this modal's markup could end up paired with a DIFFERENT one of
+ * those implementations' JS (or vice versa), which is what caused the blank
+ * main image reported after the first extraction.
+ *
+ * This element detaches itself and re-appends to <body> on init (see init()
+ * below), so its position in the layout tree is irrelevant — it is declared
+ * once, site-wide, in view/frontend/layout/default.xml.
+ */
+
+declare(strict_types=1);
+
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+use FalcoSense\Search\Helper\Data as SmartSearchHelper;
+use FalcoSense\Search\Service\SearchTokenService;
+
+/** @var Escaper $escaper */
+/** @var Template $block */
+
+$smartSearchHelper = $this->helper(SmartSearchHelper::class);
+$tokenService       = \Magento\Framework\App\ObjectManager::getInstance()->get(SearchTokenService::class);
+$platformStoreId    = (int) $smartSearchHelper->getPlatformStoreId();
+$searchToken        = $tokenService->getToken($platformStoreId);
+
+$endpoint = $smartSearchHelper->getEndpointUrl() ?: 'http://localhost:8080';
+$parsed   = parse_url($endpoint);
+$apiBase  = ($parsed['scheme'] ?? 'http') . '://' . ($parsed['host'] ?? 'localhost');
+if (!empty($parsed['port'])) { $apiBase .= ':' . $parsed['port']; }
+$productDetailUrl = $apiBase . '/api/v1/product';
+$addToCartUrl      = $block->getUrl('checkout/cart/add');
+?>
+<style>
+.ahy-cfg-overlay { position:fixed; inset:0; z-index:999997; }
+.ahy-thumb-strip::-webkit-scrollbar { display:none; }
+.ahy-thumb-strip { -ms-overflow-style:none; scrollbar-width:none; }
+</style>
+
+<script>
+function ahySmartSearchCfgModal(productDetailUrl, searchToken, addToCartUrl) {
+    return {
+        productDetailUrl, searchToken, addToCartUrl,
+        visible: false,
+        loading: false,
+        cartLoading: false,
+        product: null,
+        image: '',
+        gallery: [],
+        galleryIdx: 0,
+        attrGroups: [],       // [{label, values: [{sku,value}]}]
+        selectedAttrs: {},    // {Color: 'Brown', Size: 'L'}
+        selectedVariant: null,
+        _variants: [],        // full variant list with {variant_sku, ...attrs}
+        _parentGallery: [],   // parent product images, always kept
+
+        init() {
+            if (window._ahySmartSearchCfgModalInited) return;
+            window._ahySmartSearchCfgModalInited = true;
+            document.body.appendChild(this.$el);
+            window.ahyTokenRefresh.get().then(t => { if (t) this.searchToken = t; });
+            window.addEventListener('ahy-token-refreshed', e => { this.searchToken = e.detail; });
+            window.addEventListener('ahy-cfg-modal-open', (e) => { this.openModal(e.detail); });
+        },
+
+        async openModal(stub) {
+            this.product = stub;
+            this.selectedAttrs = {};
+            this.selectedVariant = null;
+            this.attrGroups = [];
+            this._variants = [];
+            this._setGallery([this._imgUrl(stub.image)]);
+            this.visible = true;
+            this.loading = true;
+            document.body.style.overflow = 'hidden';
+
+            try {
+                // 1. Fetch full product from OpenSearch API (price, variant list)
+                const detailUrl = new URL(this.productDetailUrl);
+                detailUrl.searchParams.set('search_token', this.searchToken);
+                if (stub.product_id) detailUrl.searchParams.set('product_id', stub.product_id);
+                else detailUrl.searchParams.set('sku', stub.sku);
+
+                const [detailResp] = await Promise.all([
+                    window.fetch(detailUrl.toString(), { credentials: 'include', cache: 'no-store' }),
+                ]);
+                const detailData = await detailResp.json();
+                if (detailData.success && detailData.product) {
+                    this.product = detailData.product;
+                    this._variants = detailData.product.variants || [];
+                    // Pre-populate attrs from API's configurable_attributes (used as fallback)
+                    this._variants = this._variants.map(v => ({
+                        ...v,
+                        attrs: this._attrsFromApiData(v, detailData.product.configurable_attributes),
+                    }));
+                }
+
+                const parentSku = (this.product || stub).sku;
+                const allVariantSkus = this._variants.map(v => v.variant_sku).filter(Boolean);
+
+                // 2. Parallel: parent gallery + variant attribute labels from Magento.
+                //    Kept small and blocking so the modal opens fast.
+                const [parentImgs, variantAttrs] = await Promise.all([
+                    this._fetchGallery(parentSku),
+                    this._fetchVariantAttrs(allVariantSkus),
+                ]);
+
+                this._parentGallery = parentImgs;
+                if (parentImgs.length) this._setGallery(parentImgs);
+
+                // 3. Merge Magento EAV attrs (override API fallback if available)
+                if (Object.keys(variantAttrs).length > 0) {
+                    this._mergeAttrs(variantAttrs);
+                }
+                this.attrGroups = this._buildAttrGroups();
+                // Pre-select the first available value of every attr group so Add-to-cart
+                // is immediately usable, but pass auto=true so selectAttr() skips its
+                // image-swap step — the main image stays on the parent's own photo until
+                // the shopper actually interacts (clicks an attribute or a thumbnail).
+                await this._autoSelectDefaults();
+
+                // 4. Every variant's images (all colors), fetched in the background rather
+                //    than blocking modal-open — this can be a large request, and awaiting it
+                //    here previously delayed the modal opening and left the connection pool
+                //    busy right when the shopper's first attribute click needed a fetch too.
+                //    Appends into the existing gallery without touching the current main
+                //    image/selection.
+                this._fetchGalleryForSkus(allVariantSkus).then(imgs => this._appendToGallery(imgs));
+
+            } catch(e) { console.error('[ahySmartSearchCfgModal]', e); }
+            this.loading = false;
+        },
+
+        async _autoSelectDefaults() {
+            for (const group of this.attrGroups) {
+                const firstAvailable = group.values.find(val => this.isValueAvailable(group.label, val));
+                if (firstAvailable) await this.selectAttr(group.label, firstAvailable, true);
+            }
+        },
+
+        FALLBACK_IMG: '/media/.thumbswysiwyg/everest-logo_2_.png',
+        isFallbackImg(image) {
+            return !image || image === this.FALLBACK_IMG;
+        },
+        _imgUrl(path) {
+            if (!path || path.includes('no_selection')) return '';
+            if (path.includes('falcosense/800x800')) return path;
+            const p = path.startsWith('http') ? path.replace(/^https?:\/\/[^/]+/, '') : path;
+            const m = p.match(/\/catalog\/product\/(.+)$/);
+            const rel = m ? m[1] : p.replace(/^\/+/, '');
+            if (!rel) return '';
+            const filename = rel.split('/').pop();
+            if (!filename) return '';
+            const c1 = filename[0], c2 = filename[1] || c1;
+            return '/media/falcosense/800x800/' + c1 + '/' + c2 + '/' + filename;
+        },
+
+        _setGallery(imgs) {
+            const filtered = imgs.filter(Boolean);
+            this.gallery = filtered.length ? filtered : [this.FALLBACK_IMG];
+            this.galleryIdx = 0;
+            this.image = this.gallery[0];
+        },
+
+        _appendToGallery(imgs) {
+            // Extends the thumbnail strip in place, without touching the current
+            // main image/selection — used for the background all-variants fetch
+            // in openModal() so a slow response can't clobber what the shopper
+            // is already looking at or has already picked.
+            imgs.filter(Boolean).forEach(img => {
+                if (!this.gallery.includes(img)) this.gallery.push(img);
+            });
+        },
+
+        async _fetchGallery(sku) {
+            if (!sku) return [];
+            try {
+                const r = await window.fetch('/ahy_themecustomization/index/mediaGallery?sku=' + encodeURIComponent(sku), { credentials: 'include' });
+                const d = await r.json();
+                return Array.isArray(d) ? d : [];
+            } catch(e) { return []; }
+        },
+
+        async _fetchGalleryForSkus(skus) {
+            if (!skus.length) return [];
+            try {
+                const r = await window.fetch('/ahy_themecustomization/index/mediaGallery?skus=' + encodeURIComponent(skus.join(',')), { credentials: 'include' });
+                const d = await r.json();
+                return Array.isArray(d) ? d : [];
+            } catch(e) { return []; }
+        },
+
+        async _fetchVariantAttrs(skus) {
+            if (!skus.length) return {};
+            try {
+                const r = await window.fetch('/variant-attrs.php?skus=' + encodeURIComponent(skus.join(',')), { credentials: 'include' });
+                return await r.json();
+            } catch(e) { return {}; }
+        },
+
+        _attrsFromApiData(variant, cfgAttrs) {
+            // Convert API's {attributes: {option: 'Lichen'}} → {Color: 'Lichen'}
+            // using configurable_attributes [{key:'option', label:'Color', values:[...]}]
+            const attrs = {};
+            if (!variant.attributes) return attrs;
+            for (const [key, val] of Object.entries(variant.attributes)) {
+                const cfg = Array.isArray(cfgAttrs) ? cfgAttrs.find(c => c.key === key) : null;
+                attrs[cfg ? cfg.label : key] = val;
+            }
+            return attrs;
+        },
+
+         _mergeAttrs(variantAttrs) {
+            // variantAttrs: {sku: {Size: 'M', Color: 'Brown'}}
+            // Try both 'variant_sku' and 'sku' field names for compatibility
+            this._variants = this._variants.map(v => ({
+                ...v,
+                attrs: variantAttrs[v.variant_sku] || variantAttrs[v.sku] || v.attrs || {},
+            }));
+        },
+
+         _buildAttrGroups() {
+            // ── Detect and split combined single-attribute values into Color + Size ──
+            // Two naming conventions exist in the catalog:
+            //   Pattern 1 — SIZE-Color : "S-Brown", "M-Royal Blue", "XL-Navy"
+            //   Pattern 2 — Color-SIZE : "Army-S", "Heather Deep Teal-M", "Olive- XL"
+            // Both are detected and split into separate Color and Size groups.
+            const sizeTokens = [
+                'XXS','XS','X-SMALL','EXTRA SMALL','SMALL','S',
+                'MEDIUM','M',
+                'X-LARGE','EXTRA LARGE','LARGE','L','XL',
+                'XX-LARGE','EXTRA EXTRA LARGE','XXL','2XL',
+                '3XL','4XL','5XL',
+            ];
+            const sizeOrder  = sizeTokens;
+            // Longest-first so multi-word tokens (e.g. "EXTRA LARGE") match before
+            // shorter ones (e.g. "L") that would otherwise swallow only part of them.
+            const sizeAlt = [...sizeTokens]
+                .sort((a, b) => b.length - a.length)
+                .map(t => t.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'))
+                .join('|');
+            // pat1: size token at START followed by the color
+            const pat1 = new RegExp('^(' + sizeAlt + ')\\s*-\\s*(.+)$', 'i');
+            // pat2: color at START, size token at END (non-greedy color capture)
+            const pat2 = new RegExp('^(.+?)\\s*-\\s*(' + sizeAlt + ')$', 'i');
+
+            const hasCombined = this._variants.length > 0 && this._variants.every(v => {
+                const keys = Object.keys(v.attrs || {});
+                if (keys.length !== 1) return false;
+                const val = Object.values(v.attrs || {})[0] || '';
+                return pat1.test(val) || pat2.test(val);
+            });
+
+            if (hasCombined) {
+                const colorSet = [], sizeSet = [];
+                this._variants.forEach(v => {
+                    const val = Object.values(v.attrs)[0];
+                    const m1 = val.match(pat1);
+                    const m2 = !m1 && val.match(pat2);
+                    const sz  = m1 ? m1[1].toUpperCase() : (m2 ? m2[2].toUpperCase() : null);
+                    const col = m1 ? m1[2].trim()        : (m2 ? m2[1].trim()        : null);
+                    if (sz && col) {
+                        v.attrs = { Color: col, Size: sz };
+                        if (!colorSet.includes(col)) colorSet.push(col);
+                        if (!sizeSet.includes(sz))   sizeSet.push(sz);
+                    }
+                });
+                sizeSet.sort((a, b) => sizeOrder.indexOf(a.toUpperCase()) - sizeOrder.indexOf(b.toUpperCase()));
+                return [
+                    { label: 'Color', values: colorSet },
+                    { label: 'Size',  values: sizeSet },
+                ];
+            }
+
+            // ── Normal path: collect labels and values from variant attrs ──────────
+            const groupMap = {};
+            const groupOrder = [];
+            for (const v of this._variants) {
+                for (const [label, val] of Object.entries(v.attrs || {})) {
+                    if (!groupMap[label]) { groupMap[label] = []; groupOrder.push(label); }
+                    if (!groupMap[label].includes(val)) groupMap[label].push(val);
+                }
+            }
+            // Preferred order: Size first, then Color, then others
+            const order = ['Size', 'Color'];
+            groupOrder.sort((a, b) => {
+                const ia = order.indexOf(a), ib = order.indexOf(b);
+                if (ia !== -1 && ib !== -1) return ia - ib;
+                if (ia !== -1) return -1;
+                if (ib !== -1) return 1;
+                return 0;
+            });
+            return groupOrder.map(label => ({ label, values: groupMap[label] }));
+        },
+
+        async selectAttr(label, value, auto = false) {
+            this.selectedAttrs = { ...this.selectedAttrs, [label]: value };
+
+            // Find variants matching all currently selected attrs
+            const matching = this._matchingVariants();
+
+            // When selecting Color, point the MAIN image at that color's own photo —
+            // the thumbnail strip itself stays fixed (it already holds every parent +
+            // variant image, fetched once in openModal()) so the shopper always sees
+            // the full photo set on the side, not just the currently selected color's.
+            // Skip this for auto=true (the initial pre-selection in _autoSelectDefaults):
+            // the main image should stay on the parent's own photo until the shopper
+            // actually interacts, even though a Color/Size is already pre-picked.
+            const colorLabels = ['Color', 'Colour', 'color', 'colour'];
+            if (!auto && colorLabels.includes(label)) {
+                const skus = matching.map(v => v.variant_sku).filter(Boolean);
+                if (skus.length) {
+                    const colorImgs = (await this._fetchGalleryForSkus(skus)).filter(Boolean);
+                    if (colorImgs.length) {
+                        const mainImg = colorImgs[0];
+                        const idx = this.gallery.indexOf(mainImg);
+                        this.image = mainImg;
+                        this.galleryIdx = idx !== -1 ? idx : this.galleryIdx;
+                    }
+                }
+            }
+
+            // If all attrs selected, pin selectedVariant
+            if (this._allSelected()) {
+                this.selectedVariant = matching[0] || null;
+            } else {
+                this.selectedVariant = null;
+            }
+        },
+
+        _matchingVariants() {
+            return this._variants.filter(v =>
+                Object.entries(this.selectedAttrs).every(([lbl, val]) => v.attrs && v.attrs[lbl] === val)
+            );
+        },
+
+        _allSelected() {
+            return this.attrGroups.length > 0 && this.attrGroups.every(g => !!this.selectedAttrs[g.label]);
+        },
+
+        isSelected(label, value) { return this.selectedAttrs[label] === value; },
+
+        isValueAvailable(label, value) {
+            // Check other currently selected attrs for compatibility
+            const otherSelections = Object.entries(this.selectedAttrs).filter(([l]) => l !== label);
+            return this._variants.some(v => {
+                if (!v.attrs || v.attrs[label] !== value) return false;
+                if (!otherSelections.every(([l, val]) => v.attrs[l] === val)) return false;
+                // Respect in_stock / qty fields if present, otherwise treat as in stock
+                if (v.in_stock === false) return false;
+                if (typeof v.qty === 'number' && v.qty <= 0) return false;
+                return true;
+            });
+        },
+
+        getPrice() {
+            if (this.selectedVariant) {
+                return this.selectedVariant.special_price || this.selectedVariant.price || 0;
+            }
+            return this.product ? (this.product.price || 0) : 0;
+        },
+
+        hasSpecialPrice() {
+            if (this.selectedVariant) return !!(this.selectedVariant.special_price && this.selectedVariant.special_price < this.selectedVariant.price);
+            return !!(this.product && this.product.special_price && this.product.special_price < this.product.price);
+        },
+
+        closeModal() {
+            this.visible = false;
+            document.body.style.overflow = '';
+        },
+
+        async addToCart() {
+            if (!this._allSelected() || !this.product || this.cartLoading) return;
+            this.cartLoading = true;
+            try {
+                const pid = this.selectedVariant ? this.selectedVariant.variant_id : this.product.product_id;
+                const params = new URLSearchParams({ product: pid, qty: 1, form_key: hyva.getFormKey() });
+                const resp = await fetch('<?= $escaper->escapeJs($addToCartUrl) ?>', {
+                    method: 'POST',
+                    body: params,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (resp.ok || resp.redirected) {
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                    window.dispatchEvent(new CustomEvent('toggle-cart'));
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{ type: 'success', text: 'Product added to cart.' }], 3000);
+                    this.closeModal();
+                }
+            } catch(e) { console.error('[ahySmartSearchCfgModal] addToCart error', e); }
+            finally { this.cartLoading = false; }
+        },
+    };
+}
+</script>
+
+<div id="ahySmartSearchCfgModalEl"
+     x-data="ahySmartSearchCfgModal('<?= $escaper->escapeJs($productDetailUrl) ?>', '<?= $escaper->escapeJs($searchToken) ?>', '<?= $escaper->escapeJs($addToCartUrl) ?>')"
+     x-init="init()"
+     x-cloak
+     style="position:fixed;inset:0;z-index:999997;display:none"
+     :style="visible ? 'position:fixed;inset:0;z-index:999997;display:block' : 'display:none'">
+
+    <!-- Backdrop -->
+    <div class="absolute inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="closeModal()"></div>
+
+    <!-- Panel -->
+    <div style="position:absolute;right:0;top:0;bottom:0;width:100%;max-width:32rem;background:#fff;overflow-y:auto;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,0.18)"
+         @keydown.escape.window="closeModal()">
+
+        <!-- Header -->
+        <div class="flex items-start justify-between px-5 pt-5 pb-4 shrink-0">
+            <div class="pr-4 flex-1">
+                <h2 class="font-bold text-gray-900 text-lg leading-snug" x-text="product && product.name"></h2>
+                <p class="text-sm text-gray-500 mt-0.5"
+                   x-text="product && 'Sold And Shipped By ' + (product.brand || 'The Everest Marketplace')"></p>
+                <p x-show="loading" class="text-xs text-ahy-blue mt-1 animate-pulse">Loading options…</p>
+            </div>
+            <button @click="closeModal()" class="shrink-0 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 text-xl mt-0.5">&#x2715;</button>
+        </div>
+
+        <!-- Image gallery -->
+        <div class="flex gap-3 px-5 pb-4 shrink-0">
+            <!-- Thumbnails: always the full parent + every-variant image set -->
+            <div class="ahy-thumb-strip flex flex-col gap-2 w-16 shrink-0 overflow-y-auto" style="max-height:320px">
+                <template x-for="(img, i) in gallery" :key="i">
+                    <button @click="image = img; galleryIdx = i"
+                            class="w-16 h-16 rounded-lg border-2 p-1 shrink-0 flex items-center justify-center"
+                            :class="galleryIdx === i ? 'border-ahy-blue' : 'border-gray-200 hover:border-gray-400'">
+                        <img :src="img" class="w-full h-full object-contain" :style="{ opacity: isFallbackImg(img) ? 0.45 : 1 }" loading="lazy"
+                             @error="$event.target.src=FALLBACK_IMG; $event.target.style.opacity='0.45'"/>
+                    </button>
+                </template>
+            </div>
+            <!-- Main image: reflects the currently selected variant -->
+            <div class="flex-1 bg-gray-50 rounded-xl flex items-center justify-center" style="min-height:260px;max-height:320px">
+                <img :src="image" class="max-h-72 w-full object-contain p-4" :style="{ opacity: isFallbackImg(image) ? 0.45 : 1 }" loading="eager" style="max-width: 300px"
+                     @error="$event.target.src=FALLBACK_IMG; $event.target.style.opacity='0.45'"/>
+            </div>
+        </div>
+
+        <!-- Price -->
+        <div class="px-5 pb-2 shrink-0">
+            <template x-if="hasSpecialPrice()">
+                <div>
+                    <p class="text-ahy-red font-bold text-sm">Deal</p>
+                    <div class="flex items-baseline gap-3">
+                        <span class="text-4xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(getPrice())"></span>
+                        <span class="text-lg text-gray-400 line-through"
+                              x-html="hyva.formatPrice(selectedVariant ? selectedVariant.price : (product && product.price))"></span>
+                    </div>
+                </div>
+            </template>
+            <template x-if="!hasSpecialPrice()">
+                <div>
+                    <p class="text-ahy-red font-bold text-sm">From</p>
+                    <span class="text-4xl font-extrabold text-ahy-blue" x-html="hyva.formatPrice(getPrice())"></span>
+                </div>
+            </template>
+            <a :href="product ? '/' + (product.url_key || '') + '.html#shipping' : '#'"
+               class="inline-block mt-2 text-ahy-blue font-semibold text-sm underline">Shipping &amp; Returns</a>
+        </div>
+
+        <!-- Attribute selectors -->
+        <div class="px-5 pb-4 flex-1 space-y-5">
+            <hr class="border-gray-200 my-3">
+            <!-- Loading skeleton -->
+            <template x-if="loading && attrGroups.length === 0">
+                <div class="space-y-4 animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+                    <div class="flex gap-2">
+                        <div class="h-9 bg-gray-200 rounded-lg w-16"></div>
+                        <div class="h-9 bg-gray-200 rounded-lg w-16"></div>
+                        <div class="h-9 bg-gray-200 rounded-lg w-16"></div>
+                    </div>
+                </div>
+            </template>
+            <template x-for="(attr, attrIdx) in attrGroups" :key="attr.label">
+                <div>
+                    <hr x-show="attrIdx > 0" class="border-gray-200 my-3">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">
+                        <span x-text="attr.label"></span>
+                        <span class="font-bold text-gray-900" x-show="selectedAttrs[attr.label]" x-text="': ' + (selectedAttrs[attr.label] || '')"></span>
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="val in attr.values" :key="val">
+                            <button @click="isValueAvailable(attr.label, val) && selectAttr(attr.label, val)"
+                                    :disabled="!isValueAvailable(attr.label, val)"
+                                    class="px-4 py-2 text-sm border-2 rounded-lg font-medium transition"
+                                    :class="isSelected(attr.label, val)
+                                        ? 'border-ahy-blue text-ahy-blue font-bold bg-blue-50'
+                                        : isValueAvailable(attr.label, val)
+                                            ? 'border-gray-300 text-gray-700 hover:border-gray-400'
+                                            : 'border-gray-200 text-gray-300 cursor-not-allowed line-through'"
+                                    x-text="val"></button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+            <hr class="border-gray-200 my-3">
+        </div>
+
+        <!-- Add to Cart -->
+        <div class="px-5 pb-6 pt-4 shrink-0 bg-white sticky bottom-0">
+            <button @click.prevent="addToCart()"
+                    :disabled="!_allSelected() || cartLoading"
+                    class="w-full text-white rounded-full py-4 text-lg font-bold flex items-center justify-center gap-3 transition"
+                    :class="(_allSelected() && !cartLoading) ? 'opacity-100 hover:opacity-90' : 'opacity-50 cursor-not-allowed'"
+                    style="background-color:#e63232">
+                <template x-if="cartLoading">
+                    <svg class="animate-spin w-6 h-6" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 22 6.477 22 12h-4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                </template>
+                <template x-if="!cartLoading">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </template>
+                <span x-text="cartLoading ? 'Adding…' : 'Add'"></span>
+            </button>
+            <p x-show="attrGroups.length > 0 && !_allSelected()" class="text-center text-xs text-gray-400 mt-2">Please select all options above</p>
+        </div>
+
+    </div><!-- /panel -->
+</div><!-- #ahySmartSearchCfgModalEl -->

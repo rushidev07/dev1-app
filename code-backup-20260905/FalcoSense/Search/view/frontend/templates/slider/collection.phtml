@@ -1,0 +1,268 @@
+<?php
+/** @var \FalcoSense\Search\Block\Slider\Collection $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+$products      = $block->getCollectionProducts();
+$title         = $block->getCollectionTitle();
+$cacheKey      = $block->getCacheKey();
+$sliderId      = 'ahyCol_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $cacheKey);
+$itemCount     = count($products);
+$addToCartUrl  = $block->escapeUrl($block->getUrl('checkout/cart/add'));
+if (!$itemCount) return;
+
+$falcosenseImgUrl = static function (string $image): string {
+    if ($image === '') return '';
+    if (str_contains($image, 'falcosense/800x800')) return $image;
+    $path = $image;
+    if (str_starts_with($image, 'http')) {
+        if (!preg_match('/\/catalog\/product\/(.+)$/', $image, $m)) return '';
+        $path = $m[1];
+    }
+    $filename = basename($path);
+    if ($filename === '') return '';
+    $c1 = $filename[0];
+    $c2 = $filename[1] ?? $c1;
+    return '/media/falcosense/800x800/' . $c1 . '/' . $c2 . '/' . $filename;
+};
+?>
+<style>
+    /* ── Slider container ─────────────────────────────────────────────────── */
+    #<?= $sliderId ?> .swiper { overflow: hidden; }
+    #<?= $sliderId ?> .swiper-scrollbar.swiper-scrollbar-horizontal {
+        height: 10px; width: 100%; left: 0; background: #d1d5db; border-radius: 9999px;
+    }
+    #<?= $sliderId ?> .swiper-scrollbar-drag { background: #1e3a5f; border-radius: 9999px; }
+    #<?= $sliderId ?> .swiper-wrapper { padding-bottom: 32px; }
+    #<?= $sliderId ?> .swiper-slide { margin: 0; vertical-align: top; }
+    @media (max-width: 639px)                          { #<?= $sliderId ?> .swiper-slide { width: 100%; } }
+    @media (min-width: 640px)  and (max-width: 1023px) { #<?= $sliderId ?> .swiper-slide { width: 50%; } }
+    @media (min-width: 1024px) and (max-width: 1279px) { #<?= $sliderId ?> .swiper-slide { width: 33.33%; } }
+    @media (min-width: 1280px)                         { #<?= $sliderId ?> .swiper-slide { width: 25%; } }
+
+    /* ── Card (identical to PDP more-seller-items) ───────────────────────── */
+    #<?= $sliderId ?> .msi-card { margin: 0 auto; padding: 12px; background: #fff; }
+    #<?= $sliderId ?> .msi-img-wrap {
+        display: flex; justify-content: center; align-items: center;
+        flex-direction: column; width: 100%; height: 210px; position: relative;
+    }
+    #<?= $sliderId ?> .msi-img-wrap a { display: block; width: 100%; height: 100%; }
+    #<?= $sliderId ?> .msi-img-wrap img.prodImg {
+        max-width: 100%; height: auto; width: auto; max-height: 100%;
+        display: block; margin: 0 auto; object-fit: contain;
+    }
+    #<?= $sliderId ?> .msi-bookmark {
+        position: absolute; top: 10px; right: 10px; width: 36px; height: 36px;
+        border-radius: 9999px; background: #fff; border: none; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0/.1), 0 2px 4px -2px rgb(0 0 0/.1);
+    }
+    #<?= $sliderId ?> .msi-detail { padding: 24px 24px 0; }
+    @media (max-width: 470px) { #<?= $sliderId ?> .msi-detail { padding: 24px 0 0; } }
+    #<?= $sliderId ?> .msi-name {
+        font-size: 16px; font-weight: 700; text-decoration: none;
+        overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical; color: #0d2f47;
+        line-height: 1.21rem; max-height: 2.42rem; min-height: 40px;
+    }
+    #<?= $sliderId ?> .msi-soldby { font-size: 0.75rem; font-weight: 500; line-height: 1rem; height: 1rem; overflow: hidden; }
+    #<?= $sliderId ?> .msi-soldby span { color: #0d2f47; }
+    #<?= $sliderId ?> .msi-price-wrap { min-height: 5.5rem; overflow: visible; }
+    #<?= $sliderId ?> .msi-from { font-size: 0.875rem; font-weight: 700; color: #dc2626; text-transform: capitalize; }
+    #<?= $sliderId ?> .msi-price { font-size: 1.5rem; font-weight: 800; color: #0d2f47; }
+    #<?= $sliderId ?> .msi-btn {
+        display: flex; justify-content: center; align-items: center; width: 100%;
+        border-radius: 9999px; background: transparent; color: #0d2f47;
+        font-size: 0.875rem; font-weight: 700; padding: 6px 10px;
+        border: 2px solid #0d2f47; text-decoration: none; text-transform: capitalize;
+        transition: box-shadow 0.15s;
+    }
+    #<?= $sliderId ?> .msi-btn:hover { box-shadow: #0d2f47 0 0 0 1px inset; }
+    #<?= $sliderId ?> .msi-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: center; min-height: 55px; }
+</style>
+
+<section id="<?= $sliderId ?>" class="my-12">
+
+    <div class="flex items-center justify-between mb-6">
+        <h3 style="display:block;line-height:1;font-size:2rem;font-weight:800;color:#0d2f47;text-transform:uppercase;padding:0 0 24px;">
+            <?= $escaper->escapeHtml($title) ?>
+        </h3>
+    </div>
+
+    <div class="swiper <?= $sliderId ?>-swiper">
+        <div class="swiper-wrapper">
+
+            <?php foreach ($products as $product):
+                $name         = html_entity_decode($product['name'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $brand        = $product['brand']    ?? '';
+                $image        = $product['image']    ?? '';
+                $price        = isset($product['price'])         ? (float) $product['price']         : null;
+                $specialPrice = isset($product['special_price']) ? (float) $product['special_price'] : null;
+                $urlKey       = $product['url_key']  ?? '';
+                $productUrl   = $block->getProductUrl($urlKey);
+                $type         = $product['type']     ?? 'simple';
+                $isCfg        = ($type === 'configurable');
+                $inStock      = (bool) ($product['in_stock'] ?? true);
+                $productId    = (int) ($product['product_id'] ?? $product['id'] ?? 0);
+                $displayPrice = ($specialPrice && $price && $specialPrice < $price) ? $specialPrice : $price;
+                $imgFalco     = $falcosenseImgUrl($image);
+                $imgFalcoEsc  = $escaper->escapeUrl($imgFalco);
+                $imgSrcEsc    = $escaper->escapeUrl($image);
+            ?>
+            <div class="kuRECSItem border border-ahy-bg swiper-slide">
+                <div class="msi-card kuRECS-item">
+
+                    <div class="msi-img-wrap kuRECS-itemImg">
+                        <a href="<?= $escaper->escapeUrl($productUrl) ?>"
+                           title="<?= $escaper->escapeHtmlAttr($name) ?>">
+                            <?php if ($image && $imgFalco): ?>
+                                <img src="<?= $imgFalcoEsc ?: $imgSrcEsc ?>"
+                                     data-original-src="<?= $imgSrcEsc ?>"
+                                     alt="<?= $escaper->escapeHtmlAttr($name) ?>"
+                                     class="prodImg"
+                                     loading="lazy"
+                                     onerror="if(this.dataset.fb){return;}this.dataset.fb='1';this.onerror=null;this.src='https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png';this.style.opacity='0.45';">
+                            <?php else: ?>
+                                <img src="https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png"
+                                     alt="<?= $escaper->escapeHtmlAttr($name) ?>"
+                                     class="prodImg"
+                                     loading="lazy"
+                                     style="opacity:0.45">
+                            <?php endif; ?>
+                        </a>
+
+                        <button aria-label="Add to Wish List" type="button" class="msi-bookmark hidden md:flex"
+                                x-data="initWishlist()" @click.prevent="addToWishlist(<?= $productId ?>)">
+                            <svg class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20">
+                                <path style="fill:#0d2f47;" d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="msi-detail ku-product-detail-padding">
+                        <div class="kuRECS-itemDesc" style="margin-top:12px;overflow:hidden;">
+                            <a href="<?= $escaper->escapeUrl($productUrl) ?>"
+                               title="<?= $escaper->escapeHtmlAttr($name) ?>"
+                               class="msi-name kuRECSTitle">
+                                <?= $escaper->escapeHtml($name) ?>
+                            </a>
+                            <?php if ($brand): ?>
+                                <div class="msi-soldby">sold by <span><?= $escaper->escapeHtml($brand) ?></span></div>
+                            <?php endif; ?>
+
+                            <div class="kuRECS-itemPrice" style="font-size:12px;color:#545454;margin:4px 0;">
+                                <div class="msi-price-wrap kuPrice">
+                                    <div class="kuSalePrice kuStartPrice flex" style="font-size:1.5rem;align-items:baseline;gap:4px;">
+                                        <?php if ($isCfg): ?>
+                                            <div class="msi-from">from</div>
+                                        <?php endif; ?>
+                                        <?php if ($displayPrice): ?>
+                                            <span class="msi-price">$<?= number_format($displayPrice, 2) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="msi-actions">
+                            <div></div>
+                            <div class="kuRECSItemBottom">
+                                <?php if ($inStock && !$isCfg): ?>
+                                    <button type="button" class="msi-btn kuBtnDark kuLandingAddToCartBtn"
+                                            onclick="ahySliderATC(this)"
+                                            data-product-id="<?= $productId ?>"
+                                            data-atc-url="<?= $escaper->escapeHtmlAttr($addToCartUrl) ?>">
+                                        <svg class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30.61 25.71">
+                                            <polyline style="fill:none;stroke:#0d2f47;stroke-linecap:round;stroke-linejoin:round;stroke-width:2.5;" points="0.75 0.75 5.51 0.75 10.82 15.88 25.24 15.88 29.86 3.3 10.84 3.3"></polyline>
+                                            <circle style="fill:none;stroke:#0d2f47;stroke-miterlimit:10;stroke-width:2.5;" cx="11.98" cy="22.46" r="2.5"></circle>
+                                            <circle style="fill:none;stroke:#0d2f47;stroke-miterlimit:10;stroke-width:2.5;" cx="24.48" cy="22.46" r="2.5"></circle>
+                                        </svg>
+                                        <span class="px-2">add</span>
+                                    </button>
+                                <?php elseif ($inStock && $isCfg): ?>
+                                    <button type="button" class="msi-btn kuBtnDark kuLandingAddToCartBtn"
+                                            onclick="ahySliderOpenOptions(this)"
+                                            data-product="<?= $escaper->escapeHtmlAttr(json_encode($product)) ?>">
+                                        <span class="px-2">options</span>
+                                    </button>
+                                <?php else: ?>
+                                    <a href="<?= $escaper->escapeUrl($productUrl) ?>" class="msi-btn kuBtnDark">
+                                        <span class="px-2">details</span>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <?php endforeach; ?>
+
+        </div>
+        <div class="swiper-scrollbar"></div>
+    </div>
+
+</section>
+
+<script>
+if (typeof ahySliderATC === 'undefined') {
+    window.ahySliderATC = function(btn) {
+        var productId = btn.dataset.productId;
+        var url = btn.dataset.atcUrl;
+        var fd = new FormData();
+        fd.append('product', productId);
+        fd.append('qty', 1);
+        fd.append('form_key', hyva.getFormKey());
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) {
+                if (r.ok || r.redirected) {
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                    window.dispatchEvent(new CustomEvent('toggle-cart'));
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{type: 'success', text: 'Product added to cart.'}], 3000);
+                }
+            })
+            .catch(function() {})
+            .finally(function() {
+                btn.disabled = false;
+                btn.style.opacity = '';
+            });
+    };
+}
+
+if (typeof ahySliderOpenOptions === 'undefined') {
+    window.ahySliderOpenOptions = function(btn) {
+        var product;
+        try {
+            product = JSON.parse(btn.dataset.product);
+        } catch (e) {
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('ahy-cfg-modal-open', { detail: product, bubbles: true }));
+    };
+}
+
+(function() {
+    function init_<?= $sliderId ?>() {
+        if (typeof Swiper === 'undefined') { setTimeout(init_<?= $sliderId ?>, 100); return; }
+        new Swiper('.<?= $sliderId ?>-swiper', {
+            slidesPerView: 'auto',
+            spaceBetween: 0,
+            freeMode: true,
+            grabCursor: true,
+            scrollbar: {
+                el: '#<?= $sliderId ?> .swiper-scrollbar',
+                draggable: true,
+                snapOnRelease: false,
+            },
+            mousewheel: false,
+            keyboard: { enabled: true },
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init_<?= $sliderId ?>);
+    } else {
+        init_<?= $sliderId ?>();
+    }
+})();
+</script>

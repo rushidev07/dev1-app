@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <table name="ahy_discount_alert_run" resource="default" engine="innodb" comment="Discount Alert Cron Runs">
+        <column xsi:type="int" name="run_id" unsigned="true" nullable="false" identity="true" comment="Run ID"/>
+        <column xsi:type="varchar" name="token" length="64" nullable="false" comment="Random token authorizing the emailed deep link"/>
+        <column xsi:type="decimal" name="threshold" scale="4" precision="12" nullable="false" default="0" comment="Discount threshold used for this run"/>
+        <column xsi:type="int" name="product_count" unsigned="true" nullable="false" default="0" comment="Products matching the threshold, before any cap"/>
+        <column xsi:type="int" name="item_count" unsigned="true" nullable="false" default="0" comment="Products actually recorded for this run"/>
+        <column xsi:type="int" name="new_count" unsigned="true" nullable="false" default="0" comment="Products flagged for the first time, versus the previous run"/>
+        <column xsi:type="int" name="removed_count" unsigned="true" nullable="false" default="0" comment="Products flagged by the previous run but no longer flagged"/>
+        <column xsi:type="boolean" name="email_sent" nullable="false" default="false" comment="Whether this run resulted in an email"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="false" default="CURRENT_TIMESTAMP" comment="Run Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="run_id"/>
+        </constraint>
+        <index referenceId="AHY_DISCOUNT_ALERT_RUN_TOKEN" indexType="btree">
+            <column name="token"/>
+        </index>
+    </table>
+
+    <table name="ahy_discount_alert_run_item" resource="default" engine="innodb" comment="Discount Alert Run Items">
+        <column xsi:type="int" name="item_id" unsigned="true" nullable="false" identity="true" comment="Item ID"/>
+        <column xsi:type="int" name="run_id" unsigned="true" nullable="false" comment="Run ID"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="false" comment="Product Entity ID"/>
+        <column xsi:type="varchar" name="sku" length="64" nullable="false" comment="SKU at send time"/>
+        <column xsi:type="varchar" name="name" length="255" nullable="true" comment="Product name at send time"/>
+        <column xsi:type="decimal" name="price" scale="4" precision="12" nullable="true" comment="Regular price at send time"/>
+        <column xsi:type="decimal" name="special_price" scale="4" precision="12" nullable="true" comment="Special price at send time"/>
+        <column xsi:type="decimal" name="discount_pct" scale="4" precision="12" nullable="true" comment="Discount percentage at send time"/>
+        <column xsi:type="smallint" name="status_at_send" unsigned="true" nullable="true" comment="Product status at send time (for rollback)"/>
+        <column xsi:type="boolean" name="is_new" nullable="false" default="false" comment="Not present in the previous run"/>
+        <column xsi:type="timestamp" name="disabled_at" on_update="false" nullable="true" comment="When this product was disabled from the alert page"/>
+        <column xsi:type="int" name="disabled_by" unsigned="true" nullable="true" comment="Admin user ID who disabled it"/>
+        <column xsi:type="timestamp" name="reverted_at" on_update="false" nullable="true" comment="When this product was reverted to MSRP from the alert page"/>
+        <column xsi:type="int" name="reverted_by" unsigned="true" nullable="true" comment="Admin user ID who reverted it to MSRP"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="item_id"/>
+        </constraint>
+        <constraint xsi:type="foreign"
+                    referenceId="AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID_AHY_DISCOUNT_ALERT_RUN_RUN_ID"
+                    table="ahy_discount_alert_run_item" column="run_id"
+                    referenceTable="ahy_discount_alert_run" referenceColumn="run_id" onDelete="CASCADE"/>
+        <constraint xsi:type="unique" referenceId="AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID_PRODUCT_ID">
+            <column name="run_id"/>
+            <column name="product_id"/>
+        </constraint>
+        <index referenceId="AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID" indexType="btree">
+            <column name="run_id"/>
+        </index>
+        <index referenceId="AHY_DISCOUNT_ALERT_RUN_ITEM_RUN_ID_IS_NEW" indexType="btree">
+            <column name="run_id"/>
+            <column name="is_new"/>
+        </index>
+    </table>
+
+</schema>

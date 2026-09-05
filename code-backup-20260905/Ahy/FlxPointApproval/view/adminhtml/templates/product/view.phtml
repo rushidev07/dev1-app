@@ -1,0 +1,86 @@
+<?php
+/** @var \Ahy\FlxPointApproval\Block\Adminhtml\Product\View $block */
+$product = $block->getProduct();
+if (!$product): ?>
+    <p><?= $block->escapeHtml(__('No product data found.')) ?></p>
+<?php return; endif; ?>
+
+<style>
+    .flxp-view-wrap { max-width: 900px; margin: 20px auto; font-family: sans-serif; }
+    .flxp-back-btn { display:inline-block; margin-bottom:20px; padding:8px 16px; background:#007bdb; color:#fff; text-decoration:none; border-radius:3px; font-size:13px; }
+    .flxp-back-btn:hover { background:#005fa3; color:#fff; }
+    .flxp-card { background:#fff; border:1px solid #d6d6d6; border-radius:4px; padding:24px 28px; margin-bottom:20px; }
+    .flxp-card h3 { margin:0 0 16px; font-size:15px; color:#333; border-bottom:1px solid #eee; padding-bottom:10px; }
+    .flxp-row { display:flex; padding:8px 0; border-bottom:1px solid #f3f3f3; font-size:13px; }
+    .flxp-row:last-child { border-bottom:none; }
+    .flxp-label { width:200px; flex-shrink:0; color:#666; font-weight:600; }
+    .flxp-value { color:#333; flex:1; word-break:break-word; }
+    .flxp-description { background:#fafafa; border:1px solid #e8e8e8; border-radius:3px; padding:14px; font-size:13px; color:#333; line-height:1.6; max-height:300px; overflow-y:auto; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; text-transform:uppercase; }
+    .badge-pending  { background:#fff3cd; color:#856404; }
+    .badge-approved { background:#d4edda; color:#155724; }
+    .badge-rejected { background:#f8d7da; color:#721c24; }
+</style>
+
+<div class="flxp-view-wrap">
+    <a href="<?= $block->escapeUrl($block->getBackUrl()) ?>" class="flxp-back-btn">← Back to Pending Products</a>
+
+    <?php
+    $status = $product->getData('status') ?? 'pending';
+    $statusBadge = '<span class="badge badge-' . $block->escapeHtmlAttr($status) . '">' . $block->escapeHtml($status) . '</span>';
+    ?>
+
+    <!-- Basic Info -->
+    <div class="flxp-card">
+        <h3>Product Information</h3>
+        <div class="flxp-row"><span class="flxp-label">SKU</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('sku')) ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">FlxPoint SKU</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('flxpoint_sku')) ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Name</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('name')) ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Brand</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('product_brand') ?: '—') ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Product Type</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('product_type')) ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Attribute Set</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('attribute_set_code') ?: '—') ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Category</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('categories') ?: '—') ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Visibility</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('visibility') ?: '—') ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Status</span><span class="flxp-value"><?= $statusBadge ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Staged At</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('created_at')) ?></span></div>
+    </div>
+
+    <!-- Pricing & Stock -->
+    <div class="flxp-card">
+        <h3>Pricing &amp; Stock</h3>
+        <div class="flxp-row"><span class="flxp-label">Price</span><span class="flxp-value">$<?= $block->escapeHtml(number_format((float)$product->getData('price'), 2)) ?></span></div>
+        <?php if ($product->getData('special_price')): ?>
+        <div class="flxp-row"><span class="flxp-label">Special Price</span><span class="flxp-value">$<?= $block->escapeHtml(number_format((float)$product->getData('special_price'), 2)) ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Special Price From</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('special_price_from_date') ?: '—') ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">Special Price To</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('special_price_to_date') ?: '—') ?></span></div>
+        <?php endif; ?>
+        <div class="flxp-row"><span class="flxp-label">Qty</span><span class="flxp-value"><?= $block->escapeHtml($product->getData('qty')) ?></span></div>
+        <div class="flxp-row"><span class="flxp-label">In Stock</span><span class="flxp-value"><?= $product->getData('is_in_stock') ? 'Yes' : 'No' ?></span></div>
+    </div>
+
+    <!-- Description -->
+    <div class="flxp-card">
+        <h3>Description</h3>
+        <div class="flxp-description">
+            <?= $product->getData('description') ? $block->escapeHtml(html_entity_decode($product->getData('description'))) : '<em style="color:#999;">No description provided.</em>' ?>
+        </div>
+    </div>
+
+    <?php if ($product->getData('short_description')): ?>
+    <!-- Short Description -->
+    <div class="flxp-card">
+        <h3>Short Description</h3>
+        <div class="flxp-description">
+            <?= $block->escapeHtml(html_entity_decode($product->getData('short_description'))) ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($product->getData('import_error')): ?>
+    <!-- Import Error -->
+    <div class="flxp-card" style="border-color:#f5c6cb;">
+        <h3 style="color:#721c24;">Import Error</h3>
+        <pre style="color:#b30000;font-size:12px;white-space:pre-wrap;word-break:break-word;margin:0;"><?= $block->escapeHtml($product->getData('import_error')) ?></pre>
+    </div>
+    <?php endif; ?>
+</div>

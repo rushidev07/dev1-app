@@ -1,0 +1,542 @@
+<?php
+/** @var \FalcoSense\Search\Block\Slider\Products $block */
+/** @var \Magento\Framework\Escaper $escaper */
+
+$_isSliderBlock = isset($block) && method_exists($block, 'getSliderProducts');
+if ($_isSliderBlock) {
+    $products     = $block->getSliderProducts();
+    $title        = $block->getSliderTitle();
+    $sliderType   = $block->getData('slider_type') ?? 'newest';
+    $sliderId     = 'ahySlider_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $sliderType);
+    $itemCount    = count($products ?: []);
+    $addToCartUrl = $block->escapeUrl($block->getUrl('checkout/cart/add'));
+}
+
+$falcosenseImgUrl = static function (string $image): string {
+    if ($image === '') return '';
+    if (str_contains($image, 'falcosense/800x800')) return $image;
+    $path = $image;
+    if (str_starts_with($image, 'http')) {
+        $path = preg_match('/\/catalog\/product\/(.+)$/', $image, $m) ? $m[1] : basename($image);
+    }
+    $filename = basename($path);
+    if ($filename === '') return '';
+    $c1 = $filename[0];
+    $c2 = $filename[1] ?? $c1;
+    return '/media/falcosense/800x800/' . $c1 . '/' . $c2 . '/' . $filename;
+};
+if ($_isSliderBlock && !$itemCount) return;
+?>
+<?php if ($_isSliderBlock): ?>
+<style>
+    /* ── Slider container ─────────────────────────────────────────────────── */
+    #<?= $sliderId ?> .swiper { overflow: hidden; }
+    #<?= $sliderId ?> .swiper-scrollbar.swiper-scrollbar-horizontal {
+        height: 10px; width: 100%; left: 0; background: #d1d5db; border-radius: 9999px;
+    }
+    #<?= $sliderId ?> .swiper-scrollbar-drag { background: #1e3a5f; border-radius: 9999px; }
+    #<?= $sliderId ?> .swiper-wrapper { padding-bottom: 32px; will-change: transform; }
+    #<?= $sliderId ?> .swiper-slide { margin: 0; vertical-align: top; }
+    @media (max-width: 639px)                          { #<?= $sliderId ?> .swiper-slide { width: 100%; } }
+    @media (min-width: 640px)  and (max-width: 1023px) { #<?= $sliderId ?> .swiper-slide { width: 50%; } }
+    @media (min-width: 1024px) and (max-width: 1279px) { #<?= $sliderId ?> .swiper-slide { width: 33.33%; } }
+    @media (min-width: 1280px)                         { #<?= $sliderId ?> .swiper-slide { width: 25%; } }
+
+    /* ── Card (identical to PDP more-seller-items) ───────────────────────── */
+    #<?= $sliderId ?> .msi-card { margin: 0 auto; padding: 12px; background: #fff; }
+    #<?= $sliderId ?> .msi-img-wrap {
+        display: flex; justify-content: center; align-items: center;
+        flex-direction: column; width: 100%; height: 210px; position: relative;
+    }
+    #<?= $sliderId ?> .msi-img-wrap a { display: block; width: 100%; height: 100%; }
+    #<?= $sliderId ?> .msi-img-wrap img.prodImg {
+        max-width: 100%; height: auto; width: auto; max-height: 100%;
+        display: block; margin: 0 auto; object-fit: contain;
+    }
+    #<?= $sliderId ?> .msi-bookmark {
+        position: absolute; top: 10px; right: 10px; width: 36px; height: 36px;
+        border-radius: 9999px; background: #fff; border: none; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0/.1), 0 2px 4px -2px rgb(0 0 0/.1);
+    }
+    #<?= $sliderId ?> .msi-detail { padding: 24px 24px 0; }
+    @media (max-width: 470px) { #<?= $sliderId ?> .msi-detail { padding: 24px 0 0; } }
+    #<?= $sliderId ?> .msi-name {
+        font-size: 1.125rem; font-weight: 700; text-decoration: none;
+        overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical; color: #0d2f47;
+        line-height: 1.375rem; margin-bottom: 18px;
+    }
+    #<?= $sliderId ?> .msi-soldby { font-size: 0.75rem; font-weight: 500; line-height: 1rem; height: 1rem; overflow: hidden; }
+    #<?= $sliderId ?> .msi-soldby span { color: #0d2f47; }
+    #<?= $sliderId ?> .msi-price-wrap { min-height: 5.5rem; overflow: visible; }
+    #<?= $sliderId ?> .msi-from { font-size: 0.875rem; font-weight: 700; color: #dc2626; text-transform: capitalize; }
+    #<?= $sliderId ?> .msi-price { font-size: 1.5rem; font-weight: 800; color: #0d2f47; }
+    #<?= $sliderId ?> .msi-btn {
+        display: flex; justify-content: center; align-items: center; width: 100%;
+        border-radius: 9999px; background: transparent; color: #0d2f47;
+        font-size: 0.875rem; font-weight: 700; padding: 6px 10px;
+        border: 2px solid #0d2f47; text-decoration: none; text-transform: capitalize;
+        transition: box-shadow 0.15s;
+    }
+    #<?= $sliderId ?> .msi-btn:hover { box-shadow: #0d2f47 0 0 0 1px inset; }
+    #<?= $sliderId ?> .msi-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: center; min-height: 55px; }
+</style>
+
+<section id="<?= $sliderId ?>" class="my-12">
+
+    <div class="flex items-center justify-between mb-6">
+        <h3 style="display:block;line-height:1;font-size:2rem;font-weight:800;color:#0d2f47;text-transform:uppercase;padding:10px 0;">
+            <?= $escaper->escapeHtml($title) ?>
+        </h3>
+    </div>
+
+    <div class="swiper <?= $sliderId ?>-swiper">
+        <div class="swiper-wrapper">
+
+            <?php
+            $cfgProducts = [];
+            foreach ($products as $pIdx => $product):
+                $name         = html_entity_decode($product['name'] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $brand        = $product['brand'] ?? '';
+                $image        = $product['image'] ?? '';
+                $price        = isset($product['price'])         ? (float) $product['price']         : null;
+                $specialPrice = isset($product['special_price']) ? (float) $product['special_price'] : null;
+                $urlKey       = $product['url_key'] ?? '';
+                $productUrl   = $block->getProductUrl($urlKey);
+                $type         = $product['type'] ?? 'simple';
+                $isCfg        = ($type === 'configurable');
+                $inStock      = (bool) ($product['in_stock'] ?? true);
+                $productId    = (int) ($product['product_id'] ?? $product['id'] ?? 0);
+                $displayPrice = ($specialPrice && $price && $specialPrice < $price) ? $specialPrice : $price;
+                $imgFalco     = $falcosenseImgUrl($image);
+                $imgFalcoEsc  = $escaper->escapeUrl($imgFalco);
+                $imgSrcEsc    = $escaper->escapeUrl($image);
+                if ($isCfg && $inStock) $cfgProducts[$pIdx] = $product;
+            ?>
+            <div class="kuRECSItem border border-ahy-bg swiper-slide">
+                <div class="msi-card kuRECS-item">
+
+                    <div class="msi-img-wrap kuRECS-itemImg">
+                        <a href="<?= $escaper->escapeUrl($productUrl) ?>"
+                           title="<?= $escaper->escapeHtmlAttr($name) ?>">
+                            <?php if ($image): ?>
+                                <img src="<?= $imgFalcoEsc ?: $imgSrcEsc ?>"
+                                     data-original-src="<?= $imgSrcEsc ?>"
+                                     alt="<?= $escaper->escapeHtmlAttr($name) ?>"
+                                     class="prodImg"
+                                     loading="lazy"
+                                     onerror="if(this.dataset.fb){return;}this.dataset.fb='1';this.onerror=null;this.src='https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png';this.style.opacity='0.45';">
+                            <?php else: ?>
+                                <img src="https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png"
+                                     alt="<?= $escaper->escapeHtmlAttr($name) ?>"
+                                     class="prodImg"
+                                     loading="lazy"
+                                     style="opacity:0.45">
+                            <?php endif; ?>
+                        </a>
+
+                        <button aria-label="Add to Wish List" type="button" class="msi-bookmark hidden md:flex"
+                                x-data="initWishlist()" @click.prevent="addToWishlist(<?= $productId ?>)">
+                            <svg class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20">
+                                <path style="fill:#0d2f47;" d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="msi-detail ku-product-detail-padding">
+                        <div class="kuRECS-itemDesc" style="margin-top:12px;overflow:hidden;">
+                            <a href="<?= $escaper->escapeUrl($productUrl) ?>"
+                               title="<?= $escaper->escapeHtmlAttr($name) ?>"
+                               class="msi-name ahy-slider-title">
+                                <?= $escaper->escapeHtml($name) ?>
+                            </a>
+                            <div style="min-height: 16px;">
+                                <?php if ($brand): ?>
+                                    <div class="msi-soldby">Sold By <span style="text-transform: capitalize;"><?= $escaper->escapeHtml($brand) ?></span></div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="kuRECS-itemPrice" style="font-size:12px;color:#545454;margin:4px 0;">
+                                <div class="msi-price-wrap kuPrice">
+                                    <div class="kuSalePrice kuStartPrice flex" style="font-size:1.5rem;align-items:baseline;gap:4px;">
+                                        <?php if ($isCfg): ?>
+                                            <div class="msi-from">from</div>
+                                        <?php endif; ?>
+                                        <?php if ($displayPrice): ?>
+                                            <span class="msi-price">$<?= number_format($displayPrice, 2) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="msi-actions">
+                            <div></div>
+                            <div class="kuRECSItemBottom">
+                                <?php if ($inStock && !$isCfg): ?>
+                                    <button type="button" class="msi-btn kuBtnDark kuLandingAddToCartBtn"
+                                            onclick="ahySliderATC(this)"
+                                            data-product-id="<?= $productId ?>"
+                                            data-atc-url="<?= $escaper->escapeHtmlAttr($addToCartUrl) ?>">
+                                        <svg class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30.61 25.71">
+                                            <polyline style="fill:none;stroke:#0d2f47;stroke-linecap:round;stroke-linejoin:round;stroke-width:2.5;" points="0.75 0.75 5.51 0.75 10.82 15.88 25.24 15.88 29.86 3.3 10.84 3.3"></polyline>
+                                            <circle style="fill:none;stroke:#0d2f47;stroke-miterlimit:10;stroke-width:2.5;" cx="11.98" cy="22.46" r="2.5"></circle>
+                                            <circle style="fill:none;stroke:#0d2f47;stroke-miterlimit:10;stroke-width:2.5;" cx="24.48" cy="22.46" r="2.5"></circle>
+                                        </svg>
+                                        <span class="px-2">add</span>
+                                    </button>
+                                <?php elseif ($inStock && $isCfg): ?>
+                                    <button type="button" class="msi-btn kuBtnDark kuLandingAddToCartBtn"
+                                            data-cfg-pid="<?= $productId ?>"
+                                            data-slider-id="<?= $escaper->escapeHtmlAttr($sliderId) ?>"
+                                            onclick="ahySliderOpenModal(this)">
+                                        <span class="px-2">options</span>
+                                    </button>
+                                <?php else: ?>
+                                    <a href="<?= $escaper->escapeUrl($productUrl) ?>" class="msi-btn kuBtnDark">
+                                        <span class="px-2">details</span>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <?php endforeach; ?>
+
+        </div>
+        <div class="swiper-scrollbar"></div>
+    </div>
+
+</section>
+
+<script>
+if (typeof ahySliderATC === 'undefined') {
+    window.ahySliderATC = function(btn) {
+        var productId = btn.dataset.productId;
+        var url = btn.dataset.atcUrl;
+        var fd = new FormData();
+        fd.append('product', productId);
+        fd.append('qty', 1);
+        fd.append('form_key', hyva.getFormKey());
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) {
+                if (r.ok || r.redirected) {
+                    window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
+                    window.dispatchEvent(new CustomEvent('toggle-cart'));
+                    typeof window.dispatchMessages !== 'undefined' && window.dispatchMessages([{type: 'success', text: 'Product added to cart.'}], 3000);
+                }
+            })
+            .catch(function() {})
+            .finally(function() {
+                btn.disabled = false;
+                btn.style.opacity = '';
+            });
+    };
+}
+
+(function() {
+    function init_<?= $sliderId ?>() {
+        if (typeof Swiper === 'undefined') { setTimeout(init_<?= $sliderId ?>, 100); return; }
+        new Swiper('.<?= $sliderId ?>-swiper', {
+            slidesPerView: 'auto',
+            spaceBetween: 0,
+            roundLengths: true,
+            freeMode: true,
+            freeModeMomentum: true,
+            freeModeMomentumRatio: 0.25,
+            freeModeMomentumVelocityRatio: 0.5,
+            freeModeMomentumBounce: false,
+            freeModeMinimumVelocity: 0.02,
+            grabCursor: true,
+            touchReleaseOnEdges: true,
+            scrollbar: {
+                el: '#<?= $sliderId ?> .swiper-scrollbar',
+                draggable: true,
+                snapOnRelease: true,
+            },
+            // Handle trackpad two-finger horizontal swipe as wheel events.
+            // forceToAxis: horizontal scroll → slider only; vertical → page scroll.
+            // thresholdDelta: absorbs micro-jitter at the start of a gesture.
+            // releaseOnEdges: hands back to page scroll at slider boundaries.
+            mousewheel: {
+                forceToAxis: true,
+                releaseOnEdges: true,
+                sensitivity: 1,
+                thresholdDelta: 5,
+            },
+            keyboard: { enabled: true },
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init_<?= $sliderId ?>);
+    } else {
+        init_<?= $sliderId ?>();
+    }
+})();
+
+window.__ahySliderCfg = window.__ahySliderCfg || {};
+window.__ahySliderCfg['<?= $sliderId ?>'] = <?= json_encode(array_values($cfgProducts), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+if (typeof ahySliderOpenModal === 'undefined') {
+    function ahySliderOpenModal(btn) {
+        var pid = parseInt(btn.getAttribute('data-cfg-pid'), 10);
+        var sid = btn.getAttribute('data-slider-id');
+        var list = (window.__ahySliderCfg && window.__ahySliderCfg[sid]) || [];
+        var product = list.find(function(p) {
+            return parseInt(p.product_id || p.id, 10) === pid;
+        });
+        if (!product) return;
+        window.dispatchEvent(new CustomEvent('ahy-cfg-modal-open', { detail: product, bubbles: true }));
+    }
+}
+</script>
+
+<?php endif; ?>
+<?php if (false): // dead block preserved for reference — do not re-enable ?>
+<div x-data="ahyConfigModal()"
+     x-show="open"
+     x-cloak
+     class="fixed inset-0"
+     style="z-index: 999999"
+     @keydown.escape.window="close()">
+    <div class="absolute inset-0 bg-black/50" @click="close()"></div>
+    <div class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl flex flex-col overflow-y-auto" @click.stop>
+        <div class="flex items-start justify-between p-5 border-b border-gray-100">
+            <div class="pr-4">
+                <h3 class="text-xl font-bold text-ahy-blue leading-snug" x-html="product.name"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="'Sold And Shipped By ' + (product.brand || 'The Everest Marketplace')"></p>
+            </div>
+            <button @click="close()" class="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="flex gap-3 p-4 border-b border-gray-100">
+            <div class="flex flex-col gap-2 w-16 shrink-0 overflow-y-auto" style="max-height:340px;scrollbar-width:none;-ms-overflow-style:none;" x-ref="thumbList">
+                <template x-for="img in galleryImages" :key="img">
+                    <button @click="activeImage = img"
+                            class="w-16 h-16 border-2 rounded-lg overflow-hidden flex-shrink-0 transition-colors"
+                            :class="activeImage === img ? 'border-ahy-blue' : 'border-gray-200'">
+                        <img :src="img" class="w-full h-full object-cover"
+                             :style="{ opacity: isFallbackImg(img) ? 0.45 : 1 }"
+                             @error="$event.target.src=FALLBACK_IMG; $event.target.style.opacity='0.45'"/>
+                    </button>
+                </template>
+            </div>
+            <style>div[x-ref=thumbList]::-webkit-scrollbar{display:none}</style>
+            <div class="relative flex-1 bg-gray-50 rounded-xl overflow-hidden" style="min-height:220px;max-height:340px">
+                <img :src="activeImage || cdnImg(product.image)" :alt="product.name"
+                     class="w-full h-full object-contain"
+                     :style="{ opacity: isFallbackImg(activeImage || product.image) ? 0.45 : 1 }"
+                     @error="$event.target.src=FALLBACK_IMG; $event.target.style.opacity='0.45'"/>
+            </div>
+        </div>
+        <div class="flex-1 p-5">
+            <div class="mb-3">
+                <div class="flex items-baseline gap-1.5">
+                    <span class="text-3xl font-extrabold text-gray-900" x-html="hyva.formatPrice(displayPrice)"></span>
+                    <template x-if="displayOriginal">
+                        <span class="text-base font-medium text-gray-400 line-through" x-html="hyva.formatPrice(displayOriginal)"></span>
+                    </template>
+                </div>
+            </div>
+            <a href="/shipping-returns" class="text-ahy-blue text-sm underline font-semibold mb-5 inline-block">Shipping &amp; Returns</a>
+            <div class="mb-4">
+                <template x-if="attrsLoaded && attrGroups().length > 0">
+                    <div>
+                        <template x-for="group in attrGroups()" :key="group.name">
+                            <div class="mb-4">
+                                <p class="text-sm font-bold text-gray-700 mb-2">
+                                    <span x-text="group.name + ':'"></span>
+                                    <span class="font-semibold text-ahy-blue ml-1" x-text="selectedAttrs[group.name] || 'Select an option'"></span>
+                                </p>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="val in group.values" :key="val">
+                                        <button @click="selectAttr(group.name, val)"
+                                                class="px-4 py-2 rounded-lg border-2 text-sm font-semibold transition-all cursor-pointer"
+                                                :class="isAttrSelected(group.name, val) ? 'border-ahy-blue text-ahy-blue bg-white' : 'border-gray-200 text-gray-700 hover:border-ahy-blue'">
+                                            <span x-text="val"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="!attrsLoaded || attrGroups().length === 0">
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="v in product.variants" :key="v.variant_id">
+                            <button @click="selectVariant(v)" :disabled="!v.in_stock"
+                                    class="px-4 py-2 rounded-lg border-2 text-sm font-semibold transition-all"
+                                    :class="{
+                                        'border-ahy-blue text-ahy-blue bg-white': selected && selected.variant_id === v.variant_id,
+                                        'border-gray-200 text-gray-700 hover:border-ahy-blue': !selected || selected.variant_id !== v.variant_id,
+                                        'opacity-40 cursor-not-allowed': !v.in_stock,
+                                        'cursor-pointer': v.in_stock
+                                    }">
+                                <span x-text="optionLabel(v)"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+            </div>
+            <p x-show="error" class="text-sm text-red-500 font-semibold" x-text="error"></p>
+        </div>
+        <div class="p-4 border-t border-gray-100">
+            <button @click="addToCart()" :disabled="adding"
+                    class="w-full py-4 rounded-full bg-ahy-red text-white font-bold text-sm uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span x-text="adding ? 'Adding…' : 'Add to Cart'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+if (typeof ahyConfigModal === 'undefined') {
+    function ahyConfigModal() {
+        return {
+            open: false, product: { variants: [] }, selected: null, adding: false, error: '', activeImage: '', galleryImages: [], variantAttrs: {}, attrsLoaded: false, selectedAttrs: {},
+            FALLBACK_IMG: 'https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png',
+            isFallbackImg(path) {
+                return this.cdnImg(path) === this.FALLBACK_IMG;
+            },
+            cdnImg(path) {
+                if (!path) return this.FALLBACK_IMG;
+                if (path.includes('falcosense/800x800')) return path;
+                let rel = path;
+                if (path.startsWith('http')) {
+                    const m = path.match(/\/catalog\/product\/(.+)$/);
+                    if (!m) return this.FALLBACK_IMG;
+                    rel = m[1];
+                } else {
+                    rel = rel.replace(/^\/+/, '');
+                }
+                if (!rel) return this.FALLBACK_IMG;
+                const filename = rel.split('/').pop();
+                if (!filename) return this.FALLBACK_IMG;
+                const c1 = filename[0], c2 = filename[1] || c1;
+                return '/media/falcosense/800x800/' + c1 + '/' + c2 + '/' + filename;
+            },
+            get displayPrice() {
+                const src = this.selected || this.product;
+                return src.special_price && src.special_price < src.price ? src.special_price : src.price;
+            },
+            get displayOriginal() {
+                const src = this.selected || this.product;
+                return src.special_price && src.special_price < src.price ? src.price : null;
+            },
+            init() {
+                if (!window._ahyCfgModalInited) window.addEventListener('ahy-open-config-modal', e => {
+                    this.product = { variants: [], ...e.detail };
+                    this.selected = (e.detail.variants || []).find(v => v.in_stock) || null;
+                    this.error = '';
+                    this.activeImage = '';
+                    this.galleryImages = [];
+                    const _parentSku = e.detail.product_sku || e.detail.sku || '';
+                    const _variantSkus = (e.detail.variants || []).map(v => v.sku || v.variant_sku).filter(Boolean);
+                    const _allSkus = [...new Set([_parentSku, ..._variantSkus])].filter(Boolean);
+                    if (_allSkus.length) {
+                        fetch('/ahy_themecustomization/index/mediaGallery?skus=' + encodeURIComponent(_allSkus.join(',')), {credentials: 'include'})
+                            .then(r => r.json())
+                            .then(imgs => { this.galleryImages = imgs; if (imgs.length) this.activeImage = imgs[0]; })
+                            .catch(() => {});
+                    }
+                    this.attrsLoaded = false;
+                    const _vSkus = _variantSkus.filter(Boolean);
+                    if (_vSkus.length) {
+                        fetch('/variant-attrs.php?skus=' + encodeURIComponent(_vSkus.join(',')), {credentials: 'include'})
+                            .then(r => r.json())
+                            .then(attrs => {
+                                this.variantAttrs = attrs || {};
+                                this.attrsLoaded = true;
+                                if (this.selected) {
+                                    var _sku = this.selected.sku || this.selected.variant_sku || '';
+                                    var _a = this.variantAttrs[_sku] || {};
+                                    var _self = this;
+                                    this.selectedAttrs = Object.fromEntries(Object.entries(_a).map(function(e) { return [e[0], _self.decodeHtml(e[1])]; }));
+                                }
+                            })
+                            .catch(() => { this.attrsLoaded = true; });
+                    } else {
+                        this.attrsLoaded = true;
+                    }
+                    this.open = true; document.body.style.overflow = 'hidden';
+                });
+            },
+            optionLabel(v) {
+                var sku = v.sku || v.variant_sku || '';
+                var attrs = sku ? (this.variantAttrs[sku] || {}) : {};
+                var vals = Object.values(attrs);
+                if (vals.length) return vals.map(v => this.decodeHtml(v)).join(' / ');
+                var label = v.variant_title || v.name || '';
+                if (label && this.product.name) {
+                    var prefix = this.product.name.toLowerCase();
+                    var lower  = label.toLowerCase();
+                    if (lower.startsWith(prefix)) {
+                        label = label.slice(this.product.name.length).replace(/^[\s\-\/]+/, '').trim();
+                    }
+                }
+                return this.decodeHtml(label || sku);
+            },
+            attrGroups() {
+                var groups = {}, order = [];
+                var self = this;
+                Object.values(this.variantAttrs).forEach(function(attrs) {
+                    Object.entries(attrs).forEach(function(e) {
+                        var name = e[0], val = self.decodeHtml(e[1]);
+                        if (!groups[name]) { groups[name] = []; order.push(name); }
+                        if (groups[name].indexOf(val) === -1) groups[name].push(val);
+                    });
+                });
+                return order.map(function(name) { return { name: name, values: groups[name] }; });
+            },
+            selectAttr(attrName, value) {
+                this.selectedAttrs = Object.assign({}, this.selectedAttrs, { [attrName]: value });
+                var self = this;
+                var matchedSku = null;
+                Object.entries(this.variantAttrs).forEach(function(e) {
+                    if (matchedSku) return;
+                    var sku = e[0], attrs = e[1];
+                    var matches = Object.entries(self.selectedAttrs).every(function(s) {
+                        return self.decodeHtml(attrs[s[0]] || '') === s[1];
+                    });
+                    if (matches) matchedSku = sku;
+                });
+                if (matchedSku) {
+                    var v = (this.product.variants || []).find(function(v) { return (v.sku || v.variant_sku) === matchedSku; });
+                    if (v) { this.selected = v; if (v.image) this.activeImage = this.cdnImg(v.image); }
+                }
+                this.error = '';
+            },
+            isAttrSelected(attrName, value) { return this.selectedAttrs[attrName] === value; },
+            decodeHtml(str) {
+                if (!str) return str;
+                return new DOMParser().parseFromString(str, 'text/html').body.textContent || str;
+            },
+            close() { this.open = false; this.selected = null; this.error = ''; document.body.style.overflow = ''; },
+            selectVariant(v) { if (!v.in_stock) return; this.selected = v; this.error = ''; if (v.image) this.activeImage = this.cdnImg(v.image); },
+            async addToCart() {
+                if (!this.selected) { this.error = 'Please select an option first.'; return; }
+                this.adding = true; this.error = '';
+                try {
+                    const fd = new FormData();
+                    fd.append('product', this.selected.variant_id); fd.append('qty', 1); fd.append('form_key', hyva.getFormKey());
+                    const resp = await fetch('<?= $addToCartUrl ?>', { method: 'POST', body: fd });
+                    if (resp.ok || resp.redirected) { window.dispatchEvent(new CustomEvent('reload-customer-section-data')); window.dispatchEvent(new CustomEvent('toggle-cart')); this.close(); }
+                    else this.error = 'Could not add to cart. Please try again.';
+                } catch(e) { this.error = 'Could not add to cart. Please try again.'; }
+                this.adding = false;
+            },
+        };
+    }
+}
+</script>
+<?php endif; ?>

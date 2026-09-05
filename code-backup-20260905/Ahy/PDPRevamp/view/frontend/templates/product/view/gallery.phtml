@@ -1,0 +1,1119 @@
+<?php
+/**
+ * Hyvä Themes - https://hyva.io
+ * Copyright © Hyvä Themes 2020-present. All rights reserved.
+ * This product is licensed per Magento install
+ * See https://hyva.io/license
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\StoreConfig;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Hyva\Theme\ViewModel\HeroiconsSolid;
+use Magento\Catalog\Block\Product\View\Gallery;
+use Magento\Catalog\Helper\Image;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var Gallery $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var StoreConfig $storeConfig */
+$storeConfig = $viewModels->require(StoreConfig::class);
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+/** @var HeroiconsSolid $heroiconsSolid */
+$heroiconsSolid = $viewModels->require(HeroiconsSolid::class);
+
+$ahyHelper = $this->helper('Ahy\PDPRevamp\Helper\Data');
+$_product = $block->getProduct();
+$galleryImages = $_product->getMediaGalleryImages();
+if ($galleryImages) {
+    foreach ($galleryImages as $image) {
+        $ahyHelper->getImageResizeService($image);
+    }
+}
+$images = $block->getGalleryImages()->getItems();
+$mainImage = current(array_filter($images, [$block, 'isMainImage']));
+
+if (!empty($images) && empty($mainImage)) {
+    $mainImage = reset($images);
+}
+
+/** @var Image $helper */
+$helper = $block->getData('imageHelper');
+$mainImageData = $mainImage ?
+    $mainImage->getData('medium_image_url') :
+    $helper->getDefaultPlaceholderUrl('image');
+
+$smallWidth = 64; //$block->getImageAttribute('product_page_image_small', 'width', 80);
+$smallHeight = 64; //$block->getImageAttribute('product_page_image_small', 'height', 80);
+$mediumWidth = $block->getImageAttribute('product_page_image_medium', 'width', 700);
+$mediumHeight = $block->getImageAttribute('product_page_image_medium', 'height', 700);
+
+// Admin Config
+$galleryOptionShowRelated = $storeConfig->getStoreConfig('catalog/product_video/show_related') ?? false;
+$galleryOptionVideoLoop = $storeConfig->getStoreConfig('catalog/product_video/video_auto_restart') ?? false;
+
+// Share row - each icon opens the platform's native share dialog for this specific
+// product (not a static link to the store's own social page), so the customer shares
+// the product to their own account.
+// Canonical product URL rather than window.location.href, so a visitor who arrived
+// with ?utm_source=... doesn't share that on.
+$shareProductUrl = $_product->getProductUrl();
+$shareProductName = $_product->getName();
+$shareProductImageUrl = $mainImageData;
+$shareFacebookUrl = 'https://www.facebook.com/sharer/sharer.php?u=' . rawurlencode($shareProductUrl);
+$sharePinterestUrl = 'https://pinterest.com/pin/create/button/?url=' . rawurlencode($shareProductUrl)
+    . '&media=' . rawurlencode($shareProductImageUrl)
+    . '&description=' . rawurlencode($shareProductName);
+$shareXUrl = 'https://twitter.com/intent/tweet?url=' . rawurlencode($shareProductUrl)
+    . '&text=' . rawurlencode($shareProductName);
+$shareEmailSubject = rawurlencode($shareProductName);
+$shareEmailBody = rawurlencode($shareProductUrl);
+$shareCopyLinkEnabled = (bool) ($storeConfig->getStoreConfig('pdprevamp_share_buttons/general/copy_link_enabled') ?? true);
+
+// view.xml Config
+$galleryOptionVideoAutoplay = (bool) $block->getVar('gallery/autoplay', 'Magento_Catalog');
+// The revamp design always uses horizontal thumbnails below the main image,
+// so the theme's view.xml "vertical" nav direction must not apply here.
+$galleryOptionNavVertical = false;
+// The revamp design scrolls the thumbnail strip directly (touch/mouse drag)
+// instead of paging through it with prev/next arrow buttons.
+$galleryOptionShowNavArrows = false;
+$galleryOptionShowNavOverflow = (bool) $block->getVar('gallery/navoverflow', 'Magento_Catalog');
+$galleryOptionAppendOnReceive = (string) $block->getVar('gallery_switch_strategy', 'Magento_ConfigurableProduct') === 'append';
+
+$productName = $block->getProduct()->getName();
+
+?>
+<?php if ($mainImageData): ?>
+<link rel="preload" as="image" href="<?= /* @noEscape */ $mainImageData ?>">
+<?php endif; ?>
+<div class="order-1 w-full flex flex-col">
+    <div id="gallery"
+        x-data="initGallery()"
+        x-bind="eventListeners"
+        class="w-full py-6 md:pt-0 md:h-full md:row-start-1 md:row-span-2 md:col-start-1 flex flex-col flex-1 min-h-0"
+    >
+        <div
+            class="relative grid gap-y-3 grid-cols-1 grid-rows-[minmax(0,1fr)_var(--thumbs-size)] flex-1 min-h-0 [--thumbs-gap:theme('spacing.2')] lg:[--thumbs-gap:theme('spacing.2')]
+                <?= $galleryOptionNavVertical ? "lg:gap-y-0 lg:gap-x-6 lg:grid-cols-[var(--thumbs-size)_1fr] lg:grid-rows-1" : "" ?>"
+            style="--thumbs-size: 76px;"
+            :class="{
+                'w-full h-full fixed top-0 left-0 bg-white z-50 flex': fullscreen,
+                'relative': !fullscreen
+            }"
+            :role="fullscreen ? 'dialog' : false"
+            :aria-modal="fullscreen"
+            :aria-label="fullscreen ? '<?= $escaper->escapeJs(__('Gallery modal fullscreen')) ?>' : false"
+        >
+            <div class="group w-full aspect-[1/1] rounded-2xl border ahy-gallery-image-border bg-white overflow-hidden ahy-gallery-zoom-cursor <?= $galleryOptionNavVertical ? "lg:col-start-2" : "" ?>"
+                @touchstart="handleTouchStart"
+                @touchmove="handleTouchMove"
+                @mousemove="handleHoverZoomMove($event)"
+                @mouseleave="handleHoverZoomLeave()"
+                :class="{
+                    'relative':!fullscreen,
+                    'absolute md:top-[5%] w-screen right-0': fullscreen
+                }"
+                x-transition:enter="ease-out duration-500"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+            >
+                <!-- Hover-to-zoom hint badge: hidden until the image is
+                     hovered, mirrors the crosshair cursor / hoverZoomActive
+                     scale effect already wired up on this container. -->
+                <div class="absolute top-3 right-4 z-10 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none hidden md:block"
+                     :class="{ '!hidden': fullscreen }">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6"/>
+                    </svg>
+                </div>
+                <div 
+                    class="absolute bottom-0 md:bottom-[3%] z-10 hidden items-center justify-center right-1/2 left-1/2"
+                    :class="{'hidden':!fullscreen, 'flex':fullscreen}"
+                >
+                    <!-- Zoom In Button -->
+                    <button
+                        @click="zoomLevel = Math.max(zoomLevel - 10, 30); clearTimeout(opacityTimeout); opacityTimeout = setTimeout(() => {opacity = 0.25}, 3000)"
+                        :disabled="zoomLevel === 30"
+                        :class="{
+                                    'opacity-0 pointer-events-none': activeVideoType,
+                                    'opacity-40 hover:opacity-100': opacity === 0.25 && !activeVideoType
+                                }"
+                        class="z-10 relative bottom-6 left-1/3 transform -translate-x-1/2 bg-white text-ahy-blue shadow-[1px_1px_6px_0px_rgba(0,0,0,0.15)] border border-[#ECECEB] p-2 disabled:cursor-not-allowed disabled:text-gray-500 disabled:opacity-25 cursor-pointer rounded-full focus:outline-none"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                            <path
+                                fill-rule="evenodd"
+                                d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Zm4.5 0a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1-.75-.75Z"
+                                clip-rule="evenodd"
+                            />
+                        </svg>
+                    </button>
+
+                    <!-- Zoom Level Display -->
+                    <div 
+                        class="z-10 relative bottom-6  bg-white text-ahy-blue shadow-[1px_1px_6px_0px_rgba(0,0,0,0.15)] border border-[#ECECEB] px-3 py-2 rounded-full"
+                        :class="{
+                                    'opacity-0 pointer-events-none': activeVideoType,
+                                    'opacity-40 hover:opacity-100': opacity === 0.25 && !activeVideoType
+                                }"
+                    >
+                        <span x-text="zoomLevel + '%'"></span>
+                    </div>
+
+                    <!-- Zoom Out Button -->
+                    <button
+                        @click="zoomLevel = Math.min(zoomLevel + 10, 150); clearTimeout(opacityTimeout); opacityTimeout = setTimeout(() => {opacity = 0.25}, 3000)"
+                        :disabled="zoomLevel === 150"
+                        :class="{
+                                    'opacity-0 pointer-events-none': activeVideoType,
+                                    'opacity-40 hover:opacity-100': opacity === 0.25 && !activeVideoType
+                                }"
+                        class="z-10 relative bottom-6 right-1/3 transform translate-x-1/2 bg-white text-ahy-blue shadow-[1px_1px_6px_0px_rgba(0,0,0,0.15)] border border-[#ECECEB] p-2 disabled:cursor-not-allowed disabled:text-gray-500 disabled:opacity-25 cursor-pointer rounded-full focus:outline-none"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                            <path
+                                fill-rule="evenodd"
+                                d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Zm8.25-3.75a.75.75 0 0 1 .75.75v2.25h2.25a.75.75 0 0 1 0 1.5h-2.25v2.25a.75.75 0 0 1-1.5 0v-2.25H7.5a.75.75 0 0 1 0-1.5h2.25V7.5a.75.75 0 0 1 .75-.75Z"
+                                clip-rule="evenodd"
+                            />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- previous icon -->
+                <div 
+                    class="absolute top-1/2 left-[3%] h-10 z-10 w-10 bg-white shadow-[1px_1px_6px_0px_rgba(0,0,0,0.15)] border border-[#ECECEB] p-2 cursor-pointer items-center justify-center rounded-full"
+                    :class="{'hidden': fullscreen || itemCount === 1 || active === 0, 'flex':!fullscreen}"
+                    @click="previousItem()"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" title="previous image" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                    </svg>
+                </div>
+                <!-- next icon -->
+                <div 
+                    class="absolute top-1/2 right-[3%] h-10 z-10 w-10 bg-white shadow-[1px_1px_6px_0px_rgba(0,0,0,0.15)] border border-[#ECECEB] p-2 cursor-pointer items-center justify-center rounded-full"
+                    :class="{'hidden': fullscreen || itemCount === 1 || (active + 1) === itemCount, 'flex':!fullscreen}"
+                    @click="nextItem()"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" title="next image" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                </div>
+                <!-- Main image -->
+                <div class="relative" aria-live="polite" aria-atomic="true">
+                    <?php
+                    /**
+                     * The first image is a placeholder that determines the
+                     * aspect ratio for the gallery. It will be hidden as
+                     * soon as JS is loaded, but will keep reserving the
+                     * necessary space in the layout for the other (absolute positioned)
+                     * images. Hence, `invisible` instead of `x-show` or `hidden`
+                     */
+                    ?>
+                    <img
+                        alt="<?= $mainImage ? $escaper->escapeHtmlAttr($mainImage->getData('label')) : '' ?>"
+                        title="<?= $mainImage ? $escaper->escapeHtmlAttr($mainImage->getData('label')) : '' ?>"
+                        class="ahy-gallery-main-image object-contain object-center w-full h-full"
+                        :class="'invisible'"
+                        src="<?= /* @noEscape */ $mainImageData ?>"
+                        width="<?= /* @noEscape */ $mediumWidth ?>"
+                        height="<?= /* @noEscape */ $mediumHeight ?>"
+                        fetchpriority="high"
+                        itemprop="image"
+                    />
+                    <template x-for="(image, index) in images" :key="index">
+                        <img
+                            :alt="image.caption || '<?= $escaper->escapeJs($productName) ?>'"
+                            :title="image.caption || '<?= $escaper->escapeJs($productName) ?>'"
+                            class="ahy-gallery-main-image absolute inset-0 object-contain object-center w-full h-full m-auto"
+                            width="<?= /* @noEscape */ $mediumWidth ?>"
+                            height="<?= /* @noEscape */ $mediumHeight ?>"
+                            :loading="active !== index ? 'lazy' : 'eager'"
+                            :style="{
+                                transform: active === index && fullscreen
+                                    ? 'scale(' + zoomLevel/100 + ')'
+                                    : (active === index && hoverZoomActive ? 'scale(2)' : ''),
+                                transformOrigin: hoverZoomOriginX + '% ' + hoverZoomOriginY + '%',
+                                transition: 'transform-origin 0.1s',
+                                display: active === index ? 'block' : 'none'
+                            }"
+                            :src="fullscreen ? image.full : image.img"
+                            x-transition:enter.opacity.duration.500ms
+                            x-transition:leave.opacity.duration.0ms
+                            x-show="active === index"
+                        />
+                    </template>
+                    <div class="absolute h-full w-full inset-0 bg-white z-[-1]"></div>
+                    <button
+                        type="button"
+                        class="group absolute inset-0 w-full outline-offset-2 grid place-items-center"
+                        aria-label="<?= $escaper->escapeHtml(__('Click to play video')) ?>"
+                        x-show="images[active].type === 'video' && !activeVideoType"
+                        x-cloak
+                        @click="activateVideo()"
+                        @keydown.enter="activateVideo()"
+                    >
+                        <?= $heroiconsSolid->playHtml(
+                            'stroke-white/75 fill-black/20 transition ease-in group-hover:scale-110 md:w-24 md:h-24',
+                            44,
+                            44,
+                            ['aria-hidden' => 'true']
+                        ); ?>
+                    </button>
+                    <div
+                        class="absolute inset-0 w-full h-full bg-white nonmobile"
+                        x-transition:enter.opacity.duration.500ms
+                        x-transition:leave.opacity.duration.0ms
+                        x-show="images[active].type === 'video' && activeVideoType === 'youtube'"
+                        x-cloak
+                    >
+                        <div id="youtube-player" class="w-full h-full"></div>
+                    </div>
+                    <div
+                        class="absolute inset-0 w-full h-full bg-white"
+                        x-transition:enter.opacity.duration.500ms
+                        x-transition:leave.opacity.duration.0ms
+                        x-show="images[active].type === 'video' && activeVideoType === 'vimeo'"
+                        x-cloak
+                    >
+                        <div id="vimeo-player" class="w-full h-full"></div>
+                    </div>
+                    <div
+                        class="absolute inset-0 w-full h-full bg-white"
+                        x-transition:enter.opacity.duration.500ms
+                        x-transition:leave.opacity.duration.0ms
+                        x-show="images[active].type === 'video' && activeVideoType === 'local'"
+                        x-cloak
+                    >
+                        <div id="local-video-player" class="w-full h-full"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div @resize.window.debounce="calcResize();" class="flex flex-col gap-2 mt-1 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+                <div
+                    id="thumbs"
+                    class="flex items-center min-w-0  <?= $galleryOptionNavVertical ? "lg:col-start-1" : "" ?>"
+                    :class="{
+                        '<?= $galleryOptionNavVertical ? "mx-6 lg:mx-[var(--thumbs-gap)] lg:my-6" : "mx-6" ?> justify-center lg:flex-row fixed bottom-[5%] left-0 right-0': fullscreen
+                    }"
+                >
+                    <?php if ($galleryOptionShowNavArrows): ?>
+                        <button
+                            type="button"
+                            aria-label="<?= $escaper->escapeHtmlAttr(__('Previous')) ?>"
+                            tabindex="-1"
+                            class="text-black p-2 outline-none focus:outline-none flex-none pt-0"
+                            :class="{ 
+                                'opacity-25 pointer-events-none hidden' : isSliderStart, 
+                                'hidden' : !isSlider 
+                            }"
+                            aria-hidden="true"
+                            @click="scrollPrevious"
+                        >
+                            <!-- left side arrow (horizontal thumbs layout) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"></path></svg>
+                            <!-- <?= $heroicons->chevronUpHtml($galleryOptionNavVertical ? 'hidden lg:block' : 'hidden') ?>
+                            <?= $heroicons->chevronLeftHtml($galleryOptionNavVertical ? 'block lg:hidden' : 'block') ?> -->
+                        </button>
+                    <?php endif; ?>
+                    <?php /* Drag-to-scroll: the design turns the prev/next arrows
+                           off ($galleryOptionShowNavArrows above) on the
+                           assumption that the strip is dragged instead, but no
+                           mouse handlers existed - so on desktop, where there is
+                           no touch scrolling and the scrollbar is hidden by
+                           .ahy-gallery-thumbs-scroll, an overflowing strip had no
+                           usable affordance at all. These handlers supply the
+                           click-and-drag the design assumed; touch devices keep
+                           using native scrolling. */ ?>
+                    <div class="js_thumbs_slides thumbs-wrapper ahy-gallery-thumbs-scroll group outline-none relative overflow-x-auto overscroll-contain js_slides snap flex gap-2 ahy-thumbs-draggable"
+                        @mousedown="dragStart($event)"
+                        @mousemove="dragMove($event)"
+                        @mouseup="dragEnd()"
+                        @mouseleave="dragEnd()"
+                        @dragstart.prevent
+                        x-ref="jsThumbSlides"
+                        @scroll.debounce="calcScrollStartEnd(); calcActive($event)"
+                         @wheel="handleThumbsWheel($event)"
+                    >
+                        <template x-for="(image, index) in images" :key="index">
+                            <div 
+                                class="js_thumbs_slide flex shrink-0 mb-1.5 mr-[var(--thumbs-gap)] items-start last:mr-0 <?= $galleryOptionNavVertical ? "lg:mb-[var(--thumbs-gap)] lg:last:mb-0" : "" ?>"
+                                :class="{
+                                    'lg:mr-0': !fullscreen
+                                }"
+                            >
+                                <button
+                                    type="button"
+                                    <?php /* dragMoved guard: without it, releasing a
+                                       drag over a thumbnail also selects that
+                                       thumbnail, so scrolling the strip changes the
+                                       main image by accident. */ ?>
+                                    @click.prevent="if (!dragMoved) setActive(index);"
+                                    class="relative block rounded-lg border-2 overflow-hidden transition duration-300 ease-in-out"
+                                    :style="active === index ? 'border-color:#e85d26;' : 'border-color:#d8d4cc;'"
+                                >
+                                    <span class="sr-only">
+                                        <?= $escaper->escapeHtml('View larger image') ?>
+                                    </span>
+                                    <span
+                                        class="absolute inset-0 grid place-items-center"
+                                        x-show="image.type === 'video'"
+                                    >
+                                        <?= $heroiconsSolid->playHtml('stroke-white/90 fill-white/80', 28, 28, ['aria-hidden' => 'true']); ?>
+                                    </span>
+                                    <img
+                                        :src="image.thumb"
+                                        :alt="hyva.str('%1 thumbnail', image.caption) || '<?= $escaper->escapeJs(__("%1 thumbnail", $productName)) ?>'"
+                                        :title="hyva.str('%1 thumbnail', image.caption) || '<?= $escaper->escapeJs(__("%1 thumbnail", $productName)) ?>'"
+                                        width="<?= /* @noEscape */ $smallWidth ?>"
+                                        height="<?= /* @noEscape */ $smallHeight ?>"
+                                        class="rounded-md mx-auto object-cover"
+                                        style="width:clamp(48px, 14vw, <?= /* @noEscape */ (int) $smallWidth ?>px);height:clamp(48px, 14vw, <?= /* @noEscape */ (int) $smallHeight ?>px);"
+                                    />
+                                    <span
+                                        class="absolute bottom-0 left-0 right-0 text-center truncate text-white"
+                                        style="font-size:11px;line-height:1.4;padding:2px 4px;background:rgba(20,25,35,.62);"
+                                        x-show="!fullscreen && (image.type === 'video' || (image.thumb_caption || '') !== '')"
+                                        x-text="(image.thumb_caption || '') !== '' ? image.thumb_caption : (image.type === 'video' ? '<?= $escaper->escapeJs(__('Video')) ?>' : '')"
+                                    ></span>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                    <?php if ($galleryOptionShowNavArrows): ?>
+                        <button
+                            type="button"
+                            x-show="images.length > 1"
+                            x-cloak
+                            aria-label="<?= $escaper->escapeHtmlAttr(__('Next')) ?>"
+                            tabindex="-1"
+                            class="text-black p-2 outline-none focus:outline-none flex-none pb-0"
+                            :class="{ 
+                                'opacity-25 pointer-events-none hidden' : isSliderEnd, 
+                                'hidden' : !isSlider,
+                            }"
+                            aria-hidden="true"
+                            @click="scrollNext"
+                        >
+                            <!-- right side arrow (horizontal thumbs layout) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"></path></svg>
+                            <!-- <?= $heroicons->chevronDownHtml($galleryOptionNavVertical ? 'hidden lg:block' : 'hidden') ?>
+                            <?= $heroicons->chevronRightHtml($galleryOptionNavVertical ? 'block lg:hidden' : 'block') ?> -->
+                        </button>
+                    <?php endif; ?>
+                </div>
+                <!-- share row (right side of thumbnail line) -->
+                <?php /* flex-wrap + shrink-0 on every child: the icons have a fixed
+                         28px box, but as flex items that is only a base size, so when
+                         the "Copied!" label widens the row they were being squashed
+                         into ovals. Wrapping is the correct overflow behaviour here. */ ?>
+                <div class="flex flex-wrap items-center gap-3 lg:shrink-0"
+                     x-data="{
+                         copied: false,
+                         shareUrl: '<?= $escaper->escapeJs($shareProductUrl) ?>',
+                         async copyLink() {
+                             try {
+                                 if (navigator.clipboard && window.isSecureContext) {
+                                     await navigator.clipboard.writeText(this.shareUrl);
+                                 } else {
+                                     /* navigator.clipboard is undefined on non-HTTPS origins
+                                        and older browsers - fall back rather than throw. */
+                                     const field = document.createElement('textarea');
+                                     field.value = this.shareUrl;
+                                     field.setAttribute('readonly', '');
+                                     field.style.position = 'fixed';
+                                     field.style.opacity = '0';
+                                     document.body.appendChild(field);
+                                     field.select();
+                                     document.execCommand('copy');
+                                     document.body.removeChild(field);
+                                 }
+                                 this.copied = true;
+                                 setTimeout(() => { this.copied = false }, 2000);
+                             } catch (error) {
+                                 console.error(error);
+                             }
+                         }
+                     }"
+                     x-show="!fullscreen"
+                >
+                    <span class="uppercase tracking-widest font-semibold" style="font-size:12px;color:#6b7688;"><?= $escaper->escapeHtml(__('Share')) ?></span>
+                    <a href="<?= $escaper->escapeUrl($shareFacebookUrl) ?>" target="_blank" rel="noopener noreferrer"
+                       aria-label="<?= $escaper->escapeHtmlAttr(__('Share on Facebook')) ?>"
+                       class="flex items-center justify-center rounded-full shrink-0" style="width:28px;height:28px;">
+                        <svg width="28" height="28" viewBox="0 0 28 28">
+                            <circle cx="14" cy="14" r="14" fill="#1877F2"/>
+                            <circle cx="14" cy="14" r="7" fill="#fff"/>
+                            <text x="14" y="21" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="16" fill="#1877F2">f</text>
+                        </svg>
+                    </a>
+                    <a href="<?= $escaper->escapeUrl($sharePinterestUrl) ?>" target="_blank" rel="noopener noreferrer"
+                       aria-label="<?= $escaper->escapeHtmlAttr(__('Share on Pinterest')) ?>"
+                       class="flex items-center justify-center rounded-full shrink-0" style="width:28px;height:28px;background:#e60023;color:#fff;">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12c0 4.2 2.6 7.8 6.3 9.3-.1-.8-.2-2 0-2.9l1.2-4.9s-.3-.6-.3-1.5c0-1.4.8-2.4 1.8-2.4.9 0 1.3.6 1.3 1.4 0 .9-.6 2.2-.9 3.4-.2 1 .5 1.8 1.5 1.8 1.8 0 3.2-1.9 3.2-4.7 0-2.4-1.7-4.1-4.2-4.1-2.9 0-4.6 2.2-4.6 4.4 0 .9.3 1.8.8 2.3.1.1.1.2.1.3l-.3 1.1c0 .2-.1.2-.3.1-1.2-.6-2-2.4-2-3.9 0-3.2 2.3-6.1 6.6-6.1 3.5 0 6.2 2.5 6.2 5.8 0 3.5-2.2 6.3-5.2 6.3-1 0-2-.5-2.3-1.1l-.6 2.4c-.2.9-.8 2-1.2 2.6.9.3 1.9.4 2.9.4 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>
+                    </a>
+                    <a href="<?= $escaper->escapeUrl($shareXUrl) ?>" target="_blank" rel="noopener noreferrer"
+                       aria-label="<?= $escaper->escapeHtmlAttr(__('Share on X')) ?>"
+                       class="flex items-center justify-center rounded-full shrink-0" style="width:28px;height:28px;background:#111;color:#fff;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.3l7.3-8.3L1.6 2h6.4l4.4 5.9L18.9 2zm-1.1 18h1.7L7.1 3.9H5.2L17.8 20z"/></svg>
+                    </a>
+                    <a href="mailto:?subject=<?= /* @noEscape */ $shareEmailSubject ?>&body=<?= /* @noEscape */ $shareEmailBody ?>"
+                       aria-label="<?= $escaper->escapeHtmlAttr(__('Share via Email')) ?>"
+                       class="flex items-center justify-center rounded-full shrink-0" style="width:28px;height:28px;background:#1e3154;color:#fff;">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                    </a>
+                    <?php if ($shareCopyLinkEnabled): ?>
+                    <button type="button"
+                            @click="copyLink()"
+                            :aria-label="copied
+                                ? '<?= $escaper->escapeJs(__('Link copied')) ?>'
+                                : '<?= $escaper->escapeJs(__('Copy Link')) ?>'"
+                            class="flex items-center gap-1.5 rounded-full border transition-all duration-200 shrink-0 sm:px-3"
+                            :class="copied ? 'border-green-600' : ''"
+                            :style="copied ? 'font-size:12px;padding:7px;color:#4a5a74;background:#F0FDF4;' : 'font-size:12px;padding:7px;color:#4a5a74;background:#f1edee;border-color:#e1ddde;'"
+                            @mouseenter="if(!copied){ $el.style.borderColor='#a09a9c'; $el.style.transform='scale(1.05)'; }"
+                            @mouseleave="if(!copied){ $el.style.borderColor='#e1ddde'; $el.style.transform='scale(1)'; }">
+                        <svg x-show="!copied" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+                        <svg x-show="copied" x-cloak width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1e7d3e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>
+                        <span x-show="!copied" class="hidden sm:inline"><?= $escaper->escapeHtml(__('Copy Link')) ?></span>
+                        <?php /* No hidden sm:inline here - on mobile the label is
+                                 suppressed to save space, so this confirmation was
+                                 invisible and the button looked like it did nothing. */ ?>
+                        <span x-show="copied" x-cloak aria-live="polite" style="color:#1e7d3e;"><?= $escaper->escapeHtml(__('Copied!')) ?></span>
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="absolute top-0 right-0 pt-4 pr-4">
+                <button @click="closeFullScreen($root)"
+                        type="button"
+                        class="hidden text-gray-500 p-3 hover:text-gray-600 focus:text-gray-600
+                            transition ease-in-out duration-150"
+                        :class="{ 'hidden': !fullscreen, 'block': fullscreen }"
+                        aria-label="<?= $escaper->escapeHtmlAttr(__('Close fullscreen')) ?>"
+                >
+                    <?= $heroicons->xHtml('', 24, 24, ['aria-hidden' => 'true']) ?>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div 
+        x-on:resize.window="isDesktop = (window.innerWidth >= 768) ? true : false" 
+        id="meet-marcus" 
+        class="w-full" 
+        x-data="{
+            isDesktop: (window.innerWidth >= 768) ? true : false,
+            open: false
+        }"
+    >
+        <template x-if="isDesktop">
+            <div class="">
+                <?php 
+                    $productInfoDetailsBlock = $this->getLayout()->getBlock('product.info.details');
+                    echo  $productInfoDetailsBlock ? $productInfoDetailsBlock->toHtml() : ''; 
+                ?>
+            </div>
+        </template>
+    </div>
+</div>
+
+<script>
+    function initGallery () {
+        let touchXDown, touchYDown;
+
+        return {
+            "active": 0,
+            "videoData": {},
+            "activeVideoType": false,
+            "autoplayVideo": <?= /* @noEscape */ $galleryOptionVideoAutoplay ? 'true' : 'false' ?>,
+            "loopVideo": <?= /* @noEscape */ $galleryOptionVideoLoop ? 'true' : 'false' ?>,
+            "relatedVideos": <?= /* @noEscape */ $galleryOptionShowRelated ? 'true' : 'false' ?>,
+            "vimeoPlayer": null,
+            "zoomLevel": 100,
+            "hoverZoomActive": false,
+            "hoverZoomOriginX": 50,
+            "hoverZoomOriginY": 50,
+            "handleHoverZoomMove"($event) {
+                if (this.fullscreen || this.activeVideoType) {
+                    return;
+                }
+                const rect = $event.currentTarget.getBoundingClientRect();
+                this.hoverZoomOriginX = Math.max(0, Math.min(100, (($event.clientX - rect.left) / rect.width) * 100));
+                this.hoverZoomOriginY = Math.max(0, Math.min(100, (($event.clientY - rect.top) / rect.height) * 100));
+                this.hoverZoomActive = true;
+            },
+            "handleHoverZoomLeave"() {
+                this.hoverZoomActive = false;
+            },
+            "opacity": 0,
+            "opacityTimeout": null,
+            "fullscreen": false,
+            "isSlider": false,
+            // Thumbnail strip drag-to-scroll state (see dragStart/dragMove).
+            "dragging": false,
+            "dragMoved": false,
+            "dragStartX": 0,
+            "dragStartScroll": 0,
+            "initialImages": <?= /* @noEscape */ $block->getGalleryImagesJson() ?>,
+            "images": <?= /* @noEscape */ $block->getGalleryImagesJson() ?>,
+            "appendOnReceiveImages": <?= $galleryOptionAppendOnReceive ? 'true' : 'false' ?>,
+            "activeSlide": 0,
+            "isSliderStart": true,
+            "isSliderEnd": true,
+            "itemCount": 0,
+            "pageSize": 4,
+            "pageFillers": 0,
+            "focusTrapListener": null,
+            init() {
+                this.itemCount = this.images.length;
+                this.initActive();
+                this.$nextTick(() => {
+                    this.zoomLevel = 100;
+                    this.opacity = 0;
+                    this.calcIsSlider();
+                });
+
+                this.$watch('fullscreen', open => {
+                    this.scrollLock(open);
+                    this.$nextTick(() => {
+                        this.calcIsSlider();
+                        this.calcPageSize();
+                        this.calcScrollStartEnd();
+                    });
+                });
+
+                this.$watch('isSlider', isSlider => {
+                    this.$nextTick(() => {
+                        if (!isSlider) return;
+                        this.calcPageSize();
+                        this.calcScrollStartEnd();
+                    });
+                });
+            },
+            receiveImages(images) {
+                if (this.appendOnReceiveImages) {
+                    const initialUrls = this.initialImages.map(image => image.full);
+                    var newImages = images.filter(image => !initialUrls.includes(image.full));
+                    if (newImages.length === 0){
+                        newImages = images.filter(image => initialUrls.includes(image.full));
+                    }
+                    this.images = [].concat(newImages, this.initialImages);
+                    this.zoomLevel = 100;
+                    this.opacity = 0;
+                    this.active = newImages.length ? 0 : this.initialImages.length;
+                    this.setActive(this.active);
+                } else {
+                    this.images = images;
+                    this.zoomLevel = 100;
+                    this.opacity = 0;
+                    this.setActiveAndScrollTo(0);
+                }
+                this.zoomLevel = 100;
+                this.opacity = 0;
+                this.$nextTick(() => {
+                    this.calcIsSlider();
+                    this.scrollTo(this.active);
+                });
+
+                this.itemCount = this.images.length;
+            },
+            resetGallery() {
+                this.images = this.initialImages;
+                this.itemCount = this.images.length;
+                this.initActive();
+                this.calcIsSlider();
+                this.zoomLevel = 100;
+                this.opacity = 0;
+                this.$nextTick(() => {
+                    this.scrollTo(this.active);
+                })
+            },
+            initActive() {
+                let active = this.images.findIndex(function(image) {
+                    return image.isMain === true
+                });
+                if (active === -1) {
+                    active = 0;
+                }
+                this.setActive(active);
+            },
+            setActive(index) {
+                this.zoomLevel = 100;
+                this.opacity = 0;
+                if (index < 0) return;
+                if (index === this.itemCount) return;
+                this.active = index;
+                this.activeVideoType = false;
+                if (window.youtubePlayer) {
+                    window.youtubePlayer.stopVideo();
+                }
+                if (this.vimeoPlayer) {
+                    this.vimeoPlayer.contentWindow.postMessage(JSON.stringify({"method": "pause"}), "*");
+                }
+
+                if (this.$refs.localVideoPlayer) {
+                    this.$refs.localVideoPlayer.pause();
+                    this.$refs.localVideoPlayer.currentTime = 0;
+                }
+                const localVid = document.getElementById('local-video-el');
+                if (localVid) { localVid.pause(); localVid.currentTime = 0; }
+
+                if (this.images[index].type === 'video' && this.autoplayVideo) {
+                    this.activateVideo();
+                }
+            },
+            activateVideo() {
+                const videoData = this.getVideoData();
+
+                if (!videoData) { return }
+
+                this.activeVideoType = videoData.type;
+
+                if (videoData.type === "youtube") {
+                    if (!window.youtubePlayer) {
+                        this.initYoutubeAPI(videoData);
+                    } else {
+                        window.youtubePlayer.loadVideoById(videoData.id);
+                    }
+
+                } else if (videoData.type === "vimeo") {
+                    this.initVimeoVideo(videoData);
+                } else if (videoData.type === "local") {
+                    this.initLocalVideo(videoData);
+                }
+            },
+            getVideoData() {
+                const videoUrl = this.images[this.active] && this.images[this.active].videoUrl;
+
+                if (!videoUrl) { return }
+
+                if (this.isLocalVideo(videoUrl)) {
+                    return { url: videoUrl, type: "local" };
+                }
+
+                let id,
+                    type,
+                    youtubeRegex,
+                    vimeoRegex,
+                    useYoutubeNoCookie = false;
+
+                if (videoUrl.match(/youtube\.com|youtu\.be|youtube-nocookie.com/)) {
+                    id = videoUrl.replace(/^\/(embed\/|v\/)?/, '').replace(/\/.*/, '');
+                    type = 'youtube';
+
+                    youtubeRegex = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
+                    id = videoUrl.match(youtubeRegex)[1];
+
+                    if (videoUrl.match(/youtube-nocookie.com/)) {
+                        useYoutubeNoCookie = true;
+                    }
+                } else if (videoUrl.match(/vimeo\.com/)) {
+                    type = 'vimeo';
+                    vimeoRegex = new RegExp(['https?:\\/\\/(?:www\\.|player\\.)?vimeo.com\\/(?:channels\\/(?:\\w+\\/)',
+                        '?|groups\\/([^\\/]*)\\/videos\\/|album\\/(\\d+)\\/video\\/|video\\/|)(\\d+)(?:$|\\/|\\?)'
+                    ].join(''));
+                    id = videoUrl.match(vimeoRegex)[3];
+                }
+
+                return id ? {
+                    id: id, type: type, useYoutubeNoCookie: useYoutubeNoCookie
+                } : false;
+            },
+            initYoutubeAPI(videoData) {
+                if (document.getElementById('loadYoutubeAPI')) {
+                    return;
+                }
+                const params = {
+                    "autoplay": true
+                };
+                const loadYoutubeAPI = document.createElement('script');
+                loadYoutubeAPI.src = 'https://www.youtube.com/iframe_api';
+                loadYoutubeAPI.id = 'loadYoutubeAPI';
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(loadYoutubeAPI, firstScriptTag);
+
+                const host = (videoData.useYoutubeNoCookie) ?
+                    'https://www.youtube-nocookie.com' :
+                    'https://www.youtube.com';
+
+                if (!this.relatedVideos) {
+                    params.rel = 0;
+                }
+                const fireYoutubeAPI = document.createElement('script');
+                fireYoutubeAPI.innerHTML = `function onYouTubeIframeAPIReady() {
+                    window.youtubePlayer = new YT.Player('youtube-player', {
+                        host: '${host}',
+                        videoId: '${videoData.id}',
+                        playerVars: ${JSON.stringify(params)},
+                    });
+                }`;
+                firstScriptTag.parentNode.insertBefore(fireYoutubeAPI, firstScriptTag);
+            },
+            initVimeoVideo(videoData) {
+                let additionalParams = '&autoplay=1';
+                let src = '';
+
+                const timestamp = new Date().getTime();
+                const vimeoContainer = document.getElementById("vimeo-player");
+                const videoId = videoData.id;
+
+                if (!vimeoContainer || !videoId) return;
+
+
+                src = 'https://player.vimeo.com/video/' +
+                    videoId + '?api=1&player_id=vimeo' +
+                    videoId +
+                    timestamp +
+                    additionalParams;
+                vimeoContainer.innerHTML =
+                    `<iframe id="${'vimeo' + videoId + timestamp}"
+                        src="${src}"
+                        width="640" height="360"
+                        webkitallowfullscreen
+                        mozallowfullscreen
+                        allowfullscreen
+                        referrerPolicy="origin"
+                        allow="autoplay"
+                        class="object-center w-full h-full object-fit"
+                    />`;
+
+                this.vimeoPlayer = vimeoContainer.childNodes[0];
+            },
+            getSlider() {
+                return this.$refs.jsThumbSlides;
+            },
+            getSliderSize() {
+                let sliderGap = 0;
+                let sliderSize = 0;
+                let slideElSize = 0;
+
+                const slider = this.getSlider();
+                const slideEl = slider && slider.querySelector('.js_thumbs_slide');
+                if (slideEl) {
+                    // The gap between thumbnails comes from the strip's flex
+                    // "gap-2" utility, not from margins on the slides - in the
+                    // horizontal layout the slides carry no margin at all (the
+                    // mb-* classes are applied only when the thumbs are
+                    // vertical). Reading marginRight/marginBottom therefore
+                    // parsed "" into NaN, which propagated through
+                    // calcIsSlider()'s arithmetic; since every comparison
+                    // against NaN is false, isSlider stayed false forever and
+                    // the prev/next arrows were never shown, however many
+                    // images the product had.
+                    //
+                    // Read the real flex gap first and keep the margin values
+                    // as the fallback for the vertical layout.
+                    const styles = window.getComputedStyle(slider);
+                    const slideStyles = window.getComputedStyle(slideEl);
+                    const isVertical = slider.offsetHeight > slider.offsetWidth;
+
+                    const flexGap = parseFloat(isVertical ? styles.rowGap : styles.columnGap);
+                    const slideElMr = parseFloat(slideStyles.marginRight) || 0;
+                    const slideElMb = parseFloat(slideStyles.marginBottom) || 0;
+                    const marginGap = slideElMr > slideElMb ? slideElMr : slideElMb;
+
+                    sliderGap = Number.isFinite(flexGap) && flexGap > 0 ? flexGap : marginGap;
+                    sliderSize = isVertical ? slider.offsetHeight : slider.offsetWidth;
+                    slideElSize = slideEl.offsetHeight > slideEl.offsetWidth ? slideEl.offsetHeight : slideEl.offsetWidth;
+                };
+
+                return { sliderGap, sliderSize, slideElSize }
+            },
+            calcPageSize() {
+                const slider = this.getSlider();
+                if (!slider) return;
+
+                const { sliderGap, sliderSize, slideElSize } = this.getSliderSize();
+                this.itemCount = slider.querySelectorAll('.js_thumbs_slide').length;
+                this.pageSize = Math.round(sliderSize / (slideElSize + sliderGap));
+                this.pageFillers = (this.pageSize * Math.ceil(this.itemCount / this.pageSize)) - this.itemCount;
+            },
+            calcIsSlider() {
+                const slider = this.getSlider();
+                if (!slider) return;
+
+                const { sliderGap, sliderSize, slideElSize } = this.getSliderSize();
+                const itemCountTotalSize = (this.itemCount * (slideElSize + sliderGap)) - sliderGap;
+                const totalSizeDiff = sliderSize - itemCountTotalSize;
+
+                // If value is a float, add -1 for the offset
+                const pixelOffset = Number.isInteger(window.devicePixelRatio) ? 0 : -1;
+                this.isSlider = totalSizeDiff < pixelOffset;
+            },
+            calcScrollStartEnd() {
+                const slider = this.getSlider();
+                if (slider) {
+                    const sliderWidth = slider.scrollWidth;
+                    const sliderHeight = slider.scrollHeight;
+
+                    this.isSliderStart = sliderHeight > sliderWidth
+                        ? slider.scrollTop === 0
+                        : slider.scrollLeft === 0;
+
+                    this.isSliderEnd = sliderHeight > sliderWidth
+                        ? Math.ceil(slider.scrollTop + slider.offsetHeight) >= sliderHeight
+                        : Math.ceil(slider.scrollLeft + slider.offsetWidth) >= sliderWidth;
+                }
+            },
+            calcActive() {
+                const slider = this.getSlider();
+                if (slider) {
+                    const sliderWidth = slider.scrollWidth;
+                    const sliderHeight = slider.scrollHeight;
+                    const sliderItems = this.itemCount + this.pageFillers;
+                    const calculatedActiveSlide = sliderHeight > sliderWidth
+                        ? slider.scrollTop / (slider.scrollHeight / sliderItems)
+                        : slider.scrollLeft / (slider.scrollWidth / sliderItems);
+                    this.activeSlide = Math.round(calculatedActiveSlide / this.pageSize) * this.pageSize;
+                }
+            },
+            /**
+             * Click-and-drag scrolling for the thumbnail strip.
+             *
+             * dragMoved is tracked so a plain click still selects a thumbnail:
+             * only once the pointer has travelled past a few pixels is the
+             * gesture treated as a drag, and the click that ends it suppressed.
+             */
+            dragStart(event) {
+                // Left button only; ignore the middle/right buttons entirely.
+                if (event.button !== 0) return;
+
+                const slider = this.getSlider();
+                if (!slider) return;
+
+                this.dragging = true;
+                this.dragMoved = false;
+                this.dragStartX = event.pageX;
+                this.dragStartScroll = slider.scrollLeft;
+            },
+            dragMove(event) {
+                if (!this.dragging) return;
+
+                const slider = this.getSlider();
+                if (!slider) return;
+
+                const delta = event.pageX - this.dragStartX;
+                if (!this.dragMoved && Math.abs(delta) > 3) {
+                    this.dragMoved = true;
+                }
+                if (this.dragMoved) {
+                    // Stop the browser turning the drag into a text selection.
+                    event.preventDefault();
+                    slider.scrollLeft = this.dragStartScroll - delta;
+                }
+            },
+            dragEnd() {
+                if (!this.dragging) return;
+                this.dragging = false;
+                // Cleared on the next tick so the click handler that fires
+                // immediately after mouseup can still see that a drag happened.
+                this.$nextTick(() => { this.dragMoved = false; });
+            },
+            calcResize() {
+                // Whether the strip overflows depends on its width, so a resize
+                // has to re-decide if the arrows belong on screen - otherwise
+                // narrowing the window leaves a scrollable strip with no
+                // affordance, and widening it leaves dead arrows behind.
+                this.calcIsSlider();
+                this.calcPageSize();
+                this.calcScrollStartEnd();
+                this.calcActive();
+                this.calcPageSize();
+                this.calcIsSlider();
+                this.calcScrollStartEnd();
+            },
+            scrollPrevious() {
+                if (this.isSliderStart) return;
+                this.scrollTo(this.activeSlide - this.pageSize);
+            },
+            scrollNext() {
+                if (this.isSliderEnd) return;
+                this.scrollTo(this.activeSlide + this.pageSize);
+            },
+            scrollTo(idx) {
+                const slider = this.getSlider();
+                if (slider) {
+                    const slideWidth = slider.scrollWidth / (this.itemCount + this.pageFillers);
+                    const slideHeight = slider.scrollHeight / (this.itemCount + this.pageFillers);
+
+                    if (slideHeight > slideWidth) {
+                        slider.scrollTop = Math.floor(slideHeight) * idx;
+                    } else {
+                        slider.scrollLeft = Math.floor(slideWidth) * idx;
+                    }
+
+                    this.activeSlide = idx;
+                }
+            },
+            setActiveAndScrollTo(index) {
+                this.setActive(index)
+                if (this.isSlider) {
+                    this.scrollTo(index);
+                }
+            },
+            eventListeners: {
+                ['@keydown.window.escape']() {
+                    if (!this.fullscreen) return;
+                    this.zoomLevel = 100;
+                    this.opacity = 0;
+                    this.closeFullScreen(this.$root)
+                },
+                ['@update-gallery.window'](event) {
+                    this.zoomLevel = 100;
+                    this.opacity = 0;
+                    this.receiveImages(event.detail);
+                },
+                ['@reset-gallery.window'](event) {
+                    this.zoomLevel = 100;
+                    this.opacity = 0;
+                    this.resetGallery();
+                },
+                ['@keyup.arrow-right.window']() {
+                    if (!this.fullscreen) return;
+                    this.nextItem();
+                },
+                ['@keyup.arrow-left.window']() {
+                    if (!this.fullscreen) return;
+                    this.previousItem();
+                },
+            },
+            scrollLock(use = true) {
+                document.body.style.overflow = use ? "hidden" : "";
+            },
+            openFullscreen(node) {
+                this.fullscreen = true;
+                hyva.trapFocus(node);
+            },
+            closeFullScreen(node, setFocusTo = this.$refs.galleryFullscreenBtn) {
+                this.fullscreen = false;
+                hyva.releaseFocus(node);
+                this.$nextTick(() => {
+                    setFocusTo.focus();
+                });
+            },
+            handleTouchStart(event) {
+                if (this.images.length <= 1) {
+                    return;
+                }
+
+                const firstTouch = event.touches[0];
+
+                touchXDown = firstTouch.clientX;
+                touchYDown = firstTouch.clientY;
+            },
+            handleTouchMove(event) {
+                if (this.images.length <= 1 || !touchXDown || !touchYDown) {
+                    return;
+                }
+
+                const xDiff = touchXDown - event.touches[0].clientX;
+                const yDiff = touchYDown - event.touches[0].clientY;
+
+                if (Math.abs(xDiff) > Math.abs(yDiff)) {
+                    const newIndex = xDiff > 0 ?  this.getNextIndex() : this.getPreviousIndex();
+                    this.setActiveAndScrollTo(newIndex)
+                }
+                touchXDown = touchYDown = null;
+            },
+             handleThumbsWheel(event) {
+                if (!this.isSlider) return;
+                const slider = this.getSlider();
+                if (!slider) return;
+
+                event.preventDefault();
+                slider.scrollLeft += Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+            },
+            getPreviousIndex() {
+                return this.active > 0 ? this.active - 1 : this.itemCount - 1;
+            },
+            getNextIndex() {
+                return this.active + 1 === this.itemCount ? 0 : this.active + 1;
+            },
+            previousItem() {
+                if (this.active === 0) {
+                    this.setActiveAndScrollTo(this.itemCount - 1);
+                    return;
+                } else {
+                    this.setActiveAndScrollTo(this.active - 1);
+                }
+            },
+            nextItem() {
+                if ((this.active + 1) === this.itemCount){
+                    this.setActiveAndScrollTo(0);
+                    return;
+                } else {
+                    this.setActiveAndScrollTo(this.active + 1);
+                }
+            },
+            isLocalVideo(url) {
+                return /\.(mp4|webm|ogg)$/i.test(url);
+            },
+            initLocalVideo(videoData) {
+                const videoContainer = document.getElementById('local-video-player');
+
+                if (!videoContainer) return;
+
+                videoContainer.innerHTML = `
+                    <video
+                        id="local-video-el"
+                        src="${videoData.url}"
+                        controls
+                        ${this.autoplayVideo ? 'autoplay' : ''}
+                        class="w-full h-full object-contain"
+                        preload="auto"
+                    ></video>
+                `;
+
+                const video = document.getElementById('local-video-el');
+                if (video) {
+                    video.addEventListener('loadedmetadata', () => {
+                        const isPortrait = video.videoHeight > video.videoWidth;
+                        video.classList.remove('object-contain', 'object-cover');
+                        video.classList.add(isPortrait ? 'object-contain' : 'object-cover');
+                        video.play().catch(() => {});
+                    });
+                }
+            },
+        }
+    }
+</script>
+<style>
+    .ahy-gallery-main-image {
+        padding: 8px;
+    }
+    
+    /* Not gated behind the >=768px media query below (unlike the padding
+       rule): a narrower browser window is still a mouse-driven desktop
+       session that benefits from the hover-zoom cursor hint, and on actual
+       touch devices a cursor style is simply never rendered anyway. */
+    .ahy-gallery-zoom-cursor {
+        cursor: crosshair;
+    }
+    @media (min-width: 768px) {
+        .ahy-gallery-main-image {
+            padding: 16px;
+        }
+    }
+    /* The scrollbar below is hidden by design, so the cursor is the only hint
+       that this strip can be dragged. Pointer devices only - a touch device
+       scrolls it natively and has no cursor to show. */
+    @media (hover: hover) and (pointer: fine) {
+        .ahy-thumbs-draggable { cursor: grab; }
+        .ahy-thumbs-draggable:active { cursor: grabbing; }
+    }
+    .ahy-gallery-thumbs-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+    .ahy-gallery-thumbs-scroll::-webkit-scrollbar { display: none; }
+    #gallery .ahy-gallery-image-border {
+        border-color: #e1ddde !important;
+    }
+</style> 

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <ahy_discount_alert>
+            <general>
+                <enabled>1</enabled>
+                <threshold>50</threshold>
+                <recipient_email></recipient_email>
+                <cc_emails></cc_emails>
+                <bcc_emails></bcc_emails>
+                <notify_on_change_only>1</notify_on_change_only>
+            </general>
+            <email>
+                <product_limit>25</product_limit>
+                <max_products>5000</max_products>
+            </email>
+            <security>
+                <link_lifetime>0</link_lifetime>
+            </security>
+            <schedule>
+                <cron_expr>0 9 * * 1</cron_expr>
+            </schedule>
+        </ahy_discount_alert>
+    </default>
+</config>

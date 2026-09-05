@@ -1,0 +1,428 @@
+<?php
+/** @var \Ahy\PlpRevamp\Block\Category\SubcategoryCards $block */
+
+$currentCategory = $block->getCurrentCategory();
+
+// Exit early — let normal layout handle the page if attribute not enabled
+if (!$currentCategory->getData('ahy_use_subcategory_layout')) {
+    return;
+}
+
+$childCategories  = $block->getChildrenCategories();
+$featuredSourceId = $block->getFeaturedSourceId();
+
+// Per-section switches. Each already implies the master switch (see the block).
+$showSubcategoryCards = $block->isSubcategoryCardsEnabled();
+$showFeaturedProducts = $block->isFeaturedProductsEnabled();
+$showFeaturedBrands   = $block->isFeaturedBrandsEnabled();
+
+// Admin-configurable cap on how many subcategory cards render. 0 = show all.
+$subcategoryCardsLimit = $block->getSubcategoryCardsCount();
+$renderedCardCount     = 0;
+
+// The cards section needs children; Featured Products and Featured Brands do not.
+// This used to be an early return, which meant a category with no subcategories
+// rendered nothing at all even with both other sections configured.
+$showSubcategoryCards = $showSubcategoryCards && $childCategories->count() > 0;
+
+// Nothing switched on — leave the page to the normal layout.
+if (!$showSubcategoryCards && !$showFeaturedProducts && !$showFeaturedBrands) {
+    return;
+}
+// Admin-configurable settings with fallbacks
+$featuredTitle       = $block->escapeHtml($block->getFeaturedTitle());
+$featuredSubtitle    = $block->escapeHtml($block->getFeaturedSubtitle());
+// Escaped, then newlines turned into <br> so paragraph breaks survive without
+// letting raw HTML through.
+$featuredDescription = $showFeaturedProducts
+    ? nl2br($block->escapeHtml($block->getFeaturedDescription()))
+    : '';
+// $featuredSourceId = $block->getFeaturedSourceId();
+// $mediaBaseUrl     = $block->getMediaBaseUrl();
+
+// Only load the collection when the section will actually render — this runs a
+// product query with a stock join, so it is not worth paying for when switched off.
+$featuredProducts = $showFeaturedProducts
+    ? $block->getFeaturedProducts()
+    : null;
+$mediaBaseUrl     = rtrim($block->getMediaBaseUrl(), '/');
+
+$categoryUrl = $currentCategory->getUrl();
+
+// Yotpo endpoint — same source used by product grid and Klevu PLP
+$yotpoEndpoint          = $block->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$featuredProductIdsJson = ($showFeaturedProducts && $featuredSourceId)
+    ? /* @noEscape */ json_encode(array_map(fn($p) => (int)$p->getId(), $featuredProducts->getItems()))
+    : '[]';
+?>
+
+<style>
+    .ahy-plp-revamp {
+        --plp-blue:        #12334b;
+        --plp-card-bg:     #f0f4f7;
+        --plp-divider:     #3e3e3f;
+        --plp-text-muted:  #666;
+        --plp-text-light:  #888;
+        --plp-star:        #f59e0b;
+        --plp-star-empty:  #D7D7DA;
+        --plp-desc-bg:     #FAFAFA;
+        --plp-desc-green:  #1a7f4b;
+        --plp-gap:         16px;
+        --plp-card-pad:    8px;
+    }
+    .ahy-plp-padding{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    @media (max-width: 768px) {
+    .ahy-plp-padding {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+    /* @media (max-width: 768px){
+    .ahy-plp-remove-padding-left-right{
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        }
+    } */
+    .ahy-fallback-img {
+        width: 60%;
+        height: auto;
+        object-fit: contain;
+        opacity: 1;
+    }
+    @media (min-width: 1441px) {
+        .ahy-subcat-grid { grid-template-columns: repeat(5, 1fr) !important; }
+    }
+    @media (min-width: 1024px) {
+        .ahy-featured-grid { grid-template-columns: repeat(4, 1fr) !important; }
+    }
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .ahy-featured-grid { grid-template-columns: repeat(3, 1fr) !important; }
+    }
+    @media (min-width: 640px) and (max-width: 767px) {
+        .ahy-featured-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    @media (max-width: 639px) {
+        .ahy-featured-grid { grid-template-columns: repeat(1, 1fr) !important; }
+    }
+    /* 400-639px: enough width for two columns on both grids. Declared after the
+       max-width:639px rule above so it wins at equal specificity.
+
+       The subcategory <ul> carries Tailwind's grid-cols-1 at this width; the
+       `.homepage-category-option > ul` selector (class + element) outranks that
+       single class, so no !important is needed. */
+    @media (min-width: 400px) and (max-width: 639px) {
+        .ahy-featured-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        .homepage-category-option > ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* Section headings ("Featured Products" / "Featured Brands") shrink on mobile.
+       !important is required: the 1.5rem it overrides is an inline style. */
+    @media (max-width: 767px) {
+        .ahy-section-title { font-size: 1.2rem !important; }
+    }
+
+    /* Tighter name spacing on mobile. !important is required: the 12px it overrides
+       is an inline style on the element. */
+    @media (max-width: 767px) {
+        .ahy-featured-name { margin-bottom: 5px !important; }
+    }
+
+    /* Featured Products description block */
+    .ahy-featured-description {
+        background: var(--plp-desc-bg);
+        border-radius: 8px;
+        padding: 20px 24px;
+        margin-top: var(--plp-gap);
+    }
+    .ahy-featured-description-text {
+        margin: 0;
+        font-size: 0.8rem;
+        line-height: 1.9;
+        color: var(--plp-blue);
+    }
+    .ahy-featured-description-text.is-clamped {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .ahy-featured-description-text.is-expanded {
+        display: block;
+        overflow: visible;
+    }
+    .ahy-featured-description-more {
+        display: inline-block;
+        margin-top: 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--plp-desc-green);
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .ahy-featured-description-more:hover { text-decoration: underline; }
+
+    @media (max-width: 767px) {
+        .ahy-featured-description { padding: 16px; }
+    }
+
+    /* Subcategory card name — responsive font size */
+    .ahy-subcat-card-name { font-size: 1rem; }
+    @media (min-width: 1441px) {
+        .ahy-subcat-card-name { font-size: 1rem; }
+    }
+    @media (min-width: 1024px) and (max-width: 1440px) {
+        .ahy-subcat-card-name { font-size: 0.875rem; }
+    }
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .ahy-subcat-card-name { font-size: 0.95rem; }
+    }
+    @media (min-width: 640px) and (max-width: 767px) {
+        .ahy-subcat-card-name { font-size: 0.9rem; }
+    }
+    @media (min-width: 400px) and (max-width: 639px) {
+        .ahy-subcat-card-name { font-size: 0.85rem; }
+    }
+    @media (max-width: 399px) {
+        .ahy-subcat-card-name { font-size: 0.8rem; }
+    }
+
+    /* --------------------------------------------------------------
+       Featured Brands - one horizontally scrollable row.
+       Applies at every breakpoint, so mobile behaves the same as desktop.
+       -------------------------------------------------------------- */
+    .ahy-brand-grid {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 12px;
+        list-style: none;
+        margin: 0;
+        padding: 0 0 8px;                  /* room for the scrollbar under the pills */
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
+        overscroll-behavior-x: contain;    /* don't fire the browser back-swipe */
+        scroll-snap-type: x proximity;
+        scrollbar-width: thin;                       /* Firefox */
+        scrollbar-color: #d4d4d8 transparent;        /* Firefox */
+    }
+
+    /* Pills keep their min-width instead of being squeezed to fit the row. */
+    .ahy-brand-grid > li {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }
+
+    .ahy-brand-grid::-webkit-scrollbar        { height: 6px; }
+    .ahy-brand-grid::-webkit-scrollbar-track  { background: transparent; }
+    .ahy-brand-grid::-webkit-scrollbar-thumb  { background: #d4d4d8; border-radius: 99px; }
+</style>
+
+<div class="ahy-plp-revamp">
+
+<?php if ($showSubcategoryCards): ?>
+<!-- Sub-category cards -->
+<div class="homepage-category-option container ahy-plp-padding ahy-plp-remove-padding-left-right">
+    <ul role="list" class="ahy-subcat-grid mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 items-start justify-center gap-4 lg:grid-cols-4">
+        <?php foreach ($childCategories as $child): ?>
+            <?php
+            // Skip the featured source category — not shown as a card
+            if ($featuredSourceId && (int)$child->getId() === $featuredSourceId) {
+                continue;
+            }
+            // Skip any child named 'Featured Products' — auto-hides even without source ID configured
+            if (strtolower(trim($child->getName())) === 'featured products') {
+                continue;
+            }
+            // Stop once the admin-configured card limit is reached (0 = show all)
+            if ($subcategoryCardsLimit > 0 && $renderedCardCount >= $subcategoryCardsLimit) {
+                break;
+            }
+            $renderedCardCount++;
+            $name         = $block->escapeHtml($child->getName());
+            $keywords     = $block->escapeHtml(trim((string)$child->getData('ahy_card_keywords')));
+            $url          = $child->getUrl();
+            $customImage  = $child->getData('ahy_card_image');
+            if ($customImage) {
+                // Stored value is /media/catalog/category/file.jpg — prepend web base URL
+                $imageUrl = rtrim($block->getStoreBaseUrl(), '/') . '/' . ltrim($customImage, '/');
+            } else {
+                $imageUrl = $child->getImageUrl();
+            }
+            ?>
+            <li class="mb-4">
+                <a href="<?= $block->escapeUrl($url) ?>">
+                    <div class="category-image-ahy"
+                         style="aspect-ratio:360/315;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;">
+                        <?php if ($imageUrl): ?>
+                            <img loading="lazy"
+                                 src="<?= $block->escapeUrl($imageUrl) ?>"
+                                 alt="<?= $name ?>"
+                                 class="w-full"
+                                 width="360"
+                                 height="315"
+                                 style="width:100%;height:100%;object-fit:contain;" />
+                        <?php else: ?>
+                            <img src="<?= $block->escapeUrl($block->getFallbackImageUrl()) ?>"
+                                 alt="Everest"
+                                 class="ahy-fallback-img" />
+                        <?php endif; ?>
+                    </div>
+                    <div class="category-name-ahy">
+                        <h3 class="text-ahy-blue pt-5 font-bold capitalize ahy-subcat-card-name"
+                            style="line-height:1.4rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:1.4rem;padding-bottom:2px;word-break:break-word;overflow-wrap:break-word;text-align:center;"><?= $name ?></h3>
+                        <?php if ($keywords): ?>
+                            <p class="ahy-card-keywords"
+                               style="font-size:0.8rem;line-height:1.2rem;color:var(--plp-text-muted);margin:2px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;overflow-wrap:break-word;text-align:center;"><?= $keywords ?></p>
+                        <?php endif; ?>
+                    </div>
+                </a>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+<?php endif; // $showSubcategoryCards ?>
+
+<?php if ($showFeaturedProducts && $featuredSourceId): ?>
+<!-- Featured Products -->
+<div class="container ahy-plp-padding">
+    <div style="margin-bottom:var(--plp-gap);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--plp-card-pad);margin-bottom:6px;">
+            <h2 class="ahy-section-title" style="font-size:1.5rem;font-weight:800;color:var(--plp-blue);text-transform:uppercase;letter-spacing:-0.02em;margin:0;">
+                <?= $featuredTitle ?>
+            </h2>
+            <a href="<?= $block->escapeUrl($block->getSeeMoreUrl()) ?>"
+               style="flex-shrink:0;font-size:0.75rem;font-weight:700;color:var(--plp-blue);text-transform:uppercase;letter-spacing:0.05em;border:2px solid var(--plp-blue);padding:6px 12px;white-space:nowrap;text-decoration:none;border-radius:99px;">
+                SEE MORE
+            </a>
+        </div>
+        <p style="font-size:0.85rem;color:var(--plp-text-muted);margin:0;"><?= $featuredSubtitle ?></p>
+    </div>
+
+    <div class="ahy-featured-grid"
+         x-data="{}"
+         x-init="$store.yotpoReviews && $store.yotpoReviews.fetch(<?= $featuredProductIdsJson ?>, '<?= $yotpoEndpoint ?>')"
+         style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--plp-gap);">
+        <?php foreach ($featuredProducts as $product): ?>
+            <?php
+            $productId    = (int)$product->getId();
+            $productName  = $block->escapeHtml($product->getName());
+            $productUrl   = $product->getProductUrl();
+            $imagePath    = $product->getSmallImage();
+            $hasImage     = $imagePath && $imagePath !== 'no_selection';
+            $imageFullUrl = $hasImage ? 'https://www.everest.com/media/catalog/product' . $imagePath : '';
+            $price        = (float)$product->getPrice();
+            $specialPrice = (float)$product->getSpecialPrice();
+            $displayPrice = ($specialPrice > 0 && $specialPrice < $price) ? $specialPrice : $price;
+
+            $labelText  = $block->getProductLabelText((string)$product->getData('ahy_product_label'));
+            $labelColor = (string)$product->getData('ahy_product_label_color');
+            $labelBg    = $labelText ? $block->getLabelBgColor($labelColor) : '';
+            ?>
+            <a href="<?= $block->escapeUrl($productUrl) ?>" style="display:block;text-decoration:none;color:inherit;">
+                <div style="position:relative;aspect-ratio:360/315;overflow:hidden;background:#ffffff;display:flex;align-items:center;justify-content:center;">
+                    <?php if ($labelText): ?>
+                        <span style="position:absolute;top:0;left:0;padding:4px var(--plp-card-pad);font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#fff;background-color:<?= $block->escapeHtml($labelBg) ?>;z-index:1;line-height:1.4;margin-top: 0.5rem; margin-left: 0.5rem; border-radius: 5px;">
+                            <?= $block->escapeHtml($labelText) ?>
+                        </span>
+                    <?php endif; ?>
+                    <?php if ($hasImage): ?>
+                    <?php $fallbackUrl = $mediaBaseUrl . '/catalog/product' . $imagePath; ?>
+                    <img loading="lazy"
+                         src="<?= $block->escapeUrl($imageFullUrl) ?>"
+                         onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='<?= $block->escapeUrl($fallbackUrl) ?>'}"
+                         alt="<?= $productName ?>"
+                         width="360"
+                         height="315"
+                         style="width:100%;height:100%;object-fit:contain;" />
+                    <?php else: ?>
+                    <img src="<?= $block->escapeUrl($block->getFallbackImageUrl()) ?>"
+                         alt="Everest"
+                         class="ahy-fallback-img" />
+                    <?php endif; ?>
+                </div>
+                <div style="padding:var(--plp-card-pad) 0;">
+                    <p class="ahy-featured-name" style="font-size:0.9rem;font-weight:600;color:var(--plp-blue);margin:0 0 12px;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;">
+                        <?= $productName ?>
+                    </p>
+                    <div x-data="{ get _r(){ return $store.yotpoReviews ? $store.yotpoReviews.data['<?= $productId ?>'] : null } }"
+                         style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                        <div style="display:flex;gap:2px;">
+                            <template x-for="i in [1,2,3,4,5]" :key="i">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                     :style="'fill:' + ((_r && _r.count > 0 && i <= Math.round(_r.score)) ? 'var(--plp-star)' : 'var(--plp-star-empty)')">
+                                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                                </svg>
+                            </template>
+                        </div>
+                        <span x-text="(_r && _r.count > 0) ? '(' + _r.count + ')' : '0'"
+                              style="font-size:0.75rem;color:var(--plp-text-light);"></span>
+                    </div>
+                    <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:1rem;font-weight:700;color:var(--plp-blue);">$<?= number_format($displayPrice, 2) ?></span>
+                        <?php if ($specialPrice > 0 && $specialPrice < $price): ?>
+                            <span style="font-size:0.8rem;color:var(--plp-text-light);text-decoration:line-through;font-weight:400;">$<?= number_format($price, 2) ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </a>
+        <?php endforeach; ?>
+    </div>
+
+    <?php if ($featuredProducts->count() === 0): ?>
+        <p style="color:var(--plp-text-muted);text-align:center;padding:32px 0;">No featured products found.</p>
+    <?php endif; ?>
+
+    <?php if ($featuredDescription !== ''): ?>
+    <!-- Featured Products description — no divider, sits directly under the grid -->
+    <div class="ahy-featured-description" x-data="{ expanded: false, clamped: false }" x-init="
+        $nextTick(() => {
+            const el = $refs.descText;
+            const cs = getComputedStyle(el);
+            let lh = parseFloat(cs.lineHeight);
+            if (isNaN(lh)) lh = parseFloat(cs.fontSize) * 1.9;
+            if (el.scrollHeight > lh * 2 + 2) {
+                clamped = true;
+            }
+        })
+    ">
+        <p class="ahy-featured-description-text" :class="{ 'is-clamped': clamped && !expanded, 'is-expanded': expanded }" x-ref="descText"><?= /* @noEscape */ $featuredDescription ?></p>
+        <span class="ahy-featured-description-more" x-show="clamped" @click="expanded = !expanded" x-text="expanded ? 'See less' : 'See more..'"></span>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; // $showFeaturedProducts ?>
+<?php
+$featuredBrandsTitle = $block->escapeHtml($block->getFeaturedBrandsTitle());
+$featuredBrands      = $showFeaturedBrands ? $block->getFeaturedBrands() : [];
+?>
+<?php if ($showFeaturedBrands && !empty($featuredBrands)): ?>
+<!-- Featured Brands -->
+<div class="container ahy-plp-padding">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--plp-card-pad);margin-bottom:var(--plp-gap);">
+        <h2 class="ahy-section-title" style="font-size:1.5rem;font-weight:800;color:var(--plp-blue);text-transform:uppercase;letter-spacing:-0.02em;margin:0;">
+            <?= $featuredBrandsTitle ?>
+        </h2>
+        <a href="<?= $block->escapeUrl($block->getBrandsSeeMoreUrl()) ?>"
+           style="flex-shrink:0;font-size:0.75rem;font-weight:700;color:var(--plp-blue);text-transform:uppercase;letter-spacing:0.05em;border:2px solid var(--plp-blue);padding:6px 12px;white-space:nowrap;text-decoration:none;border-radius:99px;">
+            SEE ALL
+        </a>
+    </div>
+    <ul role="list" class="ahy-brand-grid">
+        <?php foreach ($featuredBrands as $brand): ?>
+        <li>
+            <a href="<?= $block->escapeUrl($brand['url']) ?>"
+               style="display:inline-flex;align-items:center;justify-content:center;min-width:200px;padding: 1.2rem;border:none;background:#F4F4F5;text-decoration:none;font-size:0.9rem;font-weight:600;color:var(--plp-blue);text-align:center;white-space:nowrap;transition:background 0.15s;"
+               onmouseover="this.style.background='#f0f4f7';"
+               onmouseout="this.style.background='#F4F4F5';">
+                <?= $block->escapeHtml($brand['label']) ?>
+            </a>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+<?php endif; // $featuredBrands ?>
+
+</div><!-- /.ahy-plp-revamp -->

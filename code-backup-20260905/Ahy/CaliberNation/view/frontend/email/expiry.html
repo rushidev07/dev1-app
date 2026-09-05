@@ -1,0 +1,42 @@
+<!--@subject Your Caliber Nation membership has expired @-->
+<!--@vars {
+"var first_name":"First Name",
+"var total_savings":"Lifetime member savings",
+"var has_savings":"Has savings (boolean)",
+"var store_name":"Store Name",
+"var account_url":"Account URL"
+} @-->
+{{template config_path="design/email/header_template"}}
+
+<table border="0" cellpadding="0" cellspacing="0" style="width:100%;">
+    <tr>
+        <td>
+            <h1 style="color:#0a2540;">Your membership has expired, {{var first_name}}</h1>
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                Your Caliber Nation membership has ended, so you no longer have access to member pricing,
+                early-bird deals, and member-only spotlight deals.
+            </p>
+            {{depend has_savings}}
+            <p style="font-size:14px;color:#1b7a3d;line-height:1.6;font-weight:bold;">
+                You saved {{var total_savings}} while you were a member. Rejoin to keep saving.
+            </p>
+            {{/depend}}
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                It only takes a moment to reactivate and get your benefits back.
+            </p>
+            <p style="margin:24px 0;">
+                <a href="{{store url='caliber-nation'}}?scrollTo=signup"
+                   style="background:#e01a2b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:4px;font-weight:bold;font-size:14px;">
+                    Rejoin Caliber Nation
+                </a>
+            </p>
+            <p style="font-size:13px;color:#777;">
+                Manage your account anytime from your
+                <a href="{{var account_url}}" style="color:#e01a2b;">account dashboard</a>.
+                Thank you for being a member of {{var store_name}}.
+            </p>
+        </td>
+    </tr>
+</table>
+
+{{template config_path="design/email/footer_template"}}

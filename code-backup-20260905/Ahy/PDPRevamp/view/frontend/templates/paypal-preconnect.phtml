@@ -1,0 +1,25 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Warms the connection to PayPal before the SDK is requested.
+ *
+ * The PDP PayPal button is entirely client-rendered: the server ships an empty
+ * div and the button only appears once ~150KB of SDK has been fetched from
+ * paypal.com and an iframe rendered from it (see
+ * product/view/paypal-shortcut.phtml). DNS resolution plus the TLS handshake to
+ * a host the browser has never contacted is typically 100-300ms of that on
+ * mobile, and it is pure dead time - it can be paid up front, in parallel with
+ * the rest of the page, instead of at the head of the SDK request.
+ *
+ * paypalobjects.com is listed as well because the SDK pulls the button's own
+ * assets from there rather than from paypal.com.
+ *
+ * Loaded exclusively via catalog_product_view.xml, so no other page pays for a
+ * connection it will not use.
+ */
+?>
+<link rel="preconnect" href="https://www.paypal.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.paypal.com">
+<link rel="preconnect" href="https://www.paypalobjects.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.paypalobjects.com">

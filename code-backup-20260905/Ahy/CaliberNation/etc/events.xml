@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Activate the membership whenever an order containing the membership product
+         is placed (standard checkout AND the programmatic landing-page order). -->
+    <event name="checkout_submit_all_after">
+        <observer name="ahy_caliber_nation_activate_on_order"
+                  instance="Ahy\CaliberNation\Observer\ActivateOnOrderPlace"/>
+        <!-- Member pricing: record per-line savings + lifetime cumulative once an order is placed.
+             Bound here (not sales_order_place_after) because the order + its items are fully
+             persisted at this point, so order_id / order_item_id are populated. -->
+        <observer name="ahy_caliber_nation_record_order_savings"
+                  instance="Ahy\CaliberNation\Observer\RecordOrderSavings"/>
+    </event>
+
+    <!-- Only allow credit-card / vault methods while the membership is in the cart. -->
+    <event name="payment_method_is_active">
+        <observer name="ahy_caliber_nation_restrict_payment"
+                  instance="Ahy\CaliberNation\Observer\RestrictPaymentMethods"/>
+    </event>
+
+    <!-- Win-back: apply the Day-31 discount to the membership line for eligible ex-members. -->
+    <!-- Member pricing: apply the additive member price to catalog lines for active members. -->
+    <event name="sales_quote_collect_totals_before">
+        <observer name="ahy_caliber_nation_apply_winback_price"
+                  instance="Ahy\CaliberNation\Observer\ApplyWinbackPrice"/>
+        <observer name="ahy_caliber_nation_apply_member_price"
+                  instance="Ahy\CaliberNation\Observer\ApplyMemberPrice"/>
+    </event>
+
+    <!-- Drop a stale membership line from an ACTIVE member's cart. Runs on cart /
+         checkout page pre-dispatch (BEFORE totals collection), NOT during collect —
+         mutating the cart inside collect_totals_before collided with Amasty Free Gift
+         and dropped the gift. See RemoveActiveMemberMembership. -->
+    <event name="controller_action_predispatch_checkout_cart_index">
+        <observer name="ahy_caliber_nation_remove_active_member_membership_cart"
+                  instance="Ahy\CaliberNation\Observer\RemoveActiveMemberMembership"/>
+    </event>
+    <event name="controller_action_predispatch_checkout_index_index">
+        <observer name="ahy_caliber_nation_remove_active_member_membership_checkout"
+                  instance="Ahy\CaliberNation\Observer\RemoveActiveMemberMembership"/>
+    </event>
+
+    <!-- Win-back: auto-add the membership to an expired member's cart on login. -->
+    <event name="customer_login">
+        <observer name="ahy_caliber_nation_autoadd_for_expired"
+                  instance="Ahy\CaliberNation\Observer\AutoAddMembershipForExpired"/>
+    </event>
+</config>

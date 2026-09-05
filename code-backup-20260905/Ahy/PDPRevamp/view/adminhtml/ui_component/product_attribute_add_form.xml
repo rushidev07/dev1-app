@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+/**
+ * Merges into Magento_Catalog's product_attribute_add_form.xml (same
+ * mechanism Magento_Swatches itself uses to add visual_swatch_container to
+ * this exact form). Adds a "Two-Color Swatches" panel - a new entry in the
+ * page's left scroll-anchor nav, right after the native "Manage Swatch"
+ * grid (sortOrder 15) - listing every option whose native swatch value is a
+ * comma-paired hex (e.g. "Black & Blue" -> "#000000,#0000FF", written by
+ * Ahy\PDPRevamp\Service\AiColorHexResolver), each with two color pickers so
+ * an admin can view/correct a split-color swatch without going through the
+ * native single-color picker (which can't represent a pair and would
+ * silently collapse it to one color on save).
+ *
+ * Data is populated by Plugin\Catalog\Model\Product\Attribute\DataProvider\
+ * AddTwoColorSwatchData and saved by Plugin\Catalog\Controller\Adminhtml\
+ * Product\Attribute\Save\SaveTwoColorSwatch. Only visible for swatch_visual
+ * attributes (same valuesForOptions scoping the native grid uses) - never
+ * shown on, or affects, any other attribute type.
+ */
+-->
+<form xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <fieldset name="ahy_two_color_swatch_container" component="Magento_Catalog/js/components/visible-on-option/fieldset" sortOrder="16">
+        <argument name="data" xsi:type="array">
+            <item name="config" xsi:type="array">
+                <item name="valuesForOptions" xsi:type="array">
+                    <item name="swatch_visual" xsi:type="string">swatch_visual</item>
+                </item>
+            </item>
+        </argument>
+        <settings>
+            <collapsible>true</collapsible>
+            <label translate="true">Two-Color Swatches</label>
+        </settings>
+        <dynamicRows name="ahy_two_color_swatch">
+            <settings>
+                <addButtonLabel translate="true">Add Row</addButtonLabel>
+                <additionalClasses>
+                    <class name="admin__field-wide">true</class>
+                </additionalClasses>
+                <componentType>dynamicRows</componentType>
+            </settings>
+            <container name="record" component="Magento_Ui/js/dynamic-rows/record">
+                <argument name="data" xsi:type="array">
+                    <item name="config" xsi:type="array">
+                        <item name="isTemplate" xsi:type="boolean">true</item>
+                        <item name="is_collection" xsi:type="boolean">true</item>
+                        <item name="componentType" xsi:type="string">container</item>
+                    </item>
+                </argument>
+                <field name="option_id" formElement="input">
+                    <settings>
+                        <visible>false</visible>
+                        <dataType>text</dataType>
+                    </settings>
+                </field>
+                <field name="label" component="Magento_Catalog/js/form/element/input" template="Magento_Catalog/form/element/input" formElement="input">
+                    <settings>
+                        <disabled>true</disabled>
+                        <dataType>text</dataType>
+                        <label translate="true">Option</label>
+                    </settings>
+                </field>
+                <field name="first" component="Ahy_PDPRevamp/js/form/element/color-picker" formElement="input">
+                    <settings>
+                        <dataType>text</dataType>
+                        <label translate="true">Color 1</label>
+                    </settings>
+                </field>
+                <field name="second" component="Ahy_PDPRevamp/js/form/element/color-picker" formElement="input">
+                    <settings>
+                        <dataType>text</dataType>
+                        <label translate="true">Color 2</label>
+                    </settings>
+                </field>
+            </container>
+        </dynamicRows>
+    </fieldset>
+</form>

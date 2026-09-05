@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation.register.join_cta"
+                   template="Ahy_CaliberNation::cta/join-banner.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Ahy\CaliberNation\ViewModel\JoinCta</argument>
+                    <!-- This page hosts the signup modal below, so the CTA opens it
+                         inline instead of navigating to the landing page. -->
+                    <argument name="use_modal" xsi:type="boolean">true</argument>
+                </arguments>
+            </block>
+
+            <!-- Modal hosting the Caliber Nation signup form. Opened from the
+                 "Join & Save" banner button (open-caliber-signup window event).
+                 Reuses the same signup component/flow as the landing page. -->
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation.register.signup_modal"
+                   template="Ahy_CaliberNation::cta/register-signup-modal.phtml"
+                   before="-">
+                <block class="Magento\Framework\View\Element\Template"
+                       name="caliber_nation_membership_signup_register"
+                       as="signup_form"
+                       template="Ahy_CaliberNation::membership-signup.phtml">
+                    <arguments>
+                        <argument name="magewire" xsi:type="object">
+                            Ahy\CaliberNation\Magewire\MembershipSignup
+                        </argument>
+                        <argument name="form_only" xsi:type="boolean">true</argument>
+                    </arguments>
+                </block>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

@@ -1,0 +1,190 @@
+<?php
+/**
+ * Hyvä Themes - https://hyva.io
+ * Copyright © Hyvä Themes 2020-present. All rights reserved.
+ * This product is licensed per Magento install
+ * See https://hyva.io/license
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Hyva\Theme\ViewModel\HeroiconsSolid;
+use Hyva\Theme\ViewModel\Wishlist;
+use Magento\Catalog\Model\Product;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var Wishlist $wishlistViewModel */
+$wishlistViewModel = $viewModels->require(Wishlist::class);
+
+/** @var HeroiconsSolid $heroicons */
+$heroicons = $viewModels->require(HeroiconsSolid::class);
+
+/** @var HeroiconsOutline $heroiconsOutline */
+$heroiconsOutline = $viewModels->require(HeroiconsOutline::class);
+
+/** @var CurrentProduct $currentProduct */
+$currentProduct = $viewModels->require(CurrentProduct::class);
+
+/** @var Product $product */
+$product = $currentProduct->get();
+
+if (!$product->getId() || !$wishlistViewModel->isEnabled()) {
+    return;
+}
+/**
+ * When visiting wishlist/index/configure, the current class is Magento\Wishlist\Block\Item\Configure
+ * In that case we take the form parameters from the existing wishlist item
+ */
+$updateParams = $block->getUpdateParams() ?: null;
+$uniqueId = '_' . uniqid();
+?>
+<script>
+    function initWishlist<?= /** @noEscape */ $uniqueId ?>() {
+        return {
+            inWishlist: <?= $updateParams ? 'true' : 'false' ?>,
+            wishing: false,
+            addToWishlist(productId) {
+                if (this.inWishlist || this.wishing) {
+                    return;
+                }
+                this.wishing = true;
+                // Same optimistic-UI approach as adventure-seekers-also-viewed.phtml's
+                // toggleWish(): fill the heart immediately on click so it reacts
+                // instantly regardless of network timing, reverted below only if the
+                // add actually fails outright (network error / non-ok response).
+                this.inWishlist = true;
+
+                const postParams = <?php if ($updateParams): ?>
+                    <?= /* @noEscape */ $updateParams ?>
+                <?php else: ?>
+                {
+                    action: BASE_URL + "wishlist/index/add/",
+                    data: {
+                        product: productId,
+                        uenc: hyva.getUenc()
+                    }
+                }
+                <?php endif; ?>
+
+                postParams.data['form_key'] = hyva.getFormKey();
+                postParams.data['qty'] = document.getElementById(`qty[${productId}]`)
+                    ? document.getElementById(`qty[${productId}]`).value || 1
+                    : 1;
+
+                let postData = Object.keys(postParams.data).map(key => {
+                    return `${key}=${postParams.data[key]}`;
+                }).join('&');
+
+                // take the all the input fields that configure this product
+                // includes custom, configurable, grouped and bundled options
+                Array.from(document.querySelectorAll(
+                    '[name^=options], [name^=super_attribute], [name^=bundle_option], [name^=super_group], [name^=links]')
+                ).map(input => {
+                    if (input.type === "select-multiple") {
+                        Array.from(input.selectedOptions).forEach(option => {
+                            postData += `&${input.name}=${option.value}`
+                        })
+                    } else {
+                        // skip "checkable inputs" that are not checked
+                        if(!(['radio', 'checkbox', 'select'].includes(input.type) && !input.checked)) {
+                            postData += `&${input.name}=${input.value}`
+                        }
+                    }
+                });
+                fetch(postParams.action, {
+                    "headers": {
+                        "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                        // Without this, Magento\Wishlist\Controller\Index\Add::execute()'s
+                        // own isAjax() check (isXmlHttpRequest() || ajax param) fails, so it
+                        // always returns its non-ajax Redirect result instead of JSON - which
+                        // fetch() follows transparently, landing here as response.redirected
+                        // and sending the whole page to the wishlist instead of toggling the
+                        // heart in place.
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    "body": postData,
+                    "method": "POST",
+                    "mode": "cors",
+                    "credentials": "include"
+                }).then((response) => {
+                    if (response.redirected) {
+                        // Matches adventure-seekers-also-viewed.phtml's toggleWish(): let
+                        // the redirect happen, but only after a brief pause so the heart
+                        // that already filled optimistically above is actually visible
+                        // for a moment first, instead of navigating away instantly.
+                        this.wishing = false;
+                        setTimeout(() => { window.location.href = response.url; }, 600);
+                        return null;
+                    } else if (response.ok) {
+                        return response.json();
+                    } else {
+                        this.wishing = false;
+                        this.inWishlist = false;
+                        typeof window.dispatchMessages !== "undefined" && window.dispatchMessages(
+                            [{
+                                type: "warning",
+                                text: "<?= $escaper->escapeHtml(__('Could not add item to wishlist.')) ?>"
+                            }], 5000
+                        );
+                        return null;
+                    }
+                }).then((response) => {
+                    this.wishing = false;
+                    if (!response) {
+                        return;
+                    }
+                    // Add.php's ajax branch only ever returns {backUrl: "..."} - there is
+                    // no success/error_message field to read (a caught exception there
+                    // still returns the same shape; it surfaces its own message through
+                    // Magento's native message manager, delivered via the
+                    // reload-customer-section-data reload below). So getting a parsed JSON
+                    // body here - as opposed to the warning branch above, which handles a
+                    // non-ok HTTP response - is what "succeeded" means for this endpoint;
+                    // the optimistic fill from click time stands.
+                    typeof window.dispatchMessages !== "undefined" && window.dispatchMessages(
+                        [{
+                            type: "success",
+                            text: "<?= $escaper->escapeHtml(
+                                __("%1 has been added to your Wish List.", __("Product"))
+                            ) ?>"
+                        }], 5000
+                    );
+                    window.dispatchEvent(new CustomEvent("reload-customer-section-data"));
+                }).catch((error) => {
+                    this.wishing = false;
+                    this.inWishlist = false;
+                    typeof window.dispatchMessages !== "undefined" && window.dispatchMessages(
+                        [{
+                            type: "error",
+                            text: error
+                        }], 5000
+                    );
+                });
+            }
+        }
+    }
+</script>
+
+<button x-data="initWishlist<?= /** @noEscape */ $uniqueId ?>()"
+        @click.prevent="addToWishlist(<?= (int)$product->getId() ?>)"
+        :class="inWishlist ? 'border-[#e85d26] text-[#e85d26]' : 'border-gray-200 text-gray-400'"
+        title="<?= $escaper->escapeHtmlAttr(
+            ($updateParams) ? __('Update Wish List') : __('Add to Wish List')
+        ) ?>"
+        aria-label="<?= $escaper->escapeHtmlAttr(
+            ($updateParams) ? __('Update Wish List') : __('Add to Wish List')
+        ) ?>"
+        id="add-to-wishlist"
+        class="rounded-full w-12 h-12 bg-white border-2 p-0 inline-flex
+                items-center justify-center transition-all hover:border-[#e85d26] hover:text-[#e85d26] shrink-0">
+    <span x-show="!inWishlist"><?= $heroiconsOutline->heartHtml("w-[18px] h-[18px]", 18, 18) ?></span>
+    <span x-show="inWishlist" x-cloak><?= $heroicons->heartHtml("w-[18px] h-[18px]", 18, 18) ?></span>
+</button>

@@ -1,0 +1,460 @@
+<?php
+/**
+ * Alpine data functions backing the dynamic PDP review UI: the star/count
+ * line above the product title (product-detail-page.phtml, product-info.phtml)
+ * and the full "Ratings & Reviews" section (yotpo_reviews.phtml). Reviews are
+ * fetched through Ahy_PDPRevamp's own controllers (see
+ * Ahy\PDPRevamp\Service\YotpoClient), which call Yotpo server-side - no Yotpo
+ * app key or secret is ever exposed to the browser.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ProductPage;
+use Magento\Catalog\Model\Product;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+/** @var Product $product */
+$product = $productViewModel->getProduct();
+$productId = (int) $product->getId();
+?>
+<script defer id="ahy-yotpoReview">
+    function yotpoReview() {
+        return {
+            search:             "",
+            fetchUrl:           "<?= $escaper->escapeUrl($block->getUrl('ahyyotpo/index/reviews', ['product_id' => $productId, 'per_page' => 150])) ?>",
+            pageSize:           3,
+            showPagination:     false,
+            modalOpen:          false,
+            pageNumber:         0,
+            reviewData:         "",
+            currentIndex:       0,
+            currentImage:       {},
+            oneStartCount:      0,
+            twoStartCount:      0,
+            fiveStartCount:     0,
+            fourStartCount:     0,
+            threeStartCount:    0,
+            allReviewsData:     "",
+            selectedRatings:    [],
+            totalReviewCount:    0,
+            defaultSortValue:   { target: { value: 'most-recent' } },
+            isReviewAvailable:   false,
+            currentContentData: {},
+            twoStartPercentage:  0,
+            oneStartPercentage:  0,
+            fiveStartPercentage: 0,
+            fourStartPercentage: 0,
+            threeStartPercentage: 0,
+            totalReviewCountText: '',
+            totalRatingCountText: '',
+            currentReviewAllImages: {},
+
+            initReview() {
+                const yotpoApiOptions = {
+                    method: "GET",
+                    headers: {
+                        "accept": "application/json",
+                        "Content-Type": "application/json",
+                    },
+                };
+
+                // Several yotpoReview() instances exist on one PDP (the star
+                // line above the title, and this section) and all fetch the
+                // same URL. Sharing one in-flight request across all of them
+                // avoids firing duplicate simultaneous requests that could
+                // otherwise race each other against the server-side cache.
+                window.ahyYotpoReviewsFetches = window.ahyYotpoReviewsFetches || {};
+                if (!window.ahyYotpoReviewsFetches[this.fetchUrl]) {
+                    window.ahyYotpoReviewsFetches[this.fetchUrl] = fetch(this.fetchUrl, yotpoApiOptions)
+                        .then(res => res.json());
+                }
+
+                window.ahyYotpoReviewsFetches[this.fetchUrl]
+                    .then(data => {
+                        if (data.response.bottomline.total_review > 0) {
+                            this.reviewData = data.response.reviews;
+                            this.allReviewsData = this.reviewData;
+                            this.isReviewAvailable = true;
+                            this.allInitFunctions();
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                    });
+            },
+            openDialog(index) {
+                this.currentIndex = index;
+                this.currentImage = null;
+                this.currentContentData = null;
+                this.currentReviewAllImages = null;
+                this.reviewData.forEach(review => {
+                    this.currentReviewAllImages = review.images_data || [];
+                    this.currentContentData = {
+                        "content": review.content,
+                        "title": review.title
+                    };
+                    this.currentImage = (review.images_data || [])[index];
+                });
+                if (this.currentImage) {
+                    this.modalOpen = true;
+                }
+            },
+            prevImage() {
+                if (this.currentIndex > 0) {
+                    this.currentIndex--;
+                    this.currentImage = this.currentReviewAllImages[this.currentIndex];
+                }
+            },
+            nextImage() {
+                if (this.currentIndex < this.currentReviewAllImages.length - 1) {
+                    this.currentIndex++;
+                    this.currentImage = this.currentReviewAllImages[this.currentIndex];
+                }
+            },
+            allInitFunctions() {
+                this.reviewsSortBy(this.defaultSortValue);
+                this.calculateIndividualStarPercentage();
+            },
+            getAverageReviewScore() {
+                if (this.reviewData.length > 0) {
+                    const totalScore = this.reviewData.reduce((acc, curr) => acc + curr.score, 0);
+                    const averageScore = totalScore / this.reviewData.length;
+                    return averageScore.toFixed(1);
+                }
+                return null;
+            },
+            calculateIndividualStarPercentage() {
+                const totalReviews = this.reviewData.length;
+                this.totalReviewCount = totalReviews;
+                this.totalRatingCountText = this.totalReviewCount === 1 ? 'rating' : 'ratings';
+                this.totalReviewCountText = this.totalReviewCount === 1 ? 'review' : 'reviews';
+                let oneStarCount = 0;
+                let twoStarCount = 0;
+                let threeStarCount = 0;
+                let fourStarCount = 0;
+                let fiveStarCount = 0;
+
+                this.reviewData.forEach(review => {
+                    switch (review.score) {
+                        case 1: oneStarCount++; break;
+                        case 2: twoStarCount++; break;
+                        case 3: threeStarCount++; break;
+                        case 4: fourStarCount++; break;
+                        case 5: fiveStarCount++; break;
+                        default: break;
+                    }
+                });
+
+                this.oneStartCount = oneStarCount;
+                this.twoStartCount = twoStarCount;
+                this.threeStartCount = threeStarCount;
+                this.fourStartCount = fourStarCount;
+                this.fiveStartCount = fiveStarCount;
+
+                this.oneStartPercentage = ((oneStarCount / totalReviews) * 100).toFixed(2) + '%';
+                this.twoStartPercentage = ((twoStarCount / totalReviews) * 100).toFixed(2) + '%';
+                this.threeStartPercentage = ((threeStarCount / totalReviews) * 100).toFixed(2) + '%';
+                this.fourStartPercentage = ((fourStarCount / totalReviews) * 100).toFixed(2) + '%';
+                this.fiveStartPercentage = ((fiveStarCount / totalReviews) * 100).toFixed(2) + '%';
+            },
+            // Pure - reads reactive state and returns a value, no side effects.
+            // Calling a method with side effects (mutating this.totalPages etc.)
+            // directly from x-for's iterable expression is unreliable, since
+            // Alpine may re-evaluate it multiple times per render pass.
+            get filteredReviews() {
+                if (this.search === "") {
+                    return this.reviewData;
+                }
+                const term = this.search.toLowerCase();
+                return this.reviewData.filter(review => {
+                    return (review.content || '').toLowerCase().includes(term)
+                        || (review.title || '').toLowerCase().includes(term)
+                        || (review.user.display_name || '').toLowerCase().includes(term);
+                });
+            },
+            get totalPages() {
+                return this.filteredReviews.length;
+            },
+            searchReviews() {
+                const startPage = this.pageNumber * this.pageSize, endPage = startPage + this.pageSize;
+                return this.filteredReviews.slice(startPage, endPage);
+            },
+            pages() {
+                return Array.from({ length: Math.ceil(this.totalPages / this.pageSize) });
+            },
+            nextPage() {
+                if (this.pageNumber + 1 < this.pageCount()) {
+                    this.pageNumber++;
+                    this.scrollToYotpoReviews();
+                }
+            },
+            prevPage() {
+                if (this.pageNumber > 0) {
+                    this.pageNumber--;
+                    this.scrollToYotpoReviews();
+                }
+            },
+            pageCount() {
+                return Math.ceil(this.totalPages / this.pageSize);
+            },
+            startPageResults() {
+                return this.pageNumber * this.pageSize + 1;
+            },
+            endResults() {
+                let resultsOnPage = (this.pageNumber + 1) * this.pageSize;
+                if (resultsOnPage <= this.totalPages) {
+                    return resultsOnPage;
+                }
+                return this.totalPages;
+            },
+            viewPage(index) {
+                this.pageNumber = index;
+                this.scrollToYotpoReviews();
+            },
+            scrollToYotpoReviews() {
+                const reviewsEl = document.getElementById('ahy-yotpo-product-reviews');
+                if (reviewsEl) {
+                    reviewsEl.scrollIntoView({ behavior: 'smooth' });
+                }
+            },
+            formatReviewDate(timestamp) {
+                if (!timestamp) {
+                    return '';
+                }
+                const date = new Date(timestamp);
+                const options = { year: "numeric", month: "short", day: "numeric" };
+                return date.toLocaleDateString("en-US", options);
+            },
+            reviewFeedback(vote_type, review_id, event) {
+                const parentNodeEl = event.target.parentNode.parentNode;
+                const helpfulLoadingEl = parentNodeEl.querySelector('.helpful-loading');
+
+                if (helpfulLoadingEl) {
+                    helpfulLoadingEl.style.display = "flex";
+                }
+
+                const add_vote_string = vote_type === 0 ? "down" : "up";
+                const svg = parentNodeEl.querySelector(`#vote-${add_vote_string}-${review_id}`);
+                const isAlreadyVoted = svg.classList.contains("fill-current");
+
+                const options = {
+                    method: "POST",
+                    headers: { accept: "application/json", "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        review_id: review_id,
+                        vote_type: vote_type === 0 ? "down" : "up",
+                        unvote: isAlreadyVoted,
+                    }),
+                };
+
+                fetch('<?= $escaper->escapeUrl($block->getUrl('ahyyotpo/index/vote')) ?>', options)
+                    .then(response => response.json())
+                    .then(response => {
+                        svg.classList.toggle("fill-current");
+
+                        if (isAlreadyVoted && vote_type === "up") {
+                            const oppositeSvg = parentNodeEl.querySelector(`#vote-down-${review_id}`);
+                            oppositeSvg.classList.remove("fill-current");
+                        } else if (isAlreadyVoted && vote_type === "down") {
+                            const oppositeSvg = parentNodeEl.querySelector(`#vote-up-${review_id}`);
+                            oppositeSvg.classList.remove("fill-current");
+                        }
+
+                        if (helpfulLoadingEl) {
+                            helpfulLoadingEl.style.display = "none";
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                    });
+            },
+            reviewsSortBy(event) {
+                const sortBy = event.target.value;
+                switch (sortBy) {
+                    case "most-recent":
+                        this.reviewData = this.reviewData.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+                        break;
+                    case "least-recent":
+                        this.reviewData = this.reviewData.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+                        break;
+                    case "rating-high-low":
+                        this.reviewData = this.reviewData.sort((a, b) => b.score - a.score);
+                        break;
+                    case "rating-low-high":
+                        this.reviewData = this.reviewData.sort((a, b) => a.score - b.score);
+                        break;
+                    default:
+                        return;
+                }
+            },
+            filterByRatings(event) {
+                const checked = event.target.checked;
+                const value = event.target.value;
+
+                if (checked) {
+                    this.selectedRatings.push(value);
+                } else {
+                    const index = this.selectedRatings.indexOf(value);
+                    if (index !== -1) {
+                        this.selectedRatings.splice(index, 1);
+                    }
+                }
+
+                if (this.selectedRatings.length == 0 || this.selectedRatings.length == 5) {
+                    this.reviewData = this.allReviewsData;
+                } else {
+                    this.reviewData = this.allReviewsData.filter(review => {
+                        return this.selectedRatings.includes(review.score.toString());
+                    });
+                }
+                this.viewPage(0);
+            },
+            goToReview() {
+                if (this.totalReviewCount === 0) {
+                    window.dispatchEvent(new CustomEvent('open-yotpo-write-review'));
+                    return;
+                }
+                const reviewEl = document.getElementById('ahy-yotpo-product-reviews');
+                if (reviewEl) {
+                    reviewEl.scrollIntoView({ behavior: "smooth" });
+                }
+            },
+        };
+    }
+</script>
+
+<script defer id="ahy-createReview">
+    function createReview() {
+        return {
+            sku: '<?= $productId ?>',
+            product_title: '<?= $escaper->escapeJs($product->getName()) ?>',
+            product_url: '<?= $escaper->escapeJs($product->getProductUrl()) ?>',
+            customerName: '',
+            customerEmail: '',
+            errorMessage: null,
+            showForm: true,
+            showThankYouForm: false,
+            display_name: '',
+            email: '',
+            review_content: '',
+            review_title: '',
+            review_score: null,
+            photos: [],
+            photoError: null,
+            addPhotos(event) {
+                this.photoError = null;
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+                const maxSize = 10 * 1024 * 1024;
+                const maxCount = 5;
+
+                for (const file of Array.from(event.target.files || [])) {
+                    if (this.photos.length >= maxCount) {
+                        this.photoError = 'You can add up to 5 photos.';
+                        break;
+                    }
+                    if (!allowedTypes.includes(file.type)) {
+                        this.photoError = 'Photos must be JPG, PNG, or WebP.';
+                        continue;
+                    }
+                    if (file.size > maxSize) {
+                        this.photoError = 'Each photo must be 10MB or smaller.';
+                        continue;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.photos.push({ dataUrl: e.target.result, name: file.name });
+                    };
+                    reader.readAsDataURL(file);
+                }
+                event.target.value = '';
+            },
+            removePhoto(index) {
+                this.photos.splice(index, 1);
+            },
+            submitReviews() {
+                this.errorMessage = null;
+                const data = {
+                    sku: this.sku,
+                    product_title: this.product_title,
+                    product_url: this.product_url,
+                    display_name: this.display_name,
+                    email: this.email,
+                    review_content: this.review_content,
+                    review_title: this.review_title,
+                    review_score: this.review_score,
+                    images: this.photos.map(photo => photo.dataUrl)
+                };
+                const options = {
+                    method: 'POST',
+                    headers: { accept: 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                };
+
+                fetch('<?= $escaper->escapeUrl($block->getUrl('ahyyotpo/index/review')) ?>', options)
+                    .then(res => res.json())
+                    .then(res => {
+                        const message = res.status?.message;
+                        if (message === 'ok' || typeof message === 'undefined') {
+                            this.showForm = false;
+                            this.showThankYouForm = true;
+                            this.photos = [];
+                            return;
+                        }
+                        this.showForm = true;
+                        this.showThankYouForm = false;
+                        switch (message) {
+                            case 'Missing email':
+                                this.errorMessage = 'Please enter your email address';
+                                break;
+                            case 'Missing review_title':
+                                this.errorMessage = 'Please enter a review summary';
+                                break;
+                            case 'Missing review_content':
+                                this.errorMessage = 'Please enter a review description';
+                                break;
+                            case 'Missing display_name':
+                                this.errorMessage = 'Please enter your name';
+                                break;
+                            case 'Missing review_score':
+                                this.errorMessage = 'Please select a star rating';
+                                break;
+                            case 'duplicate_review':
+                                this.errorMessage = 'You have already submitted a review for this product';
+                                break;
+                            default:
+                                this.errorMessage = message;
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        this.errorMessage = 'Something went wrong. Please try again.';
+                    });
+            },
+            getCustomerData(customerData) {
+                if (typeof customerData.customer.fullname === 'undefined' || typeof customerData.customer.email === 'undefined') {
+                    this.customerName = '';
+                    this.customerEmail = '';
+                } else {
+                    this.customerName = customerData.customer.fullname;
+                    this.customerEmail = customerData.customer.email;
+                }
+                return customerData;
+            },
+            getCustomerName() {
+                return this.customerName;
+            },
+            getCustomerEmail() {
+                return this.customerEmail;
+            },
+        };
+    }
+</script>

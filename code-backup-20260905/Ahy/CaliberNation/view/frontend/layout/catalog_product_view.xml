@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      layout="1column" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="caliber_nation.pdp.renewal_prompt"
+                   template="Ahy_CaliberNation::cta/renewal-prompt.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Ahy\CaliberNation\ViewModel\RenewalPrompt</argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+        <!-- Rendered by product-info.phtml via getChildHtml('caliber_nation.member_price'),
+             placed immediately after the price. Declared as a child of product.info so the
+             block resolves for that template's getChildHtml call (Hyva renders children by name). -->
+        <referenceBlock name="product.info">
+            <block class="Magento\Catalog\Block\Product\View"
+                   name="caliber_nation.member_price"
+                   template="Ahy_CaliberNation::product/member-price.phtml">
+                <arguments>
+                    <argument name="memberPriceViewModel" xsi:type="object">Ahy\CaliberNation\ViewModel\MemberProductPrice</argument>
+                </arguments>
+            </block>
+            <!-- Early-access / early-bird badge. Rendered after the member price. -->
+            <block class="Magento\Catalog\Block\Product\View"
+                   name="caliber_nation.early_access_badge"
+                   template="Ahy_CaliberNation::earlyaccess/badge.phtml"
+                   after="caliber_nation.member_price">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">Ahy\CaliberNation\ViewModel\EarlyAccessBadge</argument>
+                </arguments>
+            </block>
+        </referenceBlock>
+    </body>
+</page>

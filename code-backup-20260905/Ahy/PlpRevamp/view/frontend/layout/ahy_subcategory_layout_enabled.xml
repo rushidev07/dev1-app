@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <script src="Ahy_PlpRevamp::js/yotpo-store.js"/>
+    </head>
+    <body>
+        <!-- Collapse empty Magento left sidebar — Klevu renders its own filter sidebar -->
+        <referenceContainer name="sidebar.main" remove="true"/>
+        <referenceContainer name="sidebar.additional" remove="true"/>
+
+        <!--
+        DISABLED: PHP PLP replaced by Klevu PLP. Re-enable block below to restore PHP grid.
+
+        <referenceBlock name="klevu_categorynavigation.category_index" remove="true"/>
+        <referenceBlock name="klevy_categorynavigation.category_index.themev2" remove="true"/>
+        <referenceBlock name="klevu_js_additional.catnav" remove="true"/>
+        <referenceBlock name="klevu_categorynavigation.html_head.themev2.add_price_suffix_to_query" remove="true"/>
+
+        <referenceContainer name="main">
+            <block class="Ahy\PlpRevamp\Block\Category\ProductGrid"
+                   name="ahy.subcategory.product.grid"
+                   template="Ahy_PlpRevamp::category/product_grid.phtml"
+                   after="ahy.subcategory.cards">
+                <block class="Magento\LayeredNavigation\Block\Navigation\Category"
+                       name="ahy.subcategory.product.grid.leftnav"
+                       template="Magento_LayeredNavigation::layer/view.phtml">
+                    <block class="Magento\LayeredNavigation\Block\Navigation\State"
+                           name="ahy.subcategory.product.grid.leftnav.state"
+                           as="state"/>
+                    <block class="Magento\LayeredNavigation\Block\Navigation\FilterRenderer"
+                           name="ahy.subcategory.product.grid.leftnav.renderer"
+                           as="renderer"
+                           template="Magento_LayeredNavigation::layer/filter.phtml">
+                        <arguments>
+                            <argument name="product_layer_view_model" xsi:type="object">Magento\LayeredNavigation\ViewModel\Layer\Filter</argument>
+                        </arguments>
+                    </block>
+                </block>
+            </block>
+        </referenceContainer>
+        -->
+    </body>
+</page>

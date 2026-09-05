@@ -1,0 +1,17 @@
+<?php
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+
+// Banner content and visibility are managed entirely from Admin > Content > Blocks
+// ("pdp-banner" - the real Page Builder image banner with desktop/mobile
+// image variants). Disabling the CMS block hides the banner.
+?>
+<div class="pdp-revamp-banner w-full">
+    <?= $block->getLayout()
+        ->createBlock(\Magento\Cms\Block\Block::class)
+        ->setBlockId('pdp-banner')
+        ->toHtml() ?>
+</div>

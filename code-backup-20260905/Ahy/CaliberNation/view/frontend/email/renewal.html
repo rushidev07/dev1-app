@@ -1,0 +1,34 @@
+<!--@subject Your Caliber Nation membership has been renewed @-->
+<!--@vars {
+"var first_name":"First Name",
+"var amount":"Amount charged",
+"var renewal_date":"Next renewal date",
+"var store_name":"Store Name",
+"var account_url":"Account URL",
+"var total_savings":"Lifetime member savings",
+"var has_savings":"Has savings (boolean)"
+} @-->
+{{template config_path="design/email/header_template"}}
+
+<table border="0" cellpadding="0" cellspacing="0" style="width:100%;">
+    <tr>
+        <td>
+            <h1 style="color:#0a2540;">You're all set, {{var first_name}}!</h1>
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                Your Caliber Nation membership has been successfully renewed.
+            </p>
+            <table border="0" cellpadding="8" cellspacing="0" style="margin:16px 0;font-size:14px;color:#333;">
+                <tr><td style="font-weight:bold;">Amount charged:</td><td>{{var amount}}</td></tr>
+                <tr><td style="font-weight:bold;">Next renewal:</td><td>{{var renewal_date}}</td></tr>
+                {{depend has_savings}}<tr><td style="font-weight:bold;color:#1b7a3d;">Total saved as a member:</td><td style="color:#1b7a3d;font-weight:bold;">{{var total_savings}}</td></tr>{{/depend}}
+            </table>
+            <p style="font-size:14px;color:#333;line-height:1.6;">
+                You can manage your membership, payment method, and auto-renew settings anytime from your
+                <a href="{{var account_url}}" style="color:#e01a2b;">account dashboard</a>.
+            </p>
+            <p style="font-size:13px;color:#777;">Thank you for being a member of {{var store_name}}.</p>
+        </td>
+    </tr>
+</table>
+
+{{template config_path="design/email/footer_template"}}

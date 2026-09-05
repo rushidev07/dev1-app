@@ -1,0 +1,32 @@
+<?php
+declare(strict_types=1);
+
+// PDP-only styles for the title-area block (short description + rating stars).
+// Loaded exclusively via catalog_product_view.xml, so no other page is affected.
+// Covers both the desktop markup in product/view/product-info.phtml and the
+// mobile markup in product/product-detail-page.phtml.
+?>
+<style>
+    .pdp-short-description {
+        font-weight: 400;
+        font-size: 15px;
+        letter-spacing: 0.01em;
+        color: oklch(50% 0.015 240);
+    }
+    .pdp-rating-star {
+        color: #d4d4d8;
+    }
+    .pdp-rating-star--filled {
+        color: #f59e0b;
+    }
+    /* Spacing below the quote card, moved here from the swatch label's own
+       mb-2 so the gap belongs to the block that ends, not the one that
+       starts - the label sits directly under this card. */
+    .review-quote-card {
+        margin-bottom: 8px;
+    }
+    /* Pulls the swatches up tighter under their attribute label. */
+    .product-option-label {
+        margin-bottom: -10px !important;
+    }
+</style>

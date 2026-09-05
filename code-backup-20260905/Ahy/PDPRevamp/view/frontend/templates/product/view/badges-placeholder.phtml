@@ -1,0 +1,121 @@
+<?php
+/**
+ * PDP badge row. Reads the 4 badge_{n}_icon / badge_{n}_text
+ * attribute pairs (see Ahy\PDPRevamp\Setup\Patch\Data\CreatePdpBadgeAttributes).
+ * Each pair is independently optional - a badge only renders once its
+ * text is filled in for this product. The whole row is hidden if none
+ * of the 4 pairs have text set.
+ */
+
+
+
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var CurrentProduct $currentProduct */
+$currentProduct = $viewModels->require(CurrentProduct::class);
+$product = $currentProduct->get();
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+$iconToHeroicon = [
+    'weight' => 'scale',
+    'waterproof' => 'cloud',
+    'durability' => 'shieldCheck',
+    'compartments' => 'viewGrid',
+    'lightweight' => 'lightningBolt',
+    'eco' => 'globe',
+    'premium' => 'sparkles',
+    'warranty' => 'badgeCheck',
+    'quick_dry' => 'refresh',
+    'sun_protection' => 'sun',
+    'insulated' => 'fire',
+    'odor_resistant' => 'beaker',
+    'stretch' => 'adjustments',
+    'made_in_usa' => 'flag',
+    'rugged_build' => 'shieldCheck',
+    'water_resistant' => 'cloud',
+    'windproof' => 'shieldCheck',
+    'breathable' => 'wifi',
+    'trail_tested' => 'map',
+    'adventure_ready' => 'locationMarker',
+    'expedition_ready' => 'globeAlt',
+    'built_to_last' => 'shieldCheck',
+    'heavy_duty' => 'shieldCheck',
+    'ergonomic' => 'hand',
+    'adjustable_fit' => 'adjustments',
+    'ripstop' => 'shieldCheck',
+    'reinforced_stitching' => 'link',
+    'rust_resistant' => 'shieldCheck',
+    'compact' => 'cube',
+    'packable' => 'archive',
+    'foldable' => 'archive',
+    'easy_setup' => 'cog',
+    'quick_setup' => 'lightningBolt',
+    'rechargeable' => 'chip',
+    'solar_powered' => 'sun',
+    'long_battery_life' => 'clock',
+    'reflective_details' => 'sparkles',
+    'fire_resistant' => 'fire',
+    'recycled_materials' => 'refresh',
+    'hiking' => 'map',
+    'camping' => 'home',
+    'backpacking' => 'briefcase',
+    'bushcraft' => 'scissors',
+    'survival' => 'shieldExclamation',
+    'climbing' => 'trendingUp',
+    'fishing' => 'link',
+    'cycling' => 'refresh',
+    'travel_ready' => 'globeAlt',
+    'edc' => 'briefcase',
+    'customer_favorite' => 'heart',
+    'best_seller' => 'trendingUp',
+    'top_rated' => 'star',
+    'award_winning' => 'badgeCheck',
+    'lifetime_warranty' => 'badgeCheck',
+    'food_safe' => 'cake',
+    'bpa_free' => 'beaker',
+    'professional_grade' => 'briefcase',
+];
+
+$badges = [];
+for ($i = 1; $i <= 4; $i++) {
+    $text = trim((string) $product->getData("badge_{$i}_text"));
+    if ($text === '') {
+        continue;
+    }
+    $iconKey = (string) $product->getData("badge_{$i}_icon");
+    $badges[] = [
+        'text' => $text,
+        'heroicon' => $iconToHeroicon[$iconKey] ?? 'badgeCheck',
+    ];
+}
+
+if (!$badges) {
+    return;
+}
+?>
+<div class="pdp-badges-row flex items-start justify-between py-3 px-1 gap-6 max-[420px]:gap-2">
+    <?php foreach ($badges as $badge): ?>
+        <div class="flex flex-col items-center text-center gap-1.5 flex-1 min-w-0">
+            <span
+                class="inline-flex items-center justify-center rounded-full shrink-0 w-12 h-12 max-[420px]:w-9 max-[420px]:h-9"
+                style="background:#f0ebe4;color:#0d2f47;"
+            >
+                <?= $heroicons->{$badge['heroicon'] . 'Html'}('w-[22px] h-[22px] max-[420px]:w-4 max-[420px]:h-4', 22, 22, ['aria-hidden' => 'true']) ?>
+            </span>
+            <span class="text-xs font-semibold leading-tight max-[420px]:text-[10px]!" style="color:#0d2f47;">
+                <?= $escaper->escapeHtml($badge['text']) ?>
+            </span>
+        </div>
+    <?php endforeach; ?>
+</div>

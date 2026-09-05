@@ -1,0 +1,67 @@
+<?php
+/**
+ * Mobile filter-drawer list (price + facet filters) for the category
+ * results page — extracted verbatim from category/results.phtml's inline
+ * markup so it can be rendered once via
+ * $block->getChildHtml('filters_mobile'). All data/behavior comes from
+ * the Alpine scope set up by the parent template.
+ */
+?>
+<template x-if="priceRange.min !== null">
+    <div class="border-t-2 border-white py-4">
+        <button class="flex items-center justify-between w-full mb-3" @click="priceCollapsed = !priceCollapsed">
+            <span class="font-bold text-ahy-blue ahy-filter-title">Price</span>
+            <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="priceCollapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <ul x-show="!priceCollapsed" class="">
+            <template x-for="bucket in priceRangeBuckets()" :key="bucket.label">
+                <li>
+                    <label style="margin-bottom:0.5rem" class="flex items-center gap-2.5 cursor-pointer hover:bg-white rounded-full px-2 py-2 -mx-2 transition-colors"
+                           :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-white' : ''"
+                           @click.prevent="togglePriceRange(bucket)">
+                        <span class="w-5 h-5 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center"
+                              :class="activePriceRange && activePriceRange.label === bucket.label ? 'bg-ahy-blue border-ahy-blue' : 'bg-white'">
+                            <svg x-show="activePriceRange && activePriceRange.label === bucket.label" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        </span>
+                        <span class="ahy-filter-option text-gray-700 flex-1 leading-tight"
+                              :class="activePriceRange && activePriceRange.label === bucket.label ? 'font-semibold' : ''"
+                              x-text="bucket.label"></span>
+                    </label>
+                </li>
+            </template>
+        </ul>
+    </div>
+</template>
+
+<template x-for="filter in filters" :key="'mf-' + filter.key">
+    <div class="border-t-2 border-white py-4">
+        <button class="flex items-center justify-between w-full mb-3" @click="filter.collapsed = !filter.collapsed">
+            <span class="font-bold text-ahy-blue ahy-filter-title" x-text="filter.label"></span>
+            <svg class="w-4 h-4 text-ahy-blue transition-transform" :class="filter.collapsed ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <ul x-show="!filter.collapsed" class="">
+            <template x-for="option in (filter.showAll ? filter.options : filter.options.slice(0,5))" :key="option.value">
+                <li>
+                    <label style="margin-bottom:0.5rem" class="flex items-center gap-2.5 cursor-pointer hover:bg-white rounded-full px-2 py-2 -mx-2 transition-colors"
+                           :class="isFilterActive(filter.key, option.value) ? 'bg-white' : ''"
+                           @click.prevent="toggleFilter(filter.key, filter.label, option.value)">
+                        <span class="w-5 h-5 border border-gray-400 rounded-sm flex-shrink-0 flex items-center justify-center"
+                              :class="isFilterActive(filter.key, option.value) ? 'bg-ahy-blue border-ahy-blue' : 'bg-white'">
+                            <svg x-show="isFilterActive(filter.key, option.value)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        </span>
+                        <span class="ahy-filter-option text-gray-700 flex-1"
+                              :class="isFilterActive(filter.key, option.value) ? 'font-semibold' : ''"
+                              x-text="option.value"></span>
+                        <span class="text-sm text-ahy-blue" x-text="'(' + option.count + ')'"></span>
+                    </label>
+                </li>
+            </template>
+            <li x-show="filter.options.length > 5">
+                <button class="text-sm font-bold text-ahy-blue mt-1" @click="filter.showAll = !filter.showAll">
+                    <span x-show="!filter.showAll">See More +</span>
+                    <span x-show="filter.showAll">See Less –</span>
+                </button>
+            </li>
+        </ul>
+    </div>
+</template>

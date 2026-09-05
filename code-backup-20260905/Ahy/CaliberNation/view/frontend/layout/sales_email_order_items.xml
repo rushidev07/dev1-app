@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd"
+      design_abstraction="custom">
+    <body>
+        <!-- Add a "member savings" total line to the order confirmation email. -->
+        <referenceBlock name="order_totals">
+            <block class="Ahy\CaliberNation\Block\Email\OrderSavings" name="caliber_order_savings"/>
+        </referenceBlock>
+    </body>
+</page>

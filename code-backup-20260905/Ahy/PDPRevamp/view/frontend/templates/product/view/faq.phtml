@@ -1,0 +1,200 @@
+<?php
+/**
+ * PDP FAQ section. Data comes from Amasty's FAQ & Product Questions module
+ * (see Ahy\PDPRevamp\Block\Product\View\Faq) - questions assigned to this
+ * product (or its categories) in the Amasty admin grid. Tag titles double
+ * as the filter pills.
+ */
+
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\Faq;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsOutline;
+use Magento\Framework\Escaper;
+
+/** @var Faq $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsOutline $heroicons */
+$heroicons = $viewModels->require(HeroiconsOutline::class);
+
+$faqs = $block->getFaqs();
+if (!$faqs) {
+    return;
+}
+$categories = $block->getCategories($faqs);
+$faqCount = count($faqs);
+$productName = (string) $block->getProduct()->getName();
+?>
+<?php /**
+ * Full-bleed beige panel behind the content: background lives directly on
+ * this section (which has real height from its own content) rather than on
+ * a separate absolutely-positioned decorative sibling. That "overlay div
+ * with h-full" approach - still used a few other places in this module -
+ * doesn't actually work: h-full on an absolutely-positioned element only
+ * resolves to a real pixel height when its positioned ancestor has an
+ * *explicit* height, and this section's height comes from its own content,
+ * not a fixed value - so the overlay computes to height:auto and collapses
+ * to 0px, silently never painting anything. Confirmed dead via a live
+ * eyedropper sample (rendered pixel was the page's default background, not
+ * the intended color) despite the correct color being right there in the
+ * page source. This is the same full-bleed technique trust-row.phtml uses
+ * successfully: color + the -50vw breakout on the actual content element,
+ * with a nested .container for the real max-width/padding.
+ */ ?>
+<section
+    class="pdp-faq-section"
+    x-data="{ activeCategory: 'All', openFaqId: null }"
+    style="background:#F8F6F3;width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;"
+>
+    <?php /**
+     * pdp-faq-container is this section's own dedicated width hook (see the
+     * matching pdp-details-tabs-container comment in details-tabs.phtml) -
+     * independent of the shared .container/.columns classes every other PDP
+     * section uses. Paired here with the real Tailwind `container` class
+     * for actual max-width/centering/padding (safe to use once, per
+     * trust-row's own precedent - it only breaks when stacked on top of an
+     * already-.container-wrapped ancestor, which this full-bleed section is
+     * not).
+     */ ?>
+    <div class="pdp-faq-container container py-8 md:py-12">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+            <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background:#E4E4E2;">
+                <?= $heroicons->questionMarkCircleHtml('w-4 h-4', 16, 16, ['aria-hidden' => 'true', 'style' => 'color:#0d2f47;']) ?>
+            </span>
+            <div>
+                <h2 class="text-xl font-bold text-ahy-blue"><?= __('Frequently Asked Questions') ?></h2>
+                <p class="text-xs" style="color:#6b7688;">
+                    <?php if ($productName !== ''): ?>
+                        <?= $escaper->escapeHtml(__('%1 questions answered about the %2', $faqCount, $productName)) ?>
+                    <?php else: ?>
+                        <?= $escaper->escapeHtml(__('%1 questions answered', $faqCount)) ?>
+                    <?php endif; ?>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <?php if (count($categories) > 1): ?>
+        <div class="flex flex-wrap gap-2 mb-6">
+            <button
+                type="button"
+                @click="activeCategory = 'All'"
+                :class="activeCategory === 'All' ? 'bg-[#0d2f47] text-white border-[#0d2f47]' : 'bg-white border-gray-200 hover:border-[#0d2f47]/30 hover:text-[#0d2f47]'"
+                :style="activeCategory === 'All' ? '' : 'color:#6b7688;'"
+                class="px-3 py-1.5 text-xs font-medium rounded-full border transition-all"
+            >
+                <?= __('All') ?>
+            </button>
+            <?php foreach ($categories as $category): ?>
+                <button
+                    type="button"
+                    @click="activeCategory = '<?= $escaper->escapeJs($category) ?>'"
+                    :class="activeCategory === '<?= $escaper->escapeJs($category) ?>' ? 'bg-[#0d2f47] text-white border-[#0d2f47]' : 'bg-white border-gray-200 hover:border-[#0d2f47]/30 hover:text-[#0d2f47]'"
+                    :style="activeCategory === '<?= $escaper->escapeJs($category) ?>' ? '' : 'color:#6b7688;'"
+                    class="px-3 py-1.5 text-xs font-medium rounded-full border transition-all"
+                >
+                    <?= $escaper->escapeHtml($category) ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="space-y-2">
+        <?php foreach ($faqs as $faq): ?>
+            <?php
+            $faqId = (int) $faq->getQuestionId();
+            $tagTitlesCsv = $block->getTagTitlesCsv($faq);
+            $primaryTag = $tagTitlesCsv !== '' ? explode(',', $tagTitlesCsv)[0] : '';
+            ?>
+            <div
+                class="rounded-xl border transition-all bg-white"
+                :class="openFaqId === <?= $faqId ?> ? 'border-[#0d2f47]/20 shadow-sm' : 'border-gray-200 hover:border-[#0d2f47]/10'"
+                x-show="activeCategory === 'All' || '<?= $escaper->escapeJs($tagTitlesCsv) ?>'.split(',').includes(activeCategory)"
+            >
+                <button
+                    type="button"
+                    @click="openFaqId = (openFaqId === <?= $faqId ?>) ? null : <?= $faqId ?>"
+                    class="w-full flex items-center justify-between px-5 py-4 text-left"
+                >
+                    <span class="flex items-center gap-3 pr-4">
+                        <?php if ($primaryTag !== ''): ?>
+                            <span
+                                class="text-[10px] font-bold uppercase rounded shrink-0"
+                                style="background:#f1edee;color:#6b7688;padding:2px 6px;"
+                            >
+                                <?= $escaper->escapeHtml($primaryTag) ?>
+                            </span>
+                        <?php endif; ?>
+                        <span
+                            class="text-sm font-semibold leading-snug transition-colors"
+                            :style="openFaqId === <?= $faqId ?> ? 'color:#0d2f47;' : 'color:#1f2937;'"
+                        >
+                            <?= $escaper->escapeHtml($faq->getTitle()) ?>
+                        </span>
+                    </span>
+                    <span
+                        :class="{ 'rotate-180': openFaqId === <?= $faqId ?> }"
+                        :style="openFaqId === <?= $faqId ?> ? 'color:#e85d26;' : 'color:#9aa3b0;'"
+                        class="transition-transform duration-200 shrink-0"
+                    >
+                        <?= $heroicons->chevronDownHtml('w-4 h-4', 16, 16, ['aria-hidden' => 'true']) ?>
+                    </span>
+                </button>
+                <div
+                    x-show="openFaqId === <?= $faqId ?>"
+                    x-cloak
+                    x-transition:enter="ahy-accordion-enter"
+                    x-transition:enter-start="ahy-accordion-enter-start"
+                    x-transition:enter-end="ahy-accordion-enter-end"
+                    x-transition:leave="ahy-accordion-leave"
+                    x-transition:leave-start="ahy-accordion-leave-start"
+                    x-transition:leave-end="ahy-accordion-leave-end"
+                    class="px-5 pb-4 pt-0"
+                >
+                    <div class="pdp-faq-answer border-l-2 text-sm leading-relaxed" style="color:#6b7688;border-left-color:#FBE1D8;padding-left:2.25rem;margin-left:0.3rem;">
+                        <?= /* @noEscape */ $faq->getAnswer() ?>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="flex items-center justify-center gap-3 mt-6 rounded-xl border border-gray-200 px-5 py-4 text-sm text-center" style="color:#6b7688;background:rgba(241,237,238,0.5);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#0d2f47]/50 shrink-0" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
+        <span>
+            <?= __('Still have questions?') ?>
+            <a href="/contact" class="font-semibold hover:underline" style="color:#e85d26;"><?= __('Contact our gear experts') ?></a>
+            <?= __('or call') ?>
+            <a href="tel:1-866-806-0934" class="font-semibold" style="color:#0d2f47;">1-866-806-0934</a>
+        </span>
+    </div>
+    </div>
+</section>
+<style>
+    /* Adjust max-width/padding here to resize just this section - see the
+       matching .pdp-details-tabs-container comment in details-tabs.phtml.
+       No-op by default (full width of the ambient .columns container). */
+    .pdp-faq-container {
+        width: 100%;
+    }
+    .ahy-accordion-enter, .ahy-accordion-leave {
+        transition: opacity 200ms ease-out, transform 200ms ease-out;
+    }
+    .ahy-accordion-enter-start, .ahy-accordion-leave-end {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    .ahy-accordion-enter-end, .ahy-accordion-leave-start {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    /* Amasty answers are WYSIWYG HTML - keep the first/last block flush with
+       the accent rule so the answer lines up with the question above it. */
+    .pdp-faq-answer > *:first-child { margin-top: 0; }
+    .pdp-faq-answer > *:last-child { margin-bottom: 0; }
+    .pdp-faq-answer p { margin: 0 0 0.75rem; }
+</style>

@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Audit saves of the Caliber Nation admin configuration section (B5 logging). -->
+    <event name="admin_system_config_changed_section_caliber_nation">
+        <observer name="ahy_caliber_nation_log_config_change"
+                  instance="Ahy\CaliberNation\Observer\LogAdminConfigChange"/>
+    </event>
+</config>

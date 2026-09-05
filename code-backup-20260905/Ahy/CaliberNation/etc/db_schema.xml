@@ -1,0 +1,191 @@
+<?xml version="1.0" ?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <!-- Current-state membership record. One row per customer (unique customer_id).
+         History/event data lives in dedicated child tables built in later phases. -->
+    <table name="ahy_caliber_nation_membership" resource="default" engine="innodb" comment="Caliber Nation Membership">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="customer_id" padding="10" unsigned="true" nullable="false" comment="Customer ID"/>
+        <column xsi:type="varchar" name="status" length="32" nullable="false" default="active" comment="active|renewal_pending|expired|cancelled"/>
+        <column xsi:type="varchar" name="tier" length="32" nullable="false" default="annual" comment="Membership tier"/>
+        <column xsi:type="datetime" name="start_date" nullable="true" comment="Membership start date"/>
+        <column xsi:type="datetime" name="renewal_date" nullable="true" comment="Next renewal / expiry date"/>
+        <column xsi:type="smallint" name="auto_renew" unsigned="true" nullable="false" default="1" comment="Auto-renew toggle"/>
+        <column xsi:type="int" name="payment_token_id" padding="10" unsigned="true" nullable="true" comment="Vault payment token used for renewal"/>
+        <column xsi:type="smallint" name="is_trial" unsigned="true" nullable="false" default="0" comment="Whether member is in trial period"/>
+        <column xsi:type="decimal" name="lifetime_savings" scale="4" precision="14" nullable="false" default="0" comment="Cumulative lifetime member savings (never reset)"/>
+        <column xsi:type="datetime" name="renewal_reminder_sent_at" nullable="true" comment="When the advance renewal-reminder email was sent for the current cycle"/>
+        <column xsi:type="datetime" name="winback_email_sent_at" nullable="true" comment="When the win-back email was sent for the current lapse"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" default="CURRENT_TIMESTAMP" nullable="false" comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+
+        <constraint xsi:type="unique" referenceId="AHY_CALIBER_NATION_MEMBERSHIP_CUSTOMER_ID">
+            <column name="customer_id"/>
+        </constraint>
+
+        <constraint xsi:type="foreign"
+                    referenceId="AHY_CLBR_NTN_MEMBERSHIP_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="ahy_caliber_nation_membership" column="customer_id"
+                    referenceTable="customer_entity" referenceColumn="entity_id"
+                    onDelete="CASCADE"/>
+
+        <constraint xsi:type="foreign"
+                    referenceId="AHY_CLBR_NTN_MEMBERSHIP_TOKEN_ID_VAULT_PYMNT_TOKEN_ENTITY_ID"
+                    table="ahy_caliber_nation_membership" column="payment_token_id"
+                    referenceTable="vault_payment_token" referenceColumn="entity_id"
+                    onDelete="SET NULL"/>
+
+        <index referenceId="AHY_CALIBER_NATION_MEMBERSHIP_STATUS" indexType="btree">
+            <column name="status"/>
+        </index>
+        <index referenceId="AHY_CALIBER_NATION_MEMBERSHIP_RENEWAL_DATE" indexType="btree">
+            <column name="renewal_date"/>
+        </index>
+    </table>
+
+    <!-- Membership + admin activity audit log. -->
+    <table name="ahy_caliber_nation_activity_log" resource="default" engine="innodb" comment="Caliber Nation Activity Log">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="customer_id" padding="10" unsigned="true" nullable="true" comment="Customer ID (null for admin/system events)"/>
+        <column xsi:type="int" name="admin_user_id" padding="10" unsigned="true" nullable="true" comment="Admin user id for admin events"/>
+        <column xsi:type="varchar" name="action" length="64" nullable="false" comment="e.g. created|cancelled|renewed|status_change|config_change"/>
+        <column xsi:type="text" name="detail" nullable="true" comment="Human-readable context / JSON payload"/>
+        <column xsi:type="int" name="order_id" padding="10" unsigned="true" nullable="true" comment="Related order id if any"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+
+        <index referenceId="AHY_CALIBER_NATION_ACTIVITY_LOG_CUSTOMER_ID" indexType="btree">
+            <column name="customer_id"/>
+        </index>
+        <index referenceId="AHY_CALIBER_NATION_ACTIVITY_LOG_ACTION" indexType="btree">
+            <column name="action"/>
+        </index>
+    </table>
+
+    <!-- Renewal attempt history (auto-renewal engine). One row per attempt. -->
+    <table name="ahy_caliber_nation_renewal_log" resource="default" engine="innodb" comment="Caliber Nation Renewal Log">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="membership_id" padding="10" unsigned="true" nullable="false" comment="Membership entity id"/>
+        <column xsi:type="int" name="customer_id" padding="10" unsigned="true" nullable="false" comment="Customer ID"/>
+        <column xsi:type="varchar" name="result" length="16" nullable="false" comment="success|failed"/>
+        <column xsi:type="decimal" name="amount" scale="4" precision="12" nullable="true" comment="Amount charged"/>
+        <column xsi:type="int" name="payment_token_id" padding="10" unsigned="true" nullable="true" comment="Vault token used"/>
+        <column xsi:type="varchar" name="transaction_id" length="64" nullable="true" comment="Gateway transaction id on success"/>
+        <column xsi:type="int" name="order_id" padding="10" unsigned="true" nullable="true" comment="Renewal order id if created"/>
+        <column xsi:type="text" name="error_message" nullable="true" comment="Gateway error on failure"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <index referenceId="AHY_CALIBER_NATION_RENEWAL_LOG_MEMBERSHIP_ID" indexType="btree">
+            <column name="membership_id"/>
+        </index>
+        <index referenceId="AHY_CALIBER_NATION_RENEWAL_LOG_RESULT" indexType="btree">
+            <column name="result"/>
+        </index>
+    </table>
+
+    <!-- P3: seller participation in Caliber Nation member pricing. Admin decides which
+         sellers are included and their seller-scope discount. One row per seller. -->
+    <table name="ahy_caliber_nation_seller_participation" resource="default" engine="innodb" comment="Caliber Nation Seller Participation">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="seller_id" padding="10" unsigned="true" nullable="false" comment="Webkul seller id (marketplace_product.seller_id)"/>
+        <column xsi:type="smallint" name="is_enabled" unsigned="true" nullable="false" default="1" comment="Whether the seller participates"/>
+        <column xsi:type="varchar" name="discount_type" length="16" nullable="false" default="percent" comment="percent|fixed (amount off)"/>
+        <column xsi:type="decimal" name="discount_value" scale="4" precision="12" nullable="false" default="0" comment="Percent off, or fixed amount off"/>
+        <column xsi:type="smallint" name="is_early_access" unsigned="true" nullable="false" default="0" comment="Whether this seller is flagged for early access"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" default="CURRENT_TIMESTAMP" nullable="false" comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="AHY_CLBR_NTN_SELLER_PARTICIPATION_SELLER_ID">
+            <column name="seller_id"/>
+        </constraint>
+        <index referenceId="AHY_CLBR_NTN_SELLER_PARTICIPATION_ENABLED" indexType="btree">
+            <column name="is_enabled"/>
+        </index>
+        <index referenceId="AHY_CLBR_NTN_SELLER_PARTICIPATION_IS_EARLY_ACCESS" indexType="btree">
+            <column name="is_early_access"/>
+        </index>
+    </table>
+
+    <!-- P2: category- and product-scope member discount rules (additive layers).
+         Membership base discount + global cap live in admin config, not here. -->
+    <table name="ahy_caliber_nation_member_price_rule" resource="default" engine="innodb" comment="Caliber Nation Member Price Rule">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="varchar" name="scope" length="16" nullable="false" comment="category|product"/>
+        <column xsi:type="int" name="target_id" padding="10" unsigned="true" nullable="false" comment="Category id or product id"/>
+        <column xsi:type="varchar" name="discount_type" length="16" nullable="false" default="percent" comment="percent|fixed (amount off)"/>
+        <column xsi:type="decimal" name="discount_value" scale="4" precision="12" nullable="false" default="0" comment="Percent off, or fixed amount off"/>
+        <column xsi:type="smallint" name="is_active" unsigned="true" nullable="false" default="1" comment="Rule active"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" default="CURRENT_TIMESTAMP" nullable="false" comment="Updated At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <index referenceId="AHY_CLBR_NTN_MEMBER_PRICE_RULE_SCOPE_TARGET" indexType="btree">
+            <column name="scope"/>
+            <column name="target_id"/>
+        </index>
+        <index referenceId="AHY_CLBR_NTN_MEMBER_PRICE_RULE_IS_ACTIVE" indexType="btree">
+            <column name="is_active"/>
+        </index>
+    </table>
+
+    <!-- P4: per-line member savings on completed orders (drives cumulative + reporting). -->
+    <table name="ahy_caliber_nation_order_savings" resource="default" engine="innodb" comment="Caliber Nation Order Savings">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="order_id" padding="10" unsigned="true" nullable="false" comment="Sales order id"/>
+        <column xsi:type="int" name="order_item_id" padding="10" unsigned="true" nullable="true" comment="Sales order item id"/>
+        <column xsi:type="int" name="customer_id" padding="10" unsigned="true" nullable="false" comment="Customer id"/>
+        <column xsi:type="int" name="product_id" padding="10" unsigned="true" nullable="true" comment="Product id"/>
+        <column xsi:type="int" name="seller_id" padding="10" unsigned="true" nullable="true" comment="Seller id if applicable"/>
+        <column xsi:type="decimal" name="regular_price" scale="4" precision="12" nullable="false" default="0" comment="Regular unit price"/>
+        <column xsi:type="decimal" name="member_price" scale="4" precision="12" nullable="false" default="0" comment="Member unit price (pre-coupon)"/>
+        <column xsi:type="decimal" name="paid_price" scale="4" precision="12" nullable="false" default="0" comment="Actual unit price paid"/>
+        <column xsi:type="decimal" name="savings" scale="4" precision="12" nullable="false" default="0" comment="Line savings = (regular - paid) * qty"/>
+        <column xsi:type="text" name="applied_rules" nullable="true" comment="JSON breakdown of applied layers"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <index referenceId="AHY_CLBR_NTN_ORDER_SAVINGS_CUSTOMER_ID" indexType="btree">
+            <column name="customer_id"/>
+        </index>
+        <index referenceId="AHY_CLBR_NTN_ORDER_SAVINGS_ORDER_ID" indexType="btree">
+            <column name="order_id"/>
+        </index>
+    </table>
+
+
+    <!-- Refund requests for members who cancelled within 30 days of start date. -->
+    <table name="ahy_caliber_nation_refund_request" resource="default" engine="innodb" comment="Caliber Nation Refund Requests">
+        <column xsi:type="int" name="entity_id" padding="10" unsigned="true" nullable="false" identity="true" comment="Entity ID"/>
+        <column xsi:type="int" name="customer_id" padding="10" unsigned="true" nullable="false" comment="Customer ID"/>
+        <column xsi:type="int" name="membership_id" padding="10" unsigned="true" nullable="false" comment="Membership entity_id"/>
+        <column xsi:type="datetime" name="start_date" nullable="true" comment="Membership start date at time of cancellation"/>
+        <column xsi:type="datetime" name="cancelled_at" nullable="false" comment="When the membership was cancelled"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" default="CURRENT_TIMESTAMP" nullable="false" comment="Created At"/>
+
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <index referenceId="AHY_CALIBER_NATION_REFUND_REQUEST_CUSTOMER_ID" indexType="btree">
+            <column name="customer_id"/>
+        </index>
+    </table>
+
+</schema>

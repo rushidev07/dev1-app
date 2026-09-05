@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <!-- Block active members from re-adding the membership product to the cart. -->
+    <event name="checkout_cart_product_add_before">
+        <observer name="ahy_caliber_nation_prevent_duplicate_membership"
+                  instance="Ahy\CaliberNation\Observer\PreventDuplicateMembership"/>
+    </event>
+
+    <!-- Refresh member prices in the cart on view (re-collect totals so the current
+         member price applies even if it changed since the item was added). -->
+    <event name="controller_action_predispatch_checkout_cart_index">
+        <observer name="ahy_caliber_nation_recollect_cart_totals"
+                  instance="Ahy\CaliberNation\Observer\RecollectCartTotals"/>
+    </event>
+</config>

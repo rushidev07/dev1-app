@@ -1,0 +1,11 @@
+<?php
+/**
+ * Zero-results message for the category results page — extracted verbatim
+ * from category/results.phtml's inline markup so it can be rendered once via
+ * $block->getChildHtml('zero_results'). Rendered in the exact same DOM
+ * position it previously occupied inline.
+ */
+?>
+<div x-show="!loading && results.length === 0" class="px-6 py-12 text-center text-gray-500">
+    No records found for this category.
+</div>

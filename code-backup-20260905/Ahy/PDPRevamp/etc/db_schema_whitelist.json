@@ -1,0 +1,81 @@
+{
+    "ahy_pdprevamp_faq": {
+        "column": {
+            "faq_id": true,
+            "product_id": true,
+            "category": true,
+            "question": true,
+            "answer": true,
+            "sort_order": true,
+            "is_active": true,
+            "created_at": true
+        },
+        "index": {
+            "AHY_PDPREVAMP_FAQ_PRODUCT_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_pdprevamp_variant_color": {
+        "column": {
+            "product_id": true,
+            "hex": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_pdprevamp_review_tags": {
+        "column": {
+            "review_id": true,
+            "tags": true,
+            "created_at": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ahy_pdprevamp_review_vote": {
+        "column": {
+            "vote_id": true,
+            "review_id": true,
+            "customer_id": true,
+            "vote_type": true,
+            "created_at": true
+        },
+        "index": {
+            "AHY_PDPREVAMP_REVIEW_VOTE_CUSTOMER_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AHY_PDPREVAMP_REVIEW_VOTE_REVIEW_ID_CUSTOMER_ID": true,
+            "AHY_PDPREVAMP_REVIEW_VOTE_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true
+        }
+    },
+    "ahy_pdprevamp_exit_coupon": {
+        "column": {
+            "entity_id": true,
+            "email": true,
+            "coupon_code": true,
+            "customer_id": true,
+            "product_id": true,
+            "is_redeemed": true,
+            "created_at": true,
+            "expires_at": true
+        },
+        "index": {
+            "AHY_PDPREVAMP_EXIT_COUPON_CUSTOMER_ID": true,
+            "AHY_PDPREVAMP_EXIT_COUPON_COUPON_CODE": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "AHY_PDPREVAMP_EXIT_COUPON_EMAIL": true
+        }
+    },
+    "catalog_product_entity_media_gallery": {
+        "column": {
+            "ahy_thumb_caption": true
+        }
+    } 
+}

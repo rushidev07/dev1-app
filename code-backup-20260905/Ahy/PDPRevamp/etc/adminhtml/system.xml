@@ -1,0 +1,251 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <!-- Already declared by other Ahy modules (BarcodeLookup, DiscountAlert,
+             FlxPointApproval) with the same id - Magento merges tab declarations
+             by id, so this is redundant-safe, matching that established pattern. -->
+        <tab id="ahy" translate="label" sortOrder="5">
+            <label>Ahy</label>
+        </tab>
+        <section id="pdprevamp_fbt" translate="label" type="text" sortOrder="510" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>PDP Frequently Bought Together</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General Settings</label>
+                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Section</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="heading" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Section Heading</label>
+                    <comment>Shown above the products. Used for both purchase-history and manually picked suggestions.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="discount_percent" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Bundle Discount Percent</label>
+                    <validate>validate-digits validate-digits-range-0-100</validate>
+                    <comment><![CDATA[<strong>Leave at 0 until a bundle cart price rule is in place.</strong> This value only controls what the page <em>displays</em> - it does not create a discount. A non-zero value advertises a saving that is NOT applied at checkout. At 0 the section still shows, without any discount messaging.]]></comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="max_suggestions" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Products to Suggest</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>How many companion products to show alongside the current one.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="min_copurchase_orders" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Minimum Shared Orders</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>How many past orders must contain both products before purchase history is trusted. Lower values surface more suggestions but include coincidences.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="excluded_skus" translate="label comment" type="textarea" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Never Suggest These SKUs</label>
+                    <comment><![CDATA[Comma-separated, <strong>exact SKU match</strong>. Use for free gifts and promotional items that appear in many orders without being genuine companions. Note SKUs are editable - if one of these products is renamed the exclusion stops working and a warning is written to the log.]]></comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+        </section>
+        <section id="pdprevamp_exit_popup" translate="label" type="text" sortOrder="500" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>PDP Exit Intent Popup</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General Settings</label>
+                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Exit Intent Popup</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="timer_hours" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Countdown Timer Duration (hours)</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="discount_percent" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Discount Percent</label>
+                    <validate>validate-digits validate-digits-range-1-100</validate>
+                    <comment>Shown in the popup text and used as the actual discount amount on the auto-generated coupon code issued to each claimant.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="send_email" translate="label comment" type="select" sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email the Code to the Claimant</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>No: the code is shown in the popup. Yes: the code is emailed instead and is deliberately NOT shown on screen or included in the popup's response, so it never reaches the browser.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <!-- Exit intent  -->
+                <field id="email_template" translate="label comment" type="select" sortOrder="37" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Email Template</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Template</source_model>
+                    <comment>Defaults to the module's own template. To customise the wording, go to Marketing &gt; Email Templates &gt; Add New Template, load "PDP Exit Popup - Welcome Discount Code" as the starting point, save it, then select it here.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                        <field id="send_email">1</field>
+                    </depends>
+                </field>
+                <field id="email_sender" translate="label comment" type="select" sortOrder="36" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Email Sender</label>
+                    <source_model>Magento\Config\Model\Config\Source\Email\Identity</source_model>
+                    <comment>Store email identity the discount code is sent from. Defaults to General.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                        <field id="send_email">1</field>
+                    </depends>
+                </field>
+            </group>
+        </section>
+        <section id="pdprevamp_pdp_badges" translate="label" type="text" sortOrder="510" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>PDP Badges</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="adventure_seekers" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Adventure Seekers Also Viewed Badges</label>
+                <field id="best_seller_enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show "Best Seller" Badge</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="best_seller_name" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Best Seller - Seller Name</label>
+                    <source_model>Ahy\PDPRevamp\Model\Config\Source\SellerNames</source_model>
+                    <comment>Products from this seller show the "Best Seller" badge, overriding the default behavior (Magento's own sales bestsellers report). Leave as "None" to use the default.</comment>
+                    <depends>
+                        <field id="best_seller_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="top_rated_enabled" translate="label" type="select" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show "Top Rated" Badge</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="top_rated_threshold" translate="label" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Top Rated - Minimum Rating (%)</label>
+                    <validate>validate-digits validate-digits-range-0-100</validate>
+                    <comment>Products with a review rating at or above this percentage show the "Top Rated" badge.</comment>
+                    <depends>
+                        <field id="top_rated_enabled">1</field>
+                    </depends>
+                </field>
+                <field id="same_seller_enabled" translate="label" type="select" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show "Same Seller" Badge</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Shown when a related item is sold by the same seller as the product currently being viewed.</comment>
+                </field>
+                <field id="under_price_enabled" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show "Under $X" Badge</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="under_price_value" translate="label" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Under $X - Value</label>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                    <comment>Any item priced below this amount shows an "Under $X" badge, overriding the default behavior (flagging just the 2nd-cheapest item in the carousel). Leave blank to use the default.</comment>
+                    <depends>
+                        <field id="under_price_enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+        </section>
+        <section id="pdprevamp_seller_info" translate="label" type="text" sortOrder="515" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>PDP Seller Info</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>PDP Seller Info</label>
+                <field id="seller_data" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Seller Info</label>
+                    <comment>Type the seller's name exactly as it appears in Marketplace &gt; Manage Sellers (shop title or seller name). Each value here is only shown on that seller's PDP "Seller Info" tab in place of the automatic figure when the real Webkul data for that field is missing - it never overwrites real data that already exists. Leave a field blank to leave the automatic value (or lack of one) untouched.</comment>
+                    <frontend_model>Ahy\PDPRevamp\Block\Adminhtml\System\Config\SellerInfoFieldArray</frontend_model>
+                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
+                </field>
+            </group>
+        </section>
+        <section id="pdprevamp_ai_descriptors" translate="label" type="text" sortOrder="520" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>PDP AI Descriptors</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Gemini Settings</label>
+                <field id="gemini_api_key" translate="label comment" type="obscure" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Gemini API Key</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment>Used by "bin/magento ahy:pdp:generate-ai-descriptors" to populate the AI Descriptors attribute. Leave blank to disable the command.</comment>
+                </field>
+                <field id="gemini_model" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Gemini Model</label>
+                    <comment>e.g. gemini-2.5-flash. Change here if Google renames or deprecates the default model.</comment>
+                </field>
+            </group>
+        </section>
+        <section id="pdprevamp_share_buttons" translate="label" type="text" sortOrder="530" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>PDP Social Media</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General Settings</label>
+                <field id="copy_link_enabled" translate="label" type="select" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show Copy Link</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Copies the current product page's own URL - not one of the links above.</comment>
+                </field>
+            </group>
+        </section>
+        <section id="pdprevamp_avantlink" translate="label" type="text" sortOrder="520" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>AvantLink Affiliate Tracking</label>
+            <tab>ahy</tab>
+            <resource>Magento_Config::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>General Settings</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable AvantLink Click Tracking</label>
+                    <comment>When disabled, sponsored CMS banners link straight to their destination (untracked) instead of through AvantLink.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="website_id" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Website ID</label>
+                    <comment>AvantLink-assigned affiliate website identifier for this storefront (the "pw" value on click-tracking links).</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="default_merchant_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Default Merchant ID</label>
+                    <comment>Used when a tracked banner doesn't specify its own AvantLink merchant ID.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="custom_tracking_code_prefix" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Custom Tracking Code Prefix</label>
+                    <comment>Optional prefix appended to every click-through link's "ctc" parameter, e.g. "pdp". Helps distinguish placements in AvantLink reporting.</comment>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+                <field id="banner_placements" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Sponsor Banner Placements</label>
+                    <comment>Map each sponsored CMS block (Content &gt; Blocks) to the AvantLink advertiser it should be tracked against. Leave Merchant ID blank to use the Default Merchant ID above. Leave Tracking Code blank to use the block identifier as the "ctc" value. Add a row per banner slot - no code change needed to add a new sponsored banner or swap its advertiser.</comment>
+                    <frontend_model>Ahy\PDPRevamp\Block\Adminhtml\Form\Field\BannerPlacements</frontend_model>
+                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
+                    <depends>
+                        <field id="enabled">1</field>
+                    </depends>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

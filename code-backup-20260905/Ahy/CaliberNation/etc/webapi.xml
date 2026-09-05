@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <!-- Read-only member price for the authenticated customer. No write/payment surface. -->
+    <route url="/V1/caliber-nation/me/member-price/:productId" method="GET">
+        <service class="Ahy\CaliberNation\Api\MemberPricingInterface" method="getMemberPrice"/>
+        <resources>
+            <resource ref="self"/>
+        </resources>
+    </route>
+</routes>

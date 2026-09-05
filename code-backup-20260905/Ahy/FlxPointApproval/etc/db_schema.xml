@@ -1,0 +1,191 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <!--
+    |=============================================================|
+    | TABLE: flxpoint_approval_product                            |
+    | Holds one row per parent product (configurable or simple)   |
+    | that is NEW and waiting for admin approval before import.   |
+    |=============================================================|
+    -->
+    <table name="flxpoint_approval_product" resource="default" engine="innodb"
+           comment="FlxPoint — Products pending admin approval">
+
+        <!-- Primary Key -->
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Primary Key"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+
+        <!-- Product Identity -->
+        <column xsi:type="varchar" name="sku" nullable="false" length="255" comment="Magento SKU (UPC-based)"/>
+        <column xsi:type="varchar" name="flxpoint_sku" nullable="false" length="255" comment="Original FlxPoint SKU"/>
+        <column xsi:type="varchar" name="product_type" nullable="false" length="20" comment="simple or configurable"/>
+        <column xsi:type="varchar" name="attribute_set_code" nullable="false" length="255" comment="Magento Attribute Set Name"/>
+
+        <!-- Product Info -->
+        <column xsi:type="varchar" name="name" nullable="false" length="500" comment="Product Name"/>
+        <column xsi:type="varchar" name="product_brand" nullable="true" length="255" comment="Brand"/>
+        <column xsi:type="varchar" name="categories" nullable="true" length="500" comment="Category Name"/>
+        <column xsi:type="mediumtext" name="description" nullable="true" comment="Full HTML Description"/>
+        <column xsi:type="text" name="short_description" nullable="true" comment="Short Description"/>
+        <column xsi:type="varchar" name="url_key" nullable="true" length="255" comment="URL Key"/>
+        <column xsi:type="varchar" name="visibility" nullable="false" length="50" default="Catalog, Search" comment="Magento Visibility"/>
+        <column xsi:type="smallint" name="product_online" nullable="false" default="1" comment="1=Enabled 2=Disabled"/>
+        <column xsi:type="decimal" name="weight" nullable="true" scale="4" precision="12" comment="Weight"/>
+        <column xsi:type="text" name="additional_attributes" nullable="true" comment="Extra specs (more_specs field)"/>
+
+        <!-- Pricing -->
+        <column xsi:type="decimal" name="price" nullable="false" scale="4" precision="12" default="0" comment="Regular Price"/>
+        <column xsi:type="decimal" name="special_price" nullable="true" scale="4" precision="12" comment="Sale Price"/>
+        <column xsi:type="datetime" name="special_price_from_date" nullable="true" comment="Sale Price Start Date"/>
+        <column xsi:type="datetime" name="special_price_to_date" nullable="true" comment="Sale Price End Date"/>
+
+        <!-- Stock -->
+        <column xsi:type="int" name="qty" nullable="false" default="0" comment="Quantity"/>
+        <column xsi:type="smallint" name="is_in_stock" nullable="false" default="0" comment="1=In Stock 0=Out of Stock"/>
+
+        <!-- Seller -->
+        <column xsi:type="int" name="seller_id" nullable="false" comment="FlxPoint Source/Seller ID"/>
+
+        <!-- Configurable Product Data (null for simple products) -->
+        <column xsi:type="text" name="configurable_variation_labels" nullable="true"
+                comment="Pipe-separated option names e.g. Color | Size"/>
+        <column xsi:type="text" name="configurable_variations" nullable="true"
+                comment="Pipe-separated child SKUs e.g. SKU-1 | SKU-2"/>
+        <column xsi:type="text" name="configurable_variation_labels_values" nullable="true"
+                comment="Per-variant option values e.g. SKU-1:Color=Red~Size=XL | SKU-2:Color=Blue~Size=M"/>
+
+        <!-- Images -->
+        <column xsi:type="varchar" name="base_image_url" nullable="true" length="1000" comment="Remote URL of main product image"/>
+        <column xsi:type="text" name="additional_images_url" nullable="true" comment="Pipe-separated remote URLs of extra images"/>
+        <column xsi:type="varchar" name="image_path" nullable="true" length="500" comment="Local downloaded path of main image"/>
+        <column xsi:type="text" name="additional_image_path" nullable="true" comment="Pipe-separated local paths of extra images"/>
+
+        <!-- Approval Workflow -->
+        <column xsi:type="varchar" name="status" nullable="false" length="20" default="pending"
+                comment="pending | approved | rejected"/>
+        <column xsi:type="text" name="rejection_reason" nullable="true" comment="Reason entered by admin when rejecting"/>
+        <column xsi:type="int" name="reviewed_by" nullable="true" comment="Admin User ID who approved or rejected"/>
+        <column xsi:type="datetime" name="reviewed_at" nullable="true" comment="Date and time of review action"/>
+        <column xsi:type="text" name="import_error" nullable="true"
+                comment="Error message if import failed on approval (so it can be retried)"/>
+
+        <!-- Additional Data — key/value pairs stored as serialized string e.g. material=cotton,country=US -->
+        <column xsi:type="text" name="additional_data" nullable="true"
+                comment="Key-value pairs stored as serialized string"/>
+
+        <!-- Timestamps -->
+        <column xsi:type="datetime" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Staged At"/>
+        <column xsi:type="datetime" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Last Updated"/>
+
+        <!-- Indexes -->
+        <constraint xsi:type="unique" referenceId="UNQ_FLXPOINT_APPROVAL_SKU">
+            <column name="sku"/>
+        </constraint>
+        <index referenceId="IDX_FLXPOINT_APPROVAL_STATUS" indexType="btree">
+            <column name="status"/>
+        </index>
+        <index referenceId="IDX_FLXPOINT_APPROVAL_SELLER" indexType="btree">
+            <column name="seller_id"/>
+        </index>
+        <index referenceId="IDX_FLXPOINT_APPROVAL_TYPE" indexType="btree">
+            <column name="product_type"/>
+        </index>
+
+    </table>
+
+
+    <!--
+    |=============================================================|
+    | TABLE: flxpoint_approval_variant                            |
+    | Holds child simple products (variants) of configurable      |
+    | parents. Deleted automatically when parent is deleted.      |
+    |=============================================================|
+    -->
+    <table name="flxpoint_approval_variant" resource="default" engine="innodb"
+           comment="FlxPoint — Variants of pending configurable products">
+
+        <!-- Primary Key -->
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true" comment="Primary Key"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+
+        <!-- Link to Parent -->
+        <column xsi:type="varchar" name="parent_sku" nullable="false" length="255" comment="SKU of the parent configurable product"/>
+
+        <!-- Variant Identity -->
+        <column xsi:type="varchar" name="sku" nullable="false" length="255" comment="Magento SKU (UPC-based)"/>
+        <column xsi:type="varchar" name="flxpoint_sku" nullable="false" length="255" comment="Original FlxPoint SKU"/>
+        <column xsi:type="varchar" name="name" nullable="false" length="500" comment="Variant Product Name"/>
+        <column xsi:type="varchar" name="attribute_set_code" nullable="false" length="255" comment="Magento Attribute Set Name"/>
+        <column xsi:type="varchar" name="categories" nullable="true" length="500" comment="Category Name"/>
+        <column xsi:type="varchar" name="product_brand" nullable="true" length="255" comment="Brand"/>
+        <column xsi:type="mediumtext" name="description" nullable="true" comment="Full HTML Description"/>
+        <column xsi:type="text" name="short_description" nullable="true" comment="Short Description"/>
+        <column xsi:type="varchar" name="url_key" nullable="true" length="255" comment="URL Key"/>
+        <column xsi:type="varchar" name="visibility" nullable="false" length="50" default="Not Visible Individually" comment="Always Not Visible Individually for variants"/>
+        <column xsi:type="smallint" name="product_online" nullable="false" default="1" comment="1=Enabled 2=Disabled"/>
+        <column xsi:type="decimal" name="weight" nullable="true" scale="4" precision="12" comment="Weight"/>
+
+        <!-- Pricing -->
+        <column xsi:type="decimal" name="price" nullable="false" scale="4" precision="12" default="0" comment="Regular Price"/>
+        <column xsi:type="decimal" name="special_price" nullable="true" scale="4" precision="12" comment="Sale Price"/>
+        <column xsi:type="datetime" name="special_price_from_date" nullable="true" comment="Sale Price Start Date"/>
+        <column xsi:type="datetime" name="special_price_to_date" nullable="true" comment="Sale Price End Date"/>
+
+        <!-- Stock -->
+        <column xsi:type="int" name="qty" nullable="false" default="0" comment="Quantity"/>
+        <column xsi:type="smallint" name="is_in_stock" nullable="false" default="0" comment="1=In Stock 0=Out of Stock"/>
+
+        <!-- Seller -->
+        <column xsi:type="int" name="seller_id" nullable="false" comment="FlxPoint Source/Seller ID"/>
+
+        <!--
+            Parsed variant options — pre-split at staging time from configurable_variation_labels_values
+            so the admin grid expand shows clean columns without any PHP parsing at runtime.
+            e.g. "Color=Red~Size=XL" becomes:
+                 option_label_1 = Color, option_value_1 = Red
+                 option_label_2 = Size,  option_value_2 = XL
+        -->
+        <column xsi:type="text" name="configurable_variation_labels_values" nullable="true"
+                comment="Raw option string e.g. Color=Red~Size=XL"/>
+        <column xsi:type="varchar" name="option_label_1" nullable="true" length="100" comment="Option 1 name e.g. Color"/>
+        <column xsi:type="varchar" name="option_value_1" nullable="true" length="255" comment="Option 1 value e.g. Red"/>
+        <column xsi:type="varchar" name="option_label_2" nullable="true" length="100" comment="Option 2 name e.g. Size"/>
+        <column xsi:type="varchar" name="option_value_2" nullable="true" length="255" comment="Option 2 value e.g. XL"/>
+        <column xsi:type="varchar" name="option_label_3" nullable="true" length="100" comment="Option 3 name"/>
+        <column xsi:type="varchar" name="option_value_3" nullable="true" length="255" comment="Option 3 value"/>
+
+        <!-- Images -->
+        <column xsi:type="varchar" name="base_image_url" nullable="true" length="1000" comment="Remote URL of main image"/>
+        <column xsi:type="text" name="additional_images_url" nullable="true" comment="Pipe-separated remote URLs of extra images"/>
+        <column xsi:type="varchar" name="image_path" nullable="true" length="500" comment="Local downloaded path of main image"/>
+        <column xsi:type="text" name="additional_image_path" nullable="true" comment="Pipe-separated local paths of extra images"/>
+
+        <!-- Additional Data — key/value pairs stored as serialized string e.g. material=cotton,country=US -->
+        <column xsi:type="text" name="additional_data" nullable="true"
+                comment="Key-value pairs stored as serialized string"/>
+
+        <!-- Timestamps -->
+        <column xsi:type="datetime" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Staged At"/>
+
+        <!-- Indexes -->
+        <constraint xsi:type="unique" referenceId="UNQ_FLXPOINT_VARIANT_SKU">
+            <column name="sku"/>
+        </constraint>
+        <index referenceId="IDX_FLXPOINT_VARIANT_PARENT_SKU" indexType="btree">
+            <column name="parent_sku"/>
+        </index>
+
+        <!-- Foreign Key — deletes variants automatically when parent is deleted -->
+        <constraint xsi:type="foreign" referenceId="FK_FLXPOINT_VARIANT_PARENT_SKU"
+                    table="flxpoint_approval_variant" column="parent_sku"
+                    referenceTable="flxpoint_approval_product" referenceColumn="sku"
+                    onDelete="CASCADE"/>
+
+    </table>
+
+</schema>

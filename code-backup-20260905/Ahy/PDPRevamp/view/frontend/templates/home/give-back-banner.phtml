@@ -1,0 +1,113 @@
+<?php
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+
+// Only the background image is managed from Admin > Content > Blocks
+// ("home_give_back_fund_banner") - admins can swap it there without a
+// deploy. Heading, copy, and button are hardcoded below so their Tailwind
+// classes are guaranteed to compile: Tailwind's build only scans *.phtml
+// files, and this markup previously lived in a .php string that was
+// silently purged from the compiled CSS, leaving the banner unstyled.
+$blockHtml = $block->getLayout()
+    ->createBlock(\Magento\Cms\Block\Block::class)
+    ->setBlockId('home_give_back_fund_banner')
+    ->toHtml();
+// This install auto-generates a scoped "cmsb{id}-" Tailwind stylesheet for
+// CMS block content and wraps it in a <style> tag around the block's own
+// markup. strip_tags() only removes the <style> tags themselves, not the
+// CSS text between them, so that whole ruleset was leaking into
+// $backgroundImageUrl as garbage text ahead of the real URL. Drop the
+// entire <style>...</style> block first so only the actual content (the
+// image URL) is left to strip tags from.
+$blockHtml = preg_replace('#<style\b[^>]*>.*?</style>#is', '', $blockHtml) ?? $blockHtml;
+$backgroundImageUrl = trim(strip_tags($blockHtml));
+$backgroundImageStyle = $backgroundImageUrl
+    ? sprintf("background-image:url('%s')", $block->escapeUrl($backgroundImageUrl))
+    : '';
+?>
+<section class="ahy-give-back-banner relative overflow-hidden"
+         style="width:100vw;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;">
+    <div class="absolute inset-0 ahy-give-back-bg" style="<?= $block->escapeHtmlAttr($backgroundImageStyle) ?>"></div>
+    <div class="absolute inset-0 ahy-give-back-overlay"></div>
+    <div class="relative container ahy-give-back-inner text-center">
+        <div class="ahy-give-back-content mx-auto space-y-4">
+            <p class="ahy-give-back-label">
+                <?= $block->escapeHtml(__('The Everest Give Back Fund')) ?>
+            </p>
+            <h2 class="ahy-give-back-heading text-3xl font-extrabold text-white leading-tight">
+                <?= $block->escapeHtml(__('Helping People Thrive')) ?><br/><?= $block->escapeHtml(__('in the Outdoors')) ?>
+            </h2>
+            <p class="ahy-give-back-text leading-relaxed mx-auto">
+                <?= $block->escapeHtml(__("Every purchase on Everest.com supports outdoor conservation, trail maintenance, and youth outdoor education programs. Because the outdoors isn't just something we visit \xe2\x80\x94 it's where we belong.")) ?>
+            </p>
+            <a href="<?= $block->escapeUrl($block->getUrl('give-back-fund')) ?>"
+               class="ahy-give-back-button inline-block text-white text-sm font-semibold rounded-full transition-all no-underline">
+                <?= $block->escapeHtml(__('Learn About the Give Back Fund')) ?>
+            </a>
+        </div>
+    </div>
+</section>
+<style>
+    .ahy-give-back-bg {
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    .ahy-give-back-overlay {
+        background-color: rgba(13, 47, 71, 0.8);
+    }
+    .ahy-give-back-content {
+        max-width: 42rem;
+    }
+    .ahy-give-back-inner {
+        padding-top: 40px;
+        padding-bottom: 40px;
+    }
+    @media (min-width: 768px) {
+        .ahy-give-back-inner {
+            padding-top: 64px;
+            padding-bottom: 64px;
+        }
+    }
+    .ahy-give-back-label {
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: #e85d26;
+    }
+    .ahy-give-back-heading {
+        font-size: 1.875rem;
+    }
+    @media (min-width: 1024px) {
+        .ahy-give-back-heading {
+            font-size: 2.25rem;
+        }
+    }
+    .ahy-give-back-text {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        max-width: 32rem;
+    }
+    .ahy-give-back-button {
+        margin-top: 1rem;
+        padding: 0.625rem 1.5rem;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+    }
+    @media (max-width: 360px) {
+        .ahy-give-back-button {
+            font-size: 12px !important;
+            padding: 0.625rem 1rem;
+        }
+    }
+    .ahy-give-back-button:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+</style>

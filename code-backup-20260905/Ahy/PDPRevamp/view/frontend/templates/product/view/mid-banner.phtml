@@ -1,0 +1,30 @@
+<?php
+declare(strict_types=1);
+
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+?>
+<style>
+        @media (max-width: 425px) {
+        #pdp-mid-banner-wrapper {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+
+    #pdp-mid-banner-wrapper [data-content-type='row'] {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        max-width: none !important;
+    }
+    #pdp-mid-banner-wrapper img {
+        border-radius: 10px !important;
+    }
+</style>
+<div id="pdp-mid-banner-wrapper" style="overflow:hidden; border-radius:10px;">
+    <?php echo $block->getLayout()
+        ->createBlock(\Magento\Cms\Block\Block::class)
+        ->setBlockId('pdp_mid_banner')
+        ->toHtml(); ?>
+</div>

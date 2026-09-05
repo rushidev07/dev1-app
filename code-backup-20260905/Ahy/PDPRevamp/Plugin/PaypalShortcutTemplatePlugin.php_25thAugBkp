@@ -1,0 +1,67 @@
+<?php
+declare(strict_types=1);
+
+namespace Ahy\PDPRevamp\Plugin;
+
+use Magento\Paypal\Block\Express\InContext\SmartButton;
+
+/**
+ * Swaps the PDP PayPal Smart Button's template to this module's version.
+ *
+ * Same reason GalleryTemplatePlugin/StockStatusTemplatePlugin exist: theme
+ * layout XML is merged after module layout XML, so a plain referenceBlock
+ * template change from this module would be silently overwritten. Swapping at
+ * render time makes this module the sole source of truth regardless of what the
+ * theme declares - see EXTERNAL_DEPENDENCIES.md section 4, which records that
+ * direct theme edits of exactly this kind were found drifting out of sync
+ * between environments.
+ *
+ * The guard walks the parent chain rather than matching a block name, for two
+ * reasons:
+ *
+ * 1. The block name Magento_Paypal's own layout XML assigns to this block could
+ *    not be verified - vendor/ is absent from this checkout (see
+ *    EXTERNAL_DEPENDENCIES.md section 3). The container name is verifiable,
+ *    because the theme declares it itself
+ *    (Magento_Catalog/layout/catalog_product_view.xml).
+ * 2. It is correct whichever way round the inheritance runs between
+ *    Magento\Paypal\Block\Express\InContext\SmartButton and
+ *    ...\InContext\Minicart\SmartButton, which likewise could not be confirmed
+ *    locally. A plugin on a base class also applies to its subclasses, so if the
+ *    minicart block turns out to extend this one, an unguarded plugin would swap
+ *    the minicart's template too and break it - the more so because that block
+ *    is already replaced by a preference
+ *    (Ahy\ThemeCustomization\Block\Override\SmartButton, di.xml line 16).
+ *    Requiring the PDP shortcut container as an ancestor rules that out either
+ *    way, since the minicart button is never rendered inside it.
+ *
+ * This is the same walk-up-the-parents idiom the theme's own minicart template
+ * uses to tell the cart page from the mini-cart
+ * (Magento_Paypal/templates/express/in-context/shortcut/button.phtml).
+ *
+ * Holds for bundle products too: Magento_Bundle's layout moves the container
+ * into the bundle summary rather than removing it, so this block remains its
+ * child and the walk still matches.
+ */
+class PaypalShortcutTemplatePlugin
+{
+    private const REVAMP_TEMPLATE = 'Ahy_PDPRevamp::product/view/paypal-shortcut.phtml';
+
+    /**
+     * Declared by the theme's Magento_Catalog/layout/catalog_product_view.xml,
+     * not by this module - see EXTERNAL_DEPENDENCIES.md section 6.
+     */
+    private const PDP_SHORTCUT_CONTAINER = 'addtocart.shortcut.buttons';
+
+    public function beforeToHtml(SmartButton $subject): array
+    {
+        for ($block = $subject; $block !== null; $block = $block->getParentBlock()) {
+            if ($block->getNameInLayout() === self::PDP_SHORTCUT_CONTAINER) {
+                $subject->setTemplate(self::REVAMP_TEMPLATE);
+                break;
+            }
+        }
+
+        return [];
+    }
+}

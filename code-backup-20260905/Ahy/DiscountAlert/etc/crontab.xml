@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Crontab/etc/crontab.xsd">
+    <group id="default">
+        <job name="ahy_discount_alert" instance="Ahy\DiscountAlert\Cron\SendDiscountAlert" method="execute">
+            <config_path>ahy_discount_alert/schedule/cron_expr</config_path>
+        </job>
+    </group>
+</config>

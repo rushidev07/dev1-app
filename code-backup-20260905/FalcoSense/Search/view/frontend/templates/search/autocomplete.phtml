@@ -1,0 +1,383 @@
+<?php
+/** @var \FalcoSense\Search\Block\Search $block */
+$productsApiUrl  = $block->escapeJs($block->getProductsApiUrl());
+$searchToken     = $block->escapeJs($block->getSearchToken((int) $block->getPlatformStoreId()));
+$platformStoreId = (int) $block->getPlatformStoreId();
+?>
+<style>
+#ahySearchModal{display:none;position:fixed;inset:0;z-index:10000;background:#f4ede4;overflow-y:auto;}
+#ahySearchModal.ahy-open{display:block;}
+#ahyModalBody{display:flex;gap:0;padding:0 24px 48px;}
+#ahyModalSidebar{width:260px;flex-shrink:0;padding-top:20px;display:none;}
+#ahyModalProducts{flex:1;min-width:0;padding-top:20px;}
+@media(min-width:1024px){#ahyModalSidebar{display:block;}}
+#ahyModalGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;}
+@media(min-width:1280px){#ahyModalGrid{grid-template-columns:repeat(3,1fr);}}
+.ahy-skel{background:#ebebeb;animation:ahypulse 1.6s ease-in-out infinite;}
+@keyframes ahypulse{0%,100%{opacity:1}50%{opacity:.45}}
+.ahy-card{background:#fff;display:flex;flex-direction:column;position:relative;}
+.ahy-card-img{width:100%;height:244px;object-fit:contain;object-position:center;padding:12px;display:block;}
+.ahy-card-body{display:flex;flex-direction:column;flex:1;padding:0 16px 16px;}
+.ahy-card-name{font-size:18px;font-weight:900;color:#1a3352;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:3.4rem;text-decoration:none;}
+.ahy-card-name:hover{text-decoration:underline;}
+.ahy-card-brand{font-size:12px;color:#6b7280;margin:4px 0 0;}
+.ahy-card-price{min-height:88px;display:flex;flex-direction:column;margin-top:4px;}
+.ahy-price-deal{color:#dc2626;font-size:12px;font-weight:700;text-transform:uppercase;}
+.ahy-price-main{font-size:24px;font-weight:900;color:#1a3352;}
+.ahy-price-orig{font-size:13px;color:#9ca3af;text-decoration:line-through;margin-left:6px;}
+.ahy-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:auto;}
+.ahy-card-shipping{font-size:14px;font-weight:600;color:#111;white-space:nowrap;}
+.ahy-options-btn{display:flex;align-items:center;justify-content:center;border-radius:9999px;background:transparent;border:2px solid #1a3352;color:#1a3352;font-size:13px;font-weight:700;padding:6px 16px;cursor:pointer;text-decoration:none;white-space:nowrap;}
+.ahy-options-btn:hover{box-shadow:inset 0 0 0 1px #0d2f47;}
+.ahy-facet-group{border-top:1px solid #e5e7eb;padding:16px 0;}
+.ahy-facet-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;padding:0 0 12px;text-align:left;}
+.ahy-facet-title{font-size:13px;font-weight:700;color:#1a3352;text-transform:uppercase;letter-spacing:.05em;}
+.ahy-facet-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+.ahy-facet-item{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.ahy-cb-box{width:16px;height:16px;border:1px solid #9ca3af;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s;background:#fff;}
+.ahy-cb-box.ahy-checked{background:#1a3352;border-color:#1a3352;}
+.ahy-facet-val{font-size:13px;color:#374151;flex:1;}
+.ahy-facet-cnt{font-size:13px;color:#9ca3af;}
+.ahy-page-btn{border:1px solid #e5e7eb;border-radius:6px;padding:8px 14px;background:#fff;color:#1a3352;cursor:pointer;font-size:14px;}
+.ahy-page-btn.ahy-active{background:#1a3352;color:#fff;border-color:#1a3352;}
+.ahy-page-btn:hover:not(.ahy-active){background:#ede8e0;}
+/* Mobile filter bar */
+#ahyMobileBar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 24px;background:#f4ede4;border-bottom:1px solid #d1d5db;}
+@media(min-width:1024px){#ahyMobileBar{display:none;}}
+.ahy-filter-bar-btn{border:2px solid #1a3352;color:#1a3352;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:8px 20px;border-radius:9999px;background:transparent;cursor:pointer;}
+</style>
+
+<!-- Modal — always in DOM, shown/hidden by JS -->
+<div id="ahySearchModal" role="dialog" aria-modal="true" aria-label="Search Results">
+
+    <!-- Sticky header -->
+    <div style="position:sticky;top:0;z-index:1;background:#fff;border-bottom:1px solid #e5e7eb;">
+        <div style="max-width:1400px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px;">
+            <h1 id="ahyModalTitle" style="flex:1;font-size:20px;font-weight:900;color:#1a3352;margin:0;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></h1>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:14px;color:#1a3352;">
+                <span>Sort by:</span>
+                <select id="ahyModalSort" style="border:none;background:transparent;color:#1a3352;font-weight:700;font-size:14px;cursor:pointer;outline:none;">
+                    <option value="relevance">Relevance</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                </select>
+            </div>
+            <button id="ahyModalClose" style="width:36px;height:36px;border:none;background:transparent;font-size:22px;color:#6b7280;cursor:pointer;flex-shrink:0;" aria-label="Close">✕</button>
+        </div>
+    </div>
+
+    <!-- Mobile: filter + count bar -->
+    <div id="ahyMobileBar">
+        <button id="ahyMobileFilterBtn" class="ahy-filter-bar-btn">Filter By</button>
+        <span id="ahyMobileCount" style="font-size:13px;font-weight:600;color:#1a3352;"></span>
+    </div>
+
+    <!-- Body -->
+    <div id="ahyModalBody" style="max-width:1400px;margin:0 auto;">
+
+        <!-- Sidebar: filters (desktop) -->
+        <aside id="ahyModalSidebar" style="padding-right:24px;">
+            <div id="ahyModalCount" style="padding-bottom:12px;margin-bottom:4px;border-bottom:2px solid #1a3352;font-size:13px;font-weight:600;color:#1a3352;"></div>
+            <div id="ahyModalFacets"></div>
+        </aside>
+
+        <!-- Products area -->
+        <section id="ahyModalProducts">
+            <div id="ahyModalGrid"></div>
+            <div id="ahyModalPagination" style="display:flex;justify-content:center;gap:8px;margin-top:32px;flex-wrap:wrap;"></div>
+        </section>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var API_URL  = '<?= $productsApiUrl ?>';
+    var TOKEN    = '<?= $searchToken ?>';
+    var STORE_ID = <?= $platformStoreId ?>;
+    var DEBOUNCE = 300;
+
+    var state = { query: '', page: 1, sort: 'relevance', filters: {} };
+    var timer = null;
+
+    var el = {};
+
+    function init() {
+        el.modal      = document.getElementById('ahySearchModal');
+        el.grid       = document.getElementById('ahyModalGrid');
+        el.facets     = document.getElementById('ahyModalFacets');
+        el.count      = document.getElementById('ahyModalCount');
+        el.mobileCount= document.getElementById('ahyMobileCount');
+        el.pagination = document.getElementById('ahyModalPagination');
+        el.sort       = document.getElementById('ahyModalSort');
+        el.title      = document.getElementById('ahyModalTitle');
+
+        var input = document.getElementById('search');
+        if (!input) return;
+
+        input.addEventListener('input', onInput);
+        input.setAttribute('autocomplete', 'off');
+
+        document.getElementById('ahyModalClose').addEventListener('click', closeModal);
+
+        document.getElementById('ahyMobileFilterBtn').addEventListener('click', function () {
+            var sidebar = document.getElementById('ahyModalSidebar');
+            sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
+        });
+
+        el.sort.addEventListener('change', function () {
+            state.sort = this.value;
+            state.page = 1;
+            showLoading();
+            doFetch();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeModal();
+        });
+    }
+
+    function onInput() {
+        var q = this.value.trim();
+        clearTimeout(timer);
+        if (q.length < 2) { closeModal(); return; }
+        if (q !== state.query) {
+            state.query   = q;
+            state.page    = 1;
+            state.filters = {};
+        }
+        openModal();
+        showLoading();
+        timer = setTimeout(doFetch, DEBOUNCE);
+    }
+
+    function openModal()  { el.modal.classList.add('ahy-open'); document.body.style.overflow = 'hidden'; }
+    function closeModal() { el.modal.classList.remove('ahy-open'); document.body.style.overflow = ''; }
+
+    function showLoading() {
+        el.title.textContent = '';
+        el.count.textContent = '';
+        el.mobileCount.textContent = '';
+        el.facets.innerHTML  = skelSidebar();
+        el.grid.innerHTML    = skelGrid();
+        el.pagination.innerHTML = '';
+    }
+
+    function skelSidebar() {
+        var widths = [80, 60, 75, 50, 65, 80, 55, 70, 45, 60, 75, 50];
+        return widths.map(function (w) {
+            return '<div class="ahy-skel" style="height:12px;border-radius:20px;margin-bottom:12px;width:' + w + '%"></div>';
+        }).join('');
+    }
+
+    function skelGrid() {
+        var html = '';
+        for (var i = 0; i < 6; i++) {
+            html += '<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px;">'
+                  + '<div class="ahy-skel" style="height:244px;"></div>'
+                  + '<div class="ahy-skel" style="height:14px;border-radius:20px;width:80%"></div>'
+                  + '<div class="ahy-skel" style="height:12px;border-radius:20px;width:55%"></div>'
+                  + '<div class="ahy-skel" style="height:28px;border-radius:20px;width:45%"></div>'
+                  + '</div>';
+        }
+        return html;
+    }
+
+    function buildUrl() {
+        var params = new URLSearchParams({
+            search_token:      TOKEN,
+            q:                 state.query,
+            page:              state.page,
+            sort:              state.sort,
+        });
+        Object.keys(state.filters).forEach(function (k) { params.set(k, state.filters[k]); });
+        return API_URL + '?' + params.toString();
+    }
+
+    function doFetch() {
+        var q = state.query;
+        fetch(buildUrl())
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (state.query !== q) return; // stale response, discard
+                render(data);
+            })
+            .catch(function () {
+                el.grid.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;background:#fff;"><p style="color:#555;">Something went wrong. Please try again.</p></div>';
+            });
+    }
+
+    function render(data) {
+        var products = data.data       || [];
+        var pg       = data.pagination || {};
+        var facets   = data.facets     || [];
+        var total    = pg.total        || 0;
+
+        el.title.textContent      = 'SEARCH RESULTS FOR: \'' + state.query.toUpperCase() + '\'';
+        el.count.textContent      = '(' + total + ' Items)';
+        el.mobileCount.textContent= '(' + total + ' Items)';
+
+        renderFacets(facets);
+        renderGrid(products);
+        renderPagination(pg);
+
+        el.modal.scrollTop = 0;
+    }
+
+    function renderGrid(products) {
+        if (!products.length) {
+            el.grid.innerHTML = '<div style="grid-column:1/-1;padding:48px;text-align:center;background:#fff;">'
+                + '<p style="font-size:16px;color:#555;">No results found for <strong style="color:#1a3352;">' + esc(state.query) + '</strong>.</p>'
+                + '</div>';
+            return;
+        }
+        el.grid.innerHTML = products.map(function (p) {
+            var url    = p.url_key ? '/' + p.url_key + '.html' : '#';
+            var imgSrc = p.image
+                ? (imgUrl(p.image) || 'https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png')
+                : 'https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png';
+            var imgStyle = p.image ? '' : ' style="opacity:0.45"';
+            var isDeal = p.special_price && p.special_price < p.price;
+
+            var priceHtml = '';
+            if (isDeal) {
+                priceHtml = '<span class="ahy-price-deal">Deal</span>'
+                    + '<div><span class="ahy-price-main">$' + fmtPrice(p.special_price) + '</span>'
+                    + '<span class="ahy-price-orig">$' + fmtPrice(p.price) + '</span></div>';
+            } else if (p.price) {
+                priceHtml = '<span class="ahy-price-deal" style="color:#dc2626;">From</span>'
+                    + '<span class="ahy-price-main">$' + fmtPrice(p.price) + '</span>';
+            } else {
+                priceHtml = '<a href="' + esc(url) + '" class="ahy-options-btn" style="margin-top:auto;align-self:flex-start;">See Options</a>';
+            }
+
+            return '<div class="ahy-card">'
+                + '<a href="' + esc(url) + '" style="display:block;">'
+                + '<img src="' + esc(imgSrc) + '" alt="' + esc(p.name) + '" class="ahy-card-img" loading="lazy"' + imgStyle
+                + ' onerror="if(this.dataset.fb)return;this.dataset.fb=1;this.onerror=null;this.src=\'https://static.everest.com/media/.thumbswysiwyg/everest-logo_2_.png\';this.style.opacity=\'0.45\';">'
+                + '</a>'
+                + '<div class="ahy-card-body">'
+                + '<a href="' + esc(url) + '" class="ahy-card-name">' + esc(p.name) + '</a>'
+                + (p.brand ? '<p class="ahy-card-brand">Sold By ' + esc(p.brand) + '</p>' : '')
+                + '<div class="ahy-card-price">' + priceHtml + '</div>'
+                + '<div class="ahy-card-footer">'
+                + '<span class="ahy-card-shipping">FREE Shipping</span>'
+                + '<a href="' + esc(url) + '" class="ahy-options-btn">Options</a>'
+                + '</div>'
+                + '</div>'
+                + '</div>';
+        }).join('');
+    }
+
+    function renderFacets(facets) {
+        if (!facets.length) { el.facets.innerHTML = ''; return; }
+
+        el.facets.innerHTML = facets.map(function (facet) {
+            var key     = esc(facet.key);
+            var label   = esc(facet.label || facet.key);
+            var options = facet.options || facet.values || [];
+
+            var items = options.slice(0, 8).map(function (opt) {
+                var val      = opt.value;
+                var isActive = state.filters[facet.key] === val;
+                return '<li class="ahy-facet-item">'
+                    + '<span class="ahy-cb-box' + (isActive ? ' ahy-checked' : '') + '" data-fkey="' + key + '" data-fval="' + esc(val) + '">'
+                    + (isActive ? '<svg width="10" height="10" fill="none" stroke="#fff" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : '')
+                    + '</span>'
+                    + '<span class="ahy-facet-val">' + esc(val) + '</span>'
+                    + '<span class="ahy-facet-cnt">(' + (opt.count || 0) + ')</span>'
+                    + '</li>';
+            }).join('');
+
+            return '<div class="ahy-facet-group">'
+                + '<button class="ahy-facet-toggle">'
+                + '<span class="ahy-facet-title">' + label + '</span>'
+                + '<svg width="16" height="16" fill="none" stroke="#1a3352" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>'
+                + '</button>'
+                + '<ul class="ahy-facet-list">' + items + '</ul>'
+                + '</div>';
+        }).join('');
+
+        // Filter checkbox clicks
+        el.facets.querySelectorAll('.ahy-cb-box').forEach(function (box) {
+            box.addEventListener('click', function () {
+                var key = this.getAttribute('data-fkey');
+                var val = this.getAttribute('data-fval');
+                if (state.filters[key] === val) {
+                    delete state.filters[key];
+                } else {
+                    state.filters[key] = val;
+                }
+                state.page = 1;
+                showLoading();
+                doFetch();
+            });
+        });
+
+        // Collapsible toggle
+        el.facets.querySelectorAll('.ahy-facet-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var list = this.nextElementSibling;
+                list.style.display = list.style.display === 'none' ? '' : 'none';
+            });
+        });
+    }
+
+    function renderPagination(pg) {
+        var page       = pg.page     || 1;
+        var total      = pg.total    || 0;
+        var perPage    = pg.per_page || 12;
+        var totalPages = Math.ceil(total / perPage);
+
+        if (totalPages <= 1) { el.pagination.innerHTML = ''; return; }
+
+        var html   = '';
+        var start  = Math.max(1, page - 2);
+        var end    = Math.min(totalPages, page + 2);
+
+        if (page > 1)          html += '<button class="ahy-page-btn" data-p="' + (page - 1) + '">‹ Prev</button>';
+        for (var i = start; i <= end; i++) {
+            html += '<button class="ahy-page-btn' + (i === page ? ' ahy-active' : '') + '" data-p="' + i + '">' + i + '</button>';
+        }
+        if (page < totalPages) html += '<button class="ahy-page-btn" data-p="' + (page + 1) + '">Next ›</button>';
+
+        el.pagination.innerHTML = html;
+        el.pagination.querySelectorAll('.ahy-page-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                state.page = parseInt(this.getAttribute('data-p'), 10);
+                showLoading();
+                doFetch();
+                el.modal.scrollTop = 0;
+            });
+        });
+    }
+
+    function fmtPrice(n) {
+        return parseFloat(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function esc(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function imgUrl(image) {
+        if (!image) return '';
+        if (image.indexOf('falcosense/800x800') !== -1) return image;
+        var path = image.indexOf('http') === 0 ? image.replace(/^https?:\/\/[^/]+/, '') : image;
+        var m = path.match(/\/catalog\/product\/(.+)$/);
+        var rel = m ? m[1] : path.replace(/^\/+/, '');
+        if (!rel) return '';
+        var filename = rel.split('/').pop();
+        if (!filename) return '';
+        var c1 = filename[0], c2 = filename[1] || c1;
+        return '/media/falcosense/800x800/' + c1 + '/' + c2 + '/' + filename;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        setTimeout(init, 0);
+    }
+}());
+</script>

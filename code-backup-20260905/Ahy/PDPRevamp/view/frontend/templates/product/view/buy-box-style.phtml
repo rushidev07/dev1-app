@@ -1,0 +1,201 @@
+<?php
+declare(strict_types=1);
+
+// PDP-only buy-box restyle for the revamp design.
+// Loaded exclusively via catalog_product_view.xml, so no other page/PLP is affected.
+?>
+<style>
+    #product-addtocart-button {
+        background-color: #2E7D32 !important;
+                /* Neutralise .btn's responsive px-6/text-lg overrides so the
+           icon + text never get squeezed at any viewport width.
+           .btn at base applies px-4 (16px) and at md+ bumps to px-6
+           (24px each side) + text-lg (18px). In the buy-box the
+           available slot is ~195px (mobile) and ~197px (lg:col-span-5),
+           so that leaves too little room. Fixed padding + text-base keeps
+           the content comfortable at every breakpoint. */
+        font-size: 1rem !important;
+        line-height: 1.5rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+
+    }
+    #product-addtocart-button:hover {
+        background-color: #256b28 !important;
+    }
+    /* Ensure the ATC row is always full-width regardless of the parent
+       flex-col's md:items-center alignment. */
+    #addToCartActions {
+        width: 100%;
+    }
+    /* Guarantee the cart icon stroke stays white even if a CSS rule
+       overrides the SVG presentation attribute. */
+    #product-addtocart-button .atc-icon {
+        stroke: #fff !important;
+    }
+
+    /*
+       "EverestPay coming soon" dialog (see the button in product-info.phtml).
+       Plain CSS in the same shape as this module's exit-intent popup
+       (.ahy-exit-popup-*) rather than Tailwind utilities: the markup is
+       teleported to <body>, so it renders outside every wrapper this template's
+       utility classes are scoped by, and a couple of the values here have no
+       Tailwind equivalent in this theme's compiled stylesheet anyway.
+    */
+    .ahy-coming-soon-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0009;
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        /* Guarantees a gutter so the card never touches the screen edge on the
+           narrowest phones - this plus max-width is the whole responsive story. */
+        padding: 1rem;
+    }
+
+    .ahy-coming-soon-card {
+        position: relative;
+        /* Fills the available width up to the cap, so it is edge-to-edge minus
+           the overlay's padding at 320px and a centred card from ~380px up. */
+        width: 100%;
+        max-width: 24rem;
+        border-radius: 1rem;
+        background: #ffffff;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        /* Long translations cannot push the card taller than the viewport. */
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+    }
+
+    .ahy-coming-soon-close {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        display: flex;
+        height: 32px;
+        width: 32px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: #f3f4f6;
+        color: #0d2f47;
+        border: none;
+        cursor: pointer;
+    }
+
+    .ahy-coming-soon-close:hover {
+        background: #e5e7eb;
+    }
+
+    .ahy-coming-soon-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.75rem;
+        padding: 2rem 1.5rem 1.5rem;
+    }
+
+    /*
+       Brand mark, not a warning: navy peak on the sand background, which is the
+       EverestPay logo as supplied. The values are the theme's own tokens rather
+       than sampled ones - ahy.bg (#efeadd) and ahy.blue (#0d2f47) in
+       tailwind.config.js - so it stays in step if the brand palette moves.
+
+       Written as plain hex because this dialog is teleported to <body>, outside
+       the reach of the bg-ahy-bg / text-ahy-blue utilities.
+
+       It was previously a red tint on red, borrowed from the button's own
+       colour. That read as an error state, which is the wrong signal for
+       "coming soon".
+    */
+    .ahy-coming-soon-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 9999px;
+        background: #efeadd;
+        color: #0d2f47;
+    }
+
+    .ahy-coming-soon-title {
+        margin: 0;
+        font-size: 1.125rem;
+        line-height: 1.5rem;
+        font-weight: 700;
+        color: #0d2f47;
+    }
+
+    .ahy-coming-soon-text {
+        margin: 0;
+        padding: 0;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: #4b5563;
+    }
+
+    .ahy-coming-soon-ok {
+        margin-top: 0.5rem;
+        width: 100%;
+        height: 2.75rem;
+        border: none;
+        border-radius: 0.5rem;
+        background: #0d2f47;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+
+    .ahy-coming-soon-ok:hover {
+        background: #123f60;
+    }
+
+    /*
+       Narrow phones: give Add to Cart its own full-width row.
+
+       At this width the single row (quantity | Add to Cart | wishlist) squeezes
+       Add to Cart down to a stub - see the 272px screenshot, where the label
+       wraps onto two lines inside the button. Reflowed to:
+
+           [ quantity ]            [ heart ]
+           [       Add to Cart        ]
+           [        Buy Now           ]
+
+       Done purely with flex order/wrap so the DOM is untouched: only the Add to
+       Cart slot is given an order, so quantity and wishlist keep their natural
+       order 0 and stay on the first row in source order. That means the two
+       child templates this module does not own (product.info.quantity,
+       product.info.addtowishlist) need no changes at all, and the tab/reading
+       order still matches the visual order.
+
+       Bounded by max-width only, not the 300px floor that was asked for: below
+       300px the single row is even more cramped, so reverting there would undo
+       the fix exactly where it is needed most.
+    */
+    @media (max-width: 375px) {
+        #addToCartActions {
+            flex-wrap: wrap;
+            /* quantity left, heart right - they are the only two items on the
+               first row once Add to Cart has been pulled out of it. */
+            justify-content: space-between;
+        }
+        #addToCartActions .ahy-atc-slot {
+            order: 1;
+            flex: 0 0 100%;
+            width: 100%;
+            min-width: 100%;
+        }
+        /* Matches Buy Now's rounded-lg rather than the default pill, so the
+           three stacked buttons read as one set. */
+        #product-addtocart-button {
+            border-radius: 0.5rem !important;
+        }
+    }
+</style>

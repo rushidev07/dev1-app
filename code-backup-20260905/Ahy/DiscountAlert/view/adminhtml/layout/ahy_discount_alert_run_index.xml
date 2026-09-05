@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="admin-1column" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="Ahy_DiscountAlert::css/run-grid.css"/>
+    </head>
+    <body>
+        <referenceContainer name="content">
+            <block class="Ahy\DiscountAlert\Block\Adminhtml\Run\Listing" name="ahy.discount_alert.run.listing"/>
+        </referenceContainer>
+    </body>
+</page>

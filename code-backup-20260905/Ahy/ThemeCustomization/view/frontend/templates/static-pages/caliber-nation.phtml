@@ -1,0 +1,483 @@
+<?php
+/** @var \Ahy\CaliberNation\ViewModel\JoinCta $cnJoinCta */
+$cnJoinCta = $viewModels->require(\Ahy\CaliberNation\ViewModel\JoinCta::class);
+$cnIsActiveMember = $cnJoinCta->isActiveMember();
+?>
+<section class="caliber-nation">
+	<div
+		class="relative h-[625px] md:h-[820px] lg:h-[625px] w-screen flex items-center justify-center bg-no-repeat bg-[url('/media/wysiwyg/caliber-nation/hero_background_image_mobile.png')] md:bg-[url('/media/wysiwyg/caliber-nation/hero_background_image_desktop.png')] bg-cover bg-top"
+	>
+		<div class="flex flex-col items-center gap-y-4 md:gap-y-2">
+			<img src="media/wysiwyg/caliber-nation/caliber-nation-logo.png" width="210" class="w-[210px] md:w-[350px]" />
+			<h1 class="text-white text-center w-[320px] sm:w-[385px] md:w-[550px] lg:w-full text-[84px] sm:text-[100px] md:text-[160px] leading-none font-league-gothic">JOIN NOW AND SAVE</h1>
+			<h1 class="text-wrap text-white text-center text-sm sm:text-base md:text-xl lg:text-2xl max-w-[440px] sm:max-w-full sm:w-[440px] md:w-[550px] lg:w-[720px] px-4 sm:px-0">
+				Enjoy significant benefits by participating in the Everest Caliber Nation community.
+			</h1>
+			<?php if (!$cnIsActiveMember): ?>
+			<a href="#membership-signup"
+				x-data="{}"
+				@click.prevent="document.getElementById('membership-signup').scrollIntoView({ behavior: 'smooth', block: 'start' })"
+				class="w-3xs inline-flex items-center justify-center gap-2 bg-ahy-red hover:bg-ahy-red-light text-white font-bold rounded-full h-12 mt-6 transition-colors">
+				<p class="p-4">Join Now</p>
+				</a>
+			<?php endif; ?>
+		</div>
+	</div>
+
+	<div class="flex flex-col items-center justify-center bg-ahy-khaki pb-28">
+		<div class="flex items-center justify-center bg-ahy-khaki h-40 lg:h-44 w-full">
+			<h2 class="font-bold text-4xl lg:text-[48px] text-center text-ahy-blue">CALIBER NATION PERKS</h2>
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-12 container">
+			<div class="flex flex-col items-center">
+				<div class="rounded-full h-[104px] w-[104px] bg-white flex items-center justify-center mb-8">
+					<img src="media/wysiwyg/caliber-nation/icon_discounts.png" class="w-[92px] mix-blend-darken" />
+				</div>
+				<h3 class="font-bold text-lg text-center mb-5 lg:mb-2 text-ahy-blue">CALIBER DISCOUNTS</h3>
+				<p class=" text-ahy-blue text-center text-sm max-w-[320px]">Enjoy member-only prices on the gear you already want — anywhere from 10% to 90% off specially discounted products. Seller, category and product discounts all count together, so members reach the deepest prices on the site.</p>
+			</div>
+
+			<div class="flex flex-col items-center">
+				<div class="rounded-full h-[104px] w-[104px] bg-white flex items-center justify-center mb-8">
+					<img src="media/wysiwyg/caliber-nation/Early-bird-Notice-on-Sales.png" class="w-[72px]" />
+				</div>
+				<h3 class="font-bold text-lg text-center mb-5 lg:mb-2 text-ahy-blue">EARLY-BIRD NOTICE ON SALES</h3>
+				<p class=" text-ahy-blue text-center text-sm max-w-[320px]">
+					Members get the heads-up first when sales go live and new sellers land on Everest — so you’re shopping while the gear you’ve been hunting is still on the shelf.
+				</p>
+			</div>
+
+			<?php
+			/*
+			 * HIDDEN — "Free Gift on Qualifying Orders" perk card. Commented out on
+			 * request; nothing below is emitted, so the icon is never requested either.
+			 *
+			 * To restore: delete the PHP comment wrapper lines above and below this
+			 * markup. Leaves 5 cards in the grid (grid-cols-3 → 3 + 2).
+
+			<div class="flex flex-col items-center">
+				<div class="rounded-full h-[104px] w-[104px] bg-white flex items-center justify-center mb-8">
+					<img src="media/wysiwyg/caliber-nation/Free-Priority-Shipping.png" class="w-[72px]" />
+				</div>
+				<h3 class="font-bold text-lg text-center max-w-[320px] mb-5 lg:mb-2 text-ahy-blue">FREE GIFT ON QUALIFYING ORDERS</h3>
+				<p class=" text-ahy-blue text-center text-sm max-w-[335px]">
+					Members get a free gift dropped straight into the cart on qualifying orders. No coupon codes, no hoops to jump through — it’s simply there waiting for you at checkout.
+				</p>
+			</div>
+			*/
+			?>
+
+			<div class="flex flex-col items-center">
+				<div class="rounded-full h-[104px] w-[104px] bg-white flex items-center justify-center mb-8">
+					<img src="media/wysiwyg/caliber-nation/wild-and-free-black-transparent@2x.png" class="w-[92px]" />
+				</div>
+				<h3 class="font-bold text-lg text-center max-w-[320px] mb-5 lg:mb-2 text-ahy-blue">CANCEL ANYTIME — KEEP WHAT YOU PAID FOR</h3>
+				<p class=" text-ahy-blue text-center text-sm max-w-[320px]">
+					No contract, no lock-in, no phone call to get out of it. Cancel whenever you like and you keep every member benefit right through to the end of the year you’ve already paid for.
+				</p>
+			</div>
+
+			<div class="flex flex-col items-center">
+				<div class="rounded-full h-[104px] w-[104px] bg-white flex items-center justify-center mb-8">
+					<img src="media/wysiwyg/caliber-nation/spotlight-deals-and-sales.png" class="w-[52px]" />
+				</div>
+				<h3 class="font-bold text-lg text-center max-w-[320px] mb-5 lg:mb-2 text-ahy-blue">SAVINGS ACROSS SELLERS</h3>
+				<p class=" text-ahy-blue text-center text-sm max-w-[390px]">
+					One membership, the whole marketplace. Sellers right across Everest set aside member-only prices, so you’re never stuck with a single brand’s idea of a deal.
+				</p>
+			</div>
+
+			<div class="flex flex-col items-center">
+				<div class="rounded-full h-[104px] w-[104px] bg-white flex items-center justify-center mb-8">
+					<img src="media/wysiwyg/caliber-nation/slow-time-down-black@2x.png" class="w-[72px]" />
+				</div>
+				<h3 class="font-bold text-lg text-center 2xl:p-0 max-w-[280px] mb-5 lg:mb-2 text-ahy-blue">SEE EVERY DOLLAR YOU SAVE</h3>
+				<p class=" text-ahy-blue text-center text-sm max-w-[310px]">Every order shows exactly what your membership saved you, and your account keeps a running lifetime total. You’ll always know what Caliber Nation is worth to you.</p>
+			</div>
+		</div>
+	</div>
+
+	<?php
+	/*
+	 * HIDDEN — numbered member-benefits infographic ("Become a Successful Caliber
+	 * Shopper"). Turned off on request; the perks grid above covers the same points in
+	 * responsive HTML. Nothing below is emitted, so the ~830 KB PNG is never requested.
+	 *
+	 * To restore: delete the PHP comment wrapper lines above and below this markup.
+	 * The markup is kept in its corrected form — transparent-background artwork, alt
+	 * text, lazy loading and a max width — so re-enabling brings back the fixed version
+	 * rather than the original black-background export.
+	 *
+	 * Desktop-only by design: the artwork sets two columns of body copy either side of
+	 * the figure, which is unreadable at phone widths.
+
+	<div class="w-screen flex-col items-center bg-ahy-bg hidden md:flex">
+		<div class="mt-28 flex items-center justify-center">
+			<img src="media/wysiwyg/caliber-nation/calibernation-features.png"
+			     alt="Become a successful Caliber shopper — eight Caliber Nation member benefits"
+			     loading="lazy"
+			     class="w-[85%] max-w-[1100px]" />
+		</div>
+	</div>
+
+	*/
+	?>
+
+	<div class="flex flex-col items-center py-24">
+		<div class="flex justify-center items-end pb-12">
+			<h1 class="text-2xl md:text-4xl font-bold text-center text-ahy-blue">CHOOSE YOUR MEMBERSHIP PLAN</h1>
+		</div>
+		<div class="w-full flex justify-center px-4">
+			<div class="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+
+				<?php /* Brand accent instead of the old 2px black outline */ ?>
+				<div class="h-1.5 bg-ahy-red"></div>
+
+				<div class="flex flex-col items-center text-center px-7 py-7 sm:px-9">
+
+					<span class="inline-block bg-ahy-yellow-card text-ahy-blue text-[11px] font-bold uppercase tracking-[0.2em] rounded-full px-4 py-1 mb-4">
+						Best Value
+					</span>
+
+					<h3 class="uppercase text-ahy-blue text-base font-bold leading-tight">Caliber Annual Membership</h3>
+
+					<div class="flex items-end justify-center gap-1.5 mt-3">
+						<span class="font-league-gothic text-ahy-blue text-[52px] leading-none">$99.99</span>
+						<span class="text-ahy-blue opacity-60 text-base font-semibold pb-1.5">/year</span>
+					</div>
+
+					<p class="text-[11px] uppercase tracking-[0.18em] font-bold text-ahy-blue opacity-50 mt-6">
+						One charge &mdash; set for 12 months
+					</p>
+
+					<div class="w-10 h-0.5 bg-ahy-red my-5"></div>
+
+					<ul class="w-full text-sm text-ahy-blue flex flex-col gap-2.5">
+						<?php foreach ([
+							'Free gift on qualifying orders',
+							'Early-bird notice on sales',
+							'Track every dollar you save',
+						] as $cnPlanPerk): ?>
+						<li class="flex items-start gap-2.5">
+							<svg class="w-4 h-4 shrink-0 text-ahy-red mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+							</svg>
+							<span><?= /* @noEscape */ $cnPlanPerk ?></span>
+						</li>
+						<?php endforeach; ?>
+					</ul>
+
+					<?php /* Same-page jump to the signup form; Alpine makes it a smooth scroll
+					         rather than the browser's instant fragment jump. */ ?>
+					<?php if (!$cnIsActiveMember): ?>
+					<a href="#membership-signup"
+					   x-data="{}"
+					   @click.prevent="document.getElementById('membership-signup').scrollIntoView({ behavior: 'smooth', block: 'start' })"
+					   class="w-full inline-flex items-center justify-center gap-2 bg-ahy-red hover:bg-ahy-red-light text-white font-bold rounded-full h-12 mt-6 transition-colors">
+						Join Caliber Nation
+						<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+						</svg>
+					</a>
+					<?php endif; ?>
+
+					<p class="text-xs text-ahy-blue opacity-60 mt-4 leading-snug max-w-[280px]">
+						Cancel anytime &middot; Keep your benefits through the year you&rsquo;ve paid for
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<?php
+	/**
+	 * Stats band — the three headline figures are admin-configurable under
+	 * Stores > Configuration > Caliber Nation > Landing Page Stats. The ViewModel
+	 * formats them, and each figure is reused in its own body copy so the big number
+	 * and the sentence beneath it can never disagree.
+	 *
+	 * @var \Hyva\Theme\Model\ViewModelRegistry $viewModels  (injected into every template by Hyvä)
+	 */
+	$cnStatsVm = $viewModels->require(\Ahy\CaliberNation\ViewModel\LandingStats::class);
+
+	$cnStats = [
+		[
+			'figure' => $cnStatsVm->getAvgSavings() . '<span class="opacity-50">/yr</span>',
+			'label'  => __('Average Savings Per Year'),
+			'copy'   => __(
+				'Caliber members save around %1 a year on the gear they love. Start saving today by joining the movement.',
+				$cnStatsVm->getAvgSavingsPlain()
+			),
+		],
+		[
+			'figure' => $cnStatsVm->getMonthlyCost() . '<span class="opacity-50">/mth</span>',
+			'label'  => __('Costs Less Than You Think'),
+			'copy'   => __(
+				'That is what %1 a year works out to each month — likely the best purchase you will make all year.',
+				$cnStatsVm->getAnnualPrice()
+			),
+		],
+		[
+			'figure' => $cnStatsVm->getMaxDiscount(),
+			'label'  => __('Off Your Favorite Products'),
+			'copy'   => __(
+				'Members save up to %1 on specially discounted gear from sellers right across the marketplace.',
+				$cnStatsVm->getMaxDiscount()
+			),
+		],
+	];
+	?>
+	<?php if ($cnStatsVm->hasStats()): ?>
+	<div class="w-full bg-ahy-blue">
+		<div class="container mx-auto px-4 py-16 md:py-20">
+
+			<div class="flex flex-col items-center text-center mb-12 md:mb-16">
+				<span class="text-ahy-khaki text-[11px] font-bold uppercase tracking-[0.25em]">
+					<?= $escaper->escapeHtml(__('By the numbers')) ?>
+				</span>
+				<h2 class="text-white font-bold text-2xl md:text-4xl mt-3">
+					<?= $escaper->escapeHtml(__('WHAT YOUR MEMBERSHIP IS WORTH')) ?>
+				</h2>
+				<div class="w-10 h-0.5 bg-ahy-red mt-5"></div>
+			</div>
+
+			<div class="flex flex-col md:flex-row md:items-stretch md:divide-x md:divide-white/10 gap-12 md:gap-0 text-center text-white">
+				<?php foreach ($cnStats as $cnStat): ?>
+				<div class="flex-1 flex flex-col items-center px-4 md:px-6 lg:px-8 md:justify-between">
+					<span class="font-league-gothic leading-none text-[72px] md:text-[64px] lg:text-[88px]">
+						<?= /* @noEscape */ $cnStat['figure'] ?>
+					</span>
+					<h3 class="font-bold uppercase tracking-[0.12em] text-sm mt-4"><?= $escaper->escapeHtml($cnStat['label']) ?></h3>
+					<div class="w-8 h-0.5 bg-ahy-red my-4"></div>
+					<p class="text-sm opacity-70 leading-relaxed max-w-[290px] md:max-w-full"><?= $escaper->escapeHtml($cnStat['copy']) ?></p>
+				</div>
+				<?php endforeach; ?>
+			</div>
+		</div>
+	</div>
+	<?php endif; ?>
+
+	<div class="swiper celebrity-slider bg-ahy-bg opacity-0">
+		<div class="uppercase text-2xl md:text-4xl font-bold text-center text-ahy-blue py-12">join outdoor celebrities & influencers</div>
+		<div class="swiper-wrapper">
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Amy_Robbins.jpg" loading="lazy" class="" alt="Amy_Robbins" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Amy Robbins</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Bethany_Beathard.jpg" loading="lazy" class="" alt="Bethany_Beathard" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Bethany Beathard</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Casey_Currey.jpg" loading="lazy" class="" alt="Casey_Currey" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Casey Currey</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Jared_Ogden.jpg" loading="lazy" class="" alt="Jared_Ogden" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Jared Ogden</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Mykel_Hawke.jpg" loading="lazy" class="" alt="Mykel_Hawke" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Mykel Hawke</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Omar_Crispy_Avila.jpg" loading="lazy" class="" alt="Omar_Crispy_Avila" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">
+					Omar Crispy Avila
+				</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Rikki_Folger.jpg" loading="lazy" class="" alt="Rikki_Folger" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Rikki Folger</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Ryan_Albertson.jpg" loading="lazy" class="" alt="Ryan_Albertson" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Ryan Albertson</div>
+			</div>
+			<div class="swiper-slide group relative">
+				<img src="/media/wysiwyg/caliber-nation/Scott_Brown.jpg" loading="lazy" class="" alt="Scott_Brown" />
+				<div class="group-hover:opacity-75 opacity-0 bg-[#00000080] absolute inset-0 flex items-center justify-center text-5xl font-league-gothic text-white text-center">Scott Brown</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Layout -->
+	<div class="px-2 py-3 py-12 tracking-wide md:px-4 bg-ahy-bg" x-data="faqData()">
+		<!-- Title -->
+		<div class="flex justify-center mx-auto text-4xl md:text-5xl font-bold container"><div class="border-y border-white py-6 w-full text-center text-ahy-blue">FAQs</div></div>
+		<!-- End Title -->
+
+		<!-- Accordion -->
+		<div class="flex flex-col gap-4 py-8 text-lg leading-6 text-gray-800 container">
+			<template x-for="(faq, index) in faqs" :key="index">
+				<div x-data="accordion(index)" class="space-y-3">
+					<div class="relative transition-all duration-300 border-b border-white">
+						<div @click="handleClick()" class="w-full p-4 text-left cursor-pointer">
+							<div class="flex items-center justify-between">
+								<span class="tracking-wide uppercase text-ahy-blue text-lg font-bold" x-text="faq.question"></span>
+								<span :class="handleRotate()" class="transition-transform duration-300 transform fill-current">
+									<svg class="w-5 text-ahy-blue h-5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+										<path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+									</svg>
+								</span>
+							</div>
+						</div>
+
+						<div x-ref="tab" :style="handleToggle()" class="relative overflow-hidden transition-all duration-300 max-h-0">
+							<div class="px-6 pb-4 text-gray-600 text-sm" x-text="faq.answer"></div>
+						</div>
+					</div>
+				</div>
+			</template>
+		</div>
+		<!-- End Accordion -->
+	</div>
+	<!-- End Layout -->
+	<script>
+		// FAQ data function
+		function faqData() {
+			return {
+				faqs: [
+					{
+						question: "how do I join?",
+						answer: "Joining Caliber Nation is super simple and takes less than three minutes.  Simply click on the Join Button on this page and fill in your information.  A confirmation email along with a welcome message will be sent to the email address provided by you in the sign up process.",
+					},
+					{
+						question: "Can i pay once a year or is it only monthly?",
+						answer: "Yes!  We offer a discount for those Caliber Nation members that only want to see a charge once a year.  These savvy shoppers enjoy year round benefits, with many saving thousands of dollars a year at huge Caliber discounts, along with early-bird access to sales and member-only spotlight deals.",
+					},
+					{
+						question: "do I need to have a caliber account to purchase products?",
+						answer: "No!  You can purchase products in the Everest marketplace without a Caliber Nation membership.  The only drawback is missing out on HUGE savings and other amazing Caliber benefits.  Caliber Nation memberships usually pay for themselves in the first couple purchases making joining the movement a no-brainer.",
+					},
+					{
+						question: "is it possible to activate my account today?",
+						answer: "Yes!  As soon as you sign up and process your payment you can start enjoying all the benefits a Caliber Nation membership offers.  ",
+					},
+					{
+						question: "my membership benefits aren’t working - why?",
+						answer: "I’m sorry to hear that!  We are humans (i.e. not robots) and mistakes/errors happen.  I’m sure it’s us and not you.  All you have to do is use the contact us form and our resident yeti will be in touch within 24 hours to cure the problem - heck, he may even send you a special gift for your trouble (hint: use “I Love Everest” in your message).",
+					},
+					{
+						question: "how do i access my member exclusive discounts on products?",
+						answer: "You will see “Caliber Discount Price” on various listings throughout the marketplace.  As long as you’re signed in you will see the discounted price populate in your cart at checkout.",
+					},
+					{
+						question: "how do i access my travel, eat, and ticket discounts?",
+						answer: "Once you sign up you have access to our exclusive deals app.  Download the app and log in - from there you will start seeing all the deals offered to Caliber Nation members.  Currently, there are over 700,000 locations offering Caliber Nation members exclusive discounts.",
+					},
+					{
+						question: "can i purchase a caliber nation memberships for my employees?",
+						answer: "Yes!  We offer bulk discounts for corporate accounts.  Simply email us via the contact form and et us know how many employees you have and we will provide a custom quote for you - get ready to hear “you’re the BEST boss ever!” a lot!  Your employees are going to LOVE you, just make sure you let them off a little early on Friday’s so they can enjoy the gear they purchased (at a discount) from Everest!",
+					},
+				],
+			};
+		}
+
+		// Faq Accordion functionality
+		document.addEventListener("alpine:init", () => {
+			Alpine.store("accordion", {
+				tab: -1,
+			});
+
+			Alpine.data("accordion", idx => ({
+				init() {
+					this.idx = idx;
+				},
+				idx: -1,
+				handleClick() {
+					this.$store.accordion.tab = this.$store.accordion.tab === this.idx ? -1 : this.idx;
+				},
+				handleRotate() {
+					return this.$store.accordion.tab === this.idx ? "-rotate-180" : "";
+				},
+				handleToggle() {
+					return this.$store.accordion.tab === this.idx ? `max-height: ${this.$refs.tab.scrollHeight}px` : "";
+				},
+			}));
+		});
+	</script>
+</section>
+
+<script>
+	function initializeSwiper() {
+		const swiper = new Swiper(".celebrity-slider", {
+			// Optional parameters
+			direction: "horizontal",
+			loop: false,
+			// If we need pagination
+			pagination: {
+				el: ".swiper-pagination",
+				clickable: true,
+			},
+			allowTouchMove: true,
+			noSwiping: false,
+			mousewheel: {
+				forceToAxis: true,
+			},
+
+			autoplay: {
+				delay: 3000,
+				pauseOnMouseEnter: true,
+			},
+			freeMode: true,
+			spaceBetween: 10,
+			grabCursor: true,
+			// Responsive breakpoints
+			breakpoints: {
+				// when window width is >= 320px
+				0: {
+					slidesPerView: 2,
+				},
+				// when window width is >= 640px
+				480: {
+					slidesPerView: 3,
+				},
+				// when window width is >= 1024
+				1024: {
+					slidesPerView: 5,
+				},
+				// when window width is >= 1280
+				1280: {
+					slidesPerView: 6,
+				},
+			},
+		});
+	}
+
+	function checkAndInitialize() {
+		const elementsExist = document.querySelectorAll(".celebrity-slider").length > 0;
+		console.log("🚀 ~ checkAndInitialize ~ elementsExist:", elementsExist);
+		if (elementsExist) {
+			initializeSwiper();
+			setTimeout(() => {
+				clearInterval(interval);
+			}, 2000); // 2000 milliseconds = 2 seconds
+		}
+		const sliderEl = document.getElementsByClassName("celebrity-slider")[0];
+		if (sliderEl) {
+			sliderEl.classList.remove("opacity-0");
+		}
+	}
+
+	// Check every second
+	const interval = setInterval(checkAndInitialize, 1000);
+</script>
+<style>
+	.celebrity-slider img {
+		aspect-ratio: 1;
+		object-fit: contain;
+	}
+
+	/* For elements with overflow that should still allow scrolling but hide the scrollbar */
+	.hide-scrollbar-scrollable {
+		overflow: auto;
+		scrollbar-width: none;/* Firefox */
+	}
+
+	.hide-scrollbar-scrollable::-webkit-scrollbar,
+	.hide-scrollbar-scrollable::-webkit-scrollbar-thumb {
+		display: none; /* Chrome, Safari, and newer Edge */
+	}
+</style>

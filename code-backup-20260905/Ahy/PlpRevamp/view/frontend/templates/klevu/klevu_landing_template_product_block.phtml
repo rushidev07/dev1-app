@@ -1,0 +1,458 @@
+<?php
+
+/** @var Klevu\FrontendJs\Block\Template $block */ ?>
+<!-- custom version of the klevuLandingTemplateProductBlock template -->
+<style>
+    /* NON-MEMBERS pct: default in first span, moves to second at 680–767px */
+.ahy-pct-block { display: none; }
+@media (min-width: 680px) and (max-width: 767px) {
+    .ahy-pct-inline { display: none; }
+    .ahy-pct-block  { display: inline; }
+}
+/* Single card + padding: 320px–499px */
+@media (min-width: 320px) and (max-width: 499px) {
+    .ahy-plp-card {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+/* Equalise CaliberNation price to match normal price — single-card range */
+@media (min-width: 320px) and (max-width: 479px) {
+    .ahy-plp-card .caliber-nation-price-col .ahy-plp-calibernation-price-value,
+    .ahy-plp-card .caliber-nation-price-col > div:nth-child(2) {
+        font-size: 1.5rem !important;
+    }
+}
+@media (min-width: 480px) and (max-width: 679px) {
+    .ahy-plp-card .caliber-nation-price-col .ahy-plp-calibernation-price-value,
+    .ahy-plp-card .caliber-nation-price-col > div:nth-child(2) {
+        font-size: 1.5rem !important;
+    }
+}
+/* Force single card: 768px–1023px (sidebar visible, content too narrow for 2-col) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .ahy-plp-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+}
+/* 2-column layout: 1440px–1535px */
+@media (min-width: 1440px) and (max-width: 1535px) {
+    .ahy-plp-card {
+        width: 50% !important;
+        max-width: 50% !important;
+        flex: 0 0 50% !important;
+    }
+}
+/* 2-column layout: 680px–767px (cards ≈ 340px each) */
+@media (min-width: 680px) and (max-width: 767px) {
+    .kuResults ul {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        column-count: unset !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .ahy-plp-card {
+        width: 50% !important;
+        max-width: 50% !important;
+        flex: 0 0 50% !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+    .ahy-plp-card .kuProdWrap {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        height: 100% !important;
+    }
+    .ahy-plp-card .kuProdWrap main,
+    .ahy-plp-card .kuProdWrap footer {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    /* Product name */
+    .ahy-plp-card .kuName a {
+        font-size: 0.85rem !important;
+        height: auto !important;
+        min-height: 2.2rem !important;
+    }
+    /* Price grid: horizontal 2-col */
+    .ahy-plp-card .ahy-price-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 4px !important;
+    }
+    .ahy-plp-card .ahy-price-grid > div {
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    .ahy-plp-card .ahy-plp-calibernation-price-value,
+    .ahy-plp-card .ahy-plp-normal-price {
+        font-size: 1.1rem !important;
+        font-weight: 700 !important;
+        white-space: nowrap !important;
+    }
+    .ahy-plp-card .calibernation-price-title,
+    .ahy-plp-card .ahy-plp-normal-price-title {
+        font-size: 0.65rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .ahy-plp-card .ahy-plp-join-caliber {
+        font-size: 0.65rem !important;
+        white-space: nowrap !important;
+    }
+    .ahy-plp-card .ahy-plp-member-save-container {
+        overflow: visible !important;
+    }
+    .ahy-plp-card .ahy-plp-member-save-title,
+    .ahy-plp-card .ahy-plp-member-save-msrp-title {
+        font-size: 0.65rem !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+    .ahy-plp-card .ahy-plp-non-member-container {
+        overflow: visible !important;
+    }
+    
+    .ahy-plp-card .ahy-plp-non-member-text{
+        font-size: 0.55rem !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        display: block !important;
+    }
+    .ahy-plp-card .ahy-plp-non-member-msrp {
+        font-size: 0.7rem !important;
+        font-weight: 700 !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        display: block !important;
+    }
+    .ahy-plp-card .ahy-plp-msrp-title {
+        font-size: 0.6rem !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+    .ahy-plp-card .rounded-full.absolute {
+        width: 1.75rem !important;
+        height: 1.75rem !important;
+    }
+    .ahy-plp-card .ahy-plp-member-save-icon svg {
+        width: 14px !important;
+        height: 14px !important;
+        flex-shrink: 0 !important;
+    }
+    .ahy-plp-card *:not(svg):not(svg *) {
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+}
+</style>
+<!-- custom version of the klevuLandingTemplateProductBlock template -->
+<script type="template/klevu" id="ahyKlevuLandingTemplateProductBlock" defer>
+    <%
+        var updatedProductName = dataLocal.name;
+        if(klevu.search.modules.kmcInputs.base.getSkuOnPageEnableValue()) {
+            if(klevu.dom.helpers.cleanUpSku(dataLocal.sku)) {
+                updatedProductName += klevu.dom.helpers.cleanUpSku(dataLocal.sku);
+            }
+        }
+
+        var additionalDataToReturn = dataLocal.hasOwnProperty('additionalDataToReturn') && dataLocal.additionalDataToReturn.trim() !== "" ? JSON.parse(dataLocal.additionalDataToReturn) : null;
+        var addToWishlistProductId = dataLocal.itemGroupId ? dataLocal.itemGroupId : dataLocal.id;
+    %>
+    <% if(dataLocal.inStock === "yes") { %>
+    <li ku-product-block class="klevuProduct md:h-auto !static !p-0 ahy-plp-card" data-id="<%=dataLocal.itemGroupId ? dataLocal.itemGroupId : dataLocal.id%>" >
+
+        <div class="relative">
+            <div class="absolute left-6 top-7 flex flex-col items-start justify-center gap-1 p-0 h-full">
+                <%if(additionalDataToReturn && additionalDataToReturn.stock_qty.stockQty <= 10){%>
+                    <span class="rounded border-2 border-ahy-stock-green bg-white px-2 py-1 text-xs font-semibold capitalize text-ahy-stock-green z-10" >
+                        <%=additionalDataToReturn.stock_qty.stockQty%> left
+                    </span>
+                <%}%>
+            </div>
+        </div>
+        <div class="kuProdWrap !static bg-white border border-ahy-bg !flex md:!block items-center">
+            <header ku-block data-block-id="ku_landing_result_item_header">
+                <%=helper.render('landingProductBadge', scope, data, dataLocal) %>
+            </header>
+            <% var desc = [dataLocal.summaryAttribute,dataLocal.packageText,dataLocal.summaryDescription].filter(function(el) { return el; }); desc = desc.join(" "); %>
+            <main ku-block data-block-id="ku_landing_result_item_info" class="w-full ahy-plp-card-container">
+                <div class="kuProdTop">
+                    <% 
+                        var productImage = dataLocal.image;
+                        var webpImage = productImage.replace(/\.(jpg|png|jpeg)$/i, '.webp');
+                    %>
+                    <div class="klevuImgWrap">
+                        <a data-id="<%=dataLocal.id%>" href="<%=dataLocal.url%>" class="klevuProductClick kuTrackRecentView">
+
+                        <picture>
+                            <img
+                                src="<%= webpImage %>"
+                                origin="<%= productImage %>"
+                                alt="<%= updatedProductName %>"
+                                data-original-src="<%= productImage %>"
+                                onerror="
+                                    if (this.src.endsWith('.webp')) {
+                                        this.onerror = null;
+                                        this.src = this.getAttribute('data-original-src');
+                                    } else {
+                                        klevu.dom.helpers.cleanUpProductImage(this);
+                                    }
+                                "
+                                class="kuProdImg"
+                                loading="lazy"
+                            />
+                        </picture>
+
+                            <%=helper.render('landingImageRollover', scope, data, dataLocal) %>
+                        </a>
+                    </div>
+
+                    <!-- <div class="kuQuickView">
+                        <button data-id="<%=dataLocal.id%>" class="kuBtn kuBtnLight kuQuickViewBtn" role="button" tabindex="0" area-label="">Quick view</button>
+                    </div>-->
+                    <div class="flex md:hidden justify-center h-[18px]">
+                        <div class="capitalize text-xs !text-ahy-blue">
+                            <%if ((dataLocal.hasOwnProperty('color') && dataLocal.color !== '') && additionalDataToReturn && additionalDataToReturn.swatches.color){%>
+                                <span><%=additionalDataToReturn.swatches.color.options.length%> colors</span>
+                            <%}%>
+                        </div>
+                    </div>
+                </div>
+                <button x-data="initWishlist()" @click.prevent="addToWishlist(<%=addToWishlistProductId%>)" aria-label="Add to Wish List" type="button"
+                    class="rounded-full inline-flex ring-1 ring-gray-300 absolute top-2.5 right-2.5 w-9 h-9 shadow-xl bg-white p-0 border-0 shrink-0 items-center justify-center text-gray-500 hover:text-red-600 ml-2">
+                    <svg id="Layer_1" class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20">
+                        <defs>
+                            <style>.wishList{fill:#0d2f47;}</style>
+                        </defs>
+                        <path class="wishList" d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                    </svg>
+                </button>
+            </main>
+            <footer ku-block="" data-block-id="ku_landing_result_item_footer" class="!static md:w-auto" style="display:flex;flex-direction:column;flex:1;min-width:0;">
+
+                <!-- product name + seller + static ratings -->
+                <div class="kuProdBottom !pt-2 !pb-0" style="height:auto!important;">
+                    <div class="kuName kuClippedOne mt-2">
+                        <a data-id="<%=dataLocal.id%>" href="<%=dataLocal.url%>" class="klevuProductClick kuTrackRecentView line-clamp-2 !text-lg !font-extrabold !h-[3.4rem] !text-ahy-blue !leading-normal" title="<%= updatedProductName %>">
+                            <%= updatedProductName %>
+                        </a>
+                    </div>
+                    <div class="capitalize !text-xs text-ahy-rating-text !font-medium line-clamp-1 h-4">
+                        <%if (additionalDataToReturn && additionalDataToReturn.seller_data.shopTitle){%>
+                            <span class="capitalize">sold by
+                                <%=additionalDataToReturn.seller_data.shopTitle%>
+                            </span>
+                        <%} else {%>
+                            <span class="capitalize opacity-0">sold by
+
+                            </span>
+                        <% } %>
+                    </div>
+                    <!-- Dynamic Yotpo star ratings -->
+                    <div x-data="{ get _r(){ return $store.yotpoReviews ? $store.yotpoReviews.data['<%=(dataLocal.itemGroupId ? dataLocal.itemGroupId : dataLocal.id)%>'] : null } }"
+                         style="display:flex;align-items:center;gap:6px;margin-top:8px;margin-bottom:4px;">
+                        <div style="display:flex;gap:2px;">
+                            <template x-for="i in [1,2,3,4,5]" :key="i">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                     :fill="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                     :stroke="(_r && _r.count > 0 && i <= Math.round(_r.score)) ? '#f59e0b' : '#e5e7eb'"
+                                     stroke-width="1">
+                                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                                </svg>
+                            </template>
+                        </div>
+                        <span x-text="_r ? '(' + _r.count + ')' : '(0)'" style="font-size:0.75rem;color:#6b7280;"></span>
+                    </div>
+                </div>
+
+                <!-- pricing section: 2-col grid (CaliberNation left, normal price right) -->
+                <%
+                    window.klevu_addToCartEnabled = true;
+                    var isAddToCartEnabled = klevu.search.modules.kmcInputs.base.getAddToCartEnableValue();
+                    var nPrice       = klevu.dom.helpers.cleanUpPriceValue(dataLocal.price);
+                    var nSalePrice   = klevu.dom.helpers.cleanUpPriceValue(dataLocal.salePrice);
+                    var nHasDiscount = !Number.isNaN(nSalePrice) && !Number.isNaN(nPrice) && nPrice > nSalePrice && nSalePrice > 0;
+                    var nSavingsPct  = nHasDiscount ? Math.round(((nPrice - nSalePrice) / nPrice) * 100) : 0;
+                    var nDisplayPrice = (nHasDiscount) ? dataLocal.salePrice : dataLocal.price;
+                %>
+                <div class="ahy-price-section ahy-plp-revamp-price-container"
+                     x-data="{ get _cp(){ return $store.ahyCaliberPrices ? $store.ahyCaliberPrices.data['<%=(dataLocal.itemGroupId ? dataLocal.itemGroupId : dataLocal.id)%>'] : null } }">
+                    <div class="ahy-price-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"
+                         :class="_cp ? '' : 'ahy-price-grid--single'">
+
+                        <!-- CaliberNation Price col (left) — hidden when no member price is available -->
+                        <div class="caliber-nation-price-col" x-show="_cp">
+                            <div class="calibernation-price-title">CaliberNation Price</div>
+                            <div class="ahy-plp-calibernation-price-value" x-text="_cp ? _cp.formattedMember : ''"></div>
+                            <div class="ahy-plp-member-save-container">
+                               <div class="ahy-plp-member-save-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;transform:scaleX(-1);"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                                </div>
+                                <div class="ahy-plp-members-save-container"><span class="ahy-plp-member-save-title" x-text="_cp ? 'MEMBERS SAVE ' + _cp.formattedSavings : ''"></span><span class="ahy-plp-member-save-msrp-title" x-text="_cp ? Math.round((1 - _cp.memberPrice / _cp.regularPrice) * 100) + '% OFF MSRP' : ''"></span></div>
+                            </div>
+                            <a href="/caliber-nation" class="ahy-plp-join-caliber">
+                                JOIN CALIBER >
+                            </a>
+                        </div>
+
+                        <!-- Normal price col (right) -->
+                        <div class="normal-price-col ahy-plp-normal-price-container">
+                            <% if(dataLocal.inStock && dataLocal.inStock != "yes") { %>
+                                <div style="font-weight:700;color:#dc2626;font-size:0.9rem;">Out of Stock</div>
+                            <% } else if(klevu.search.modules.kmcInputs.base.getShowPrices()) { %>
+                                <% if(nHasDiscount) { %>
+                                    <div class="ahy-plp-normal-price-title">Sale Price</div>
+                                <% } else { %>
+                                    <div class="ahy-plp-normal-price-title">Price</div>
+                                <% } %>
+                                <div class="ahy-plp-normal-price" x-html="hyva.formatPrice(<%=nDisplayPrice%>)">
+                                    <%=helper.processCurrency(dataLocal.currency, parseFloat(nDisplayPrice))%>
+                                </div>
+                                <% if(nHasDiscount) { %>
+  <div class="ahy-plp-non-member-container">
+                                        <span style="color:#ffffff;font-weight:600;" class="ahy-plp-non-member-section"><span class="ahy-plp-non-member-text">NON-MEMBERS SAVE <span class="ahy-pct-inline"><%=nSavingsPct%>%</span></span><span class="ahy-plp-non-member-msrp"><span class="ahy-pct-block"><%=nSavingsPct%>% </span>OFF MSRP</span></span>
+                                    </div>
+                                    <div class="ahy-plp-msrp-title">
+                                        MSRP <span style="text-decoration:line-through;" x-html="hyva.formatPrice(<%=dataLocal.price%>)"><%=helper.processCurrency(dataLocal.currency, parseFloat(dataLocal.price))%></span>
+                                    </div>
+                                <% } %>
+                            <% } %>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Add to Cart + mobile wishlist -->
+                <div class="kuProdAdditional !static !visible !inset-0 !w-full !border-0 !bg-transparent ahy-atc-wrap" style="margin-top:auto;padding-top:10px;">
+                    <div class="!static kuProdAdditionalData ahy-plp-add-to-cart-button-container">
+                        <%// FREE Shipping hidden — re-enable: remove "0 &&" below %>
+                        <% if(0 && additionalDataToReturn && additionalDataToReturn.shipping_charge) { %>
+                            <div class="capitalize !text-ahy-blue !font-semibold !text-sm" style="margin-bottom:6px;">
+                                <%=additionalDataToReturn.shipping_charge%>
+                            </div>
+                        <% } %>
+                        <div class="flex gap-2 items-center ahy-plp-button-container">
+                            <% if(isAddToCartEnabled) { %>
+                                <div style="flex:1;min-width:0;"><%=helper.render('landingPageProductAddToCart',scope,data,dataLocal) %></div>
+                            <% } %>
+                            <!-- <div class="wishlist-btn">
+                                <button x-data="initWishlist()" @click.prevent="addToWishlist(<%=addToWishlistProductId%>)" aria-label="Add to Wish List" type="button"
+                                    class="rounded-full w-9 h-9 md:hidden ring-1 ring-gray-300 bg-white p-0 border-0 inline-flex shrink-0 items-center justify-center text-gray-500 hover:text-red-600">
+                                    <svg id="Layer_1" class="w-5 h-5" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15.91 20"
+                                        x-on:mouseover="function(evt){ evt.target.querySelector('.wishList').setAttribute('fill', '#ff0000') }"
+                                        x-on:mouseout="function(evt){ evt.target.querySelector('.wishList').setAttribute('fill', '#0d2f47') }"
+                                        x-on:focus="function(evt){ evt.target.querySelector('.wishList').setAttribute('fill', '#ff0000') }"
+                                        x-on:blur="function(evt){ evt.target.querySelector('.wishList').setAttribute('fill', '#0d2f47') }"
+                                    >
+                                        <defs>
+                                            <style>.wishList{fill:#0d2f47;}</style>
+                                        </defs>
+                                        <path class="wishList" d="M14.41,1.5v16L9.27,12.71a1.62,1.62,0,0,0-2.19,0L1.5,17.58V1.5H14.41M14.76,0H1.15A1.16,1.16,0,0,0,0,1.15v18.1a.74.74,0,0,0,1.24.56l6.83-6a.12.12,0,0,1,.18,0l6.38,5.9a.74.74,0,0,0,.52.21.76.76,0,0,0,.76-.77v-18A1.15,1.15,0,0,0,14.76,0Z"/>
+                                    </svg>
+                                </button>
+                            </div> -->
+                        </div>
+                    </div>
+                </div>
+
+            </footer>
+        </div>
+    </li>
+    <% } %>
+</script>
+
+<!-- COMMENTED OUT: gradient divider replaced by border-right via catnav-styles.css
+<style>
+.ahy-price-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; background-image: linear-gradient(#e5e7eb, #e5e7eb); background-size: 1px 100%; background-position: center; background-repeat: no-repeat; }
+.ahy-price-grid .caliber-nation-price-col { border-right: none !important; border-bottom:hidden !important; }
+.ahy-price-grid > div { min-width: 0; }
+</style>
+-->
+
+<?php
+/** @var \Magento\Framework\Escaper $escaper */
+$klevuYotpoEndpoint   = $escaper->escapeUrl($block->getUrl('ahy_plprevamp/yotpo/bottomline'));
+$klevuCaliberEndpoint = $escaper->escapeUrl($block->getUrl('caliber-nation/pricing/memberprice'));
+?>
+<script>
+(function() {
+    var YOTPO_ENDPOINT   = '<?= $klevuYotpoEndpoint ?>';
+    var CALIBER_ENDPOINT = '<?= $klevuCaliberEndpoint ?>';
+
+    /*
+     * CaliberNation member prices for Klevu-rendered cards.
+     *
+     * Klevu builds its cards client-side, so there is no PHP render pass to price
+     * them in. The store holds only the products the endpoint actually returned a
+     * member price for — a missing key is the "no member price" signal the card
+     * markup uses (x-show="_cp") to hide the CaliberNation column entirely.
+     *
+     * Registered inline rather than via a layout <script src> because the Klevu
+     * handles do not load yotpo-store.js, which is why $store.yotpoReviews is
+     * absent on these pages. Keeping this self-contained avoids that trap.
+     */
+    function registerCaliberStore() {
+        if (!window.Alpine || Alpine.store('ahyCaliberPrices')) return;
+        Alpine.store('ahyCaliberPrices', {
+            data: {},
+            requested: {},
+            enabled: false,
+            isMember: false,
+            fetch: async function(ids) {
+                var self = this;
+                var newIds = (ids || []).filter(function(id) { return id && !(String(id) in self.requested); });
+                if (!newIds.length) return;
+                newIds.forEach(function(id) { self.requested[String(id)] = true; });
+                // The endpoint caps a request at 50 ids; send in chunks so a long
+                // page never silently loses the tail of its grid.
+                for (var i = 0; i < newIds.length; i += 50) {
+                    var chunk = newIds.slice(i, i + 50);
+                    try {
+                        var r = await fetch(CALIBER_ENDPOINT + '?ids=' + chunk.join(','), { credentials: 'include' });
+                        if (!r.ok) continue;
+                        var json = await r.json();
+                        if (!json.pricing_enabled) return;
+                        self.enabled  = true;
+                        self.isMember = !!json.is_member;
+                        self.data = Object.assign({}, self.data, json.prices || {});
+                    } catch (e) {
+                        console.error('[CaliberNation] price fetch error', e);
+                    }
+                }
+            }
+        });
+    }
+    if (window.Alpine) { registerCaliberStore(); }
+    document.addEventListener('alpine:init', registerCaliberStore);
+
+    // MutationObserver: detect when Klevu renders product cards, then batch-fetch Yotpo
+    var fetchTimer = null;
+    var observer = new MutationObserver(function() {
+        clearTimeout(fetchTimer);
+        fetchTimer = setTimeout(function() {
+            var cards = document.querySelectorAll('[ku-product-block][data-id]');
+            var ids = [];
+            cards.forEach(function(c) {
+                var id = c.getAttribute('data-id');
+                if (id) ids.push(id);
+            });
+            if (ids.length && window.Alpine && Alpine.store('yotpoReviews')) {
+                Alpine.store('yotpoReviews').fetch(ids, YOTPO_ENDPOINT);
+            }
+            if (ids.length && window.Alpine && Alpine.store('ahyCaliberPrices')) {
+                Alpine.store('ahyCaliberPrices').fetch(ids);
+            }
+        }, 200);
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        observer.observe(document.body, { childList: true, subtree: true });
+    });
+})();
+</script>
+

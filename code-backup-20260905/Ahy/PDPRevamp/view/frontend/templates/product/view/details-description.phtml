@@ -1,0 +1,189 @@
+<?php
+/**
+ * PDPRevamp's own copy of the theme's dynamic product-description renderer
+ * (originally Magento_Catalog::product/view/sections/description.phtml),
+ * so the "Details" tab in details-tabs.phtml doesn't reach into the theme
+ * for it. Same description-fetch/read-more/Alpine cleanup logic, unchanged,
+ * plus responsive safeguards (below) for whatever markup ends up in the
+ * product's WYSIWYG/Page Builder description content.
+ */
+
+declare (strict_types = 1);
+
+use Ahy\PDPRevamp\Block\Product\View\DetailsDescription;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ProductPage;
+use Magento\Catalog\Model\Product;
+use Magento\Framework\Escaper;
+
+/** @var Escaper $escaper */
+/** @var DetailsDescription $block */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+/** @var Product $product */
+$product    = $productViewModel->getProduct();
+$_helper    = $this->helper('Webkul\Marketplace\Helper\data');
+$sellerData = $_helper->getSellerProductDataByProductId($product->getId())->getData()[0] ?? null;
+
+$sellerId   = $sellerData['seller_id'] ?? 0;
+$shopUrl    = null;
+
+if ($sellerId) {
+    $sellerData = $_helper->getSellerDataBySellerId($sellerId)->getData()[0] ?? [];
+    $shopUrl    = strtolower(string: $sellerData['shop_url']) ?? null;
+}
+$isPatriotCooler = $shopUrl == 'patriotcoolers' ? 'true' : 'false';
+
+if (!$product->getDescription()) {
+    return;
+}
+
+$cssClasses = $block->getData('css_classes') ?? 'prose';
+$isAddProp69WarningEnabled = $product->hasData('add_prop_69_warning') ? $product->getData('add_prop_69_warning') : null;
+
+// If no admin Key Features rows exist for this product, the feature
+// bullet list in this description has been promoted into the Key
+// Features tile grid (key-features.phtml) - strip it here so it isn't
+// shown twice. No-op when admin rows exist (nothing was promoted).
+$description = $block->getKeyFeaturesResolver()->stripFallbackListFromDescription(
+    $product,
+    (string) $product->getDescription()
+);
+?>
+<div class="<?=$escaper->escapeHtmlAttr($cssClasses)?> description-ahy">
+                <?=html_entity_decode($productViewModel->productAttributeHtml($product, $description, 'description'))?>
+
+                <?php if ($isAddProp69WarningEnabled): ?>
+                    <div class="prop-69-warning">
+                        <p class="text-ahy-blue relative">
+                            <span class="warning-title" @click=""></span><span class=""></span>
+                            <div x-data="{ open: false }" class="relative">
+                                <div
+                                    class="ahy-warning-tooltip-arrow bg-white shadow-xl p-4 hidden 2xl:left-0 bottom-14 md:w-[83%] border-b-5 border-ahy-blue"
+                                    :class="{ 'hidden' : !open, 'flex flex-col absolute': open }"
+                                    x-show="open" @click.away="open = false"
+                                >
+                                    <div class="ahy-warning-tooltip-header flex items-baseline justify-between">
+                                        <div class="flex gap-2 items-center">
+                                            <svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16">
+                                                <defs>
+                                                    <style>
+                                                        .cls-1123 {
+                                                            fill: none;
+                                                        }
+                                                        .cls-2123 {
+                                                            fill: #fff200;
+                                                            fill-rule: evenodd;
+                                                            stroke: #000;
+                                                            stroke-miterlimit: 10;
+                                                        }
+                                                    </style>
+                                                </defs>
+                                                <path class="cls-1123" d="m0,0h16v16H0V0Z" />
+                                                <path class="cls-2123" d="m6.9,1.7c.3-.6,1.1-.9,1.7-.6.2.1.4.2.5.4l.1.1,5.8,11.5c.3.6.1,1.4-.6,1.7-.2.1-.4.2-.5.2H2.2c-.6,0-1.2-.6-1.2-1.2,0-.1,0-.3.1-.4l.1-.1L6.9,1.7h0Z" />
+                                                <path d="m7.2,12.3c0-.4.3-.7.7-.7s.7.3.7.7-.3.7-.7.7-.7-.3-.7-.7Zm.3-1.7l-.2-5.8h1.2l-.2,5.8h-.8Z" />
+                                            </svg>
+                                            <span class="capitalize text-base sm:text-lg font-bold">WARNING - California Proposition 65</span>
+                                        </div>
+                                        <button @click="open=false" aria-label="Close panel" class="p-2 card rounded-full text-ahy-blue transition duration-150 ease-in-out hover:text-black">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="ahy-warning-tooltip-description">
+                                        <p class="text-sm font-medium">
+                                            This product contains chemicals known to the State of California to cause cancer and birth defects or other reproductive harm
+                                        </p>
+                                    </div>
+                                    <div class="ahy-warning-tooltip-button">
+                                        <span @click.prevent="redirectToLink('https://www.p65warnings.ca.gov')"  class="underline-offset-6 cursor-pointer">
+                                            www.p65warnings.ca.gov
+                                        </span>
+                                    </div>
+                                </div>
+                                <button @click="open = !open" class="ahy-warning-tooltip-button button">
+                                    <p><span class="ahy-warning-tooltip-text uppercase font-extrabold hover:underline underline-offset-6" :class="{'underline' : open}">warning</span> - California Proposition 65</p>
+                                </button>
+                            </div>
+
+                        </p>
+                    </div>
+                    <style>
+                        .ahy-warning-tooltip-arrow::after {
+                            content: "";
+                            position: absolute;
+                            top: 100%;
+                            left: 10%;
+                            margin-left: -15px;
+                            border-width: 15px;
+                            border-style: solid;
+                            border-color: #0d2f47 transparent transparent transparent;
+                        }
+                    </style>
+                    <script>
+                        document.addEventListener("DOMContentLoaded", async function () {
+                            try {
+                                setTimeout(async function () {
+                                    var paragraphs = document.querySelectorAll('p');
+                                    var textToFind = "WARNING: This product can expose you to chemicals which are known to the State of California to cause cancer, birth defects or other reproductive harm. For more information go to P65Warnings.ca.gov.";
+                                    paragraphs.forEach(function (paragraph) {
+                                        if (paragraph.textContent.indexOf(textToFind) !== -1) {
+                                            paragraph.remove();
+                                        }
+                                    });
+                                }, 0);
+                            } catch (error) {
+                                console.error(error);
+                            }
+                        });
+                    </script>
+                <?php endif;?>
+</div>
+
+<script>window._ahyIsPatriotCooler = <?= $isPatriotCooler ?>;</script>
+
+<style>
+    .prose.description-ahy :where(h2):not(:where([class~=not-prose],[class~=not-prose] *)),
+    .prose.description-ahy :where(p):not(:where([class~=not-prose],[class~=not-prose] *)){
+        margin-top: 0;
+        margin-bottom: 0.5em !important;
+    }
+
+    /* Responsive safeguards for dynamically loaded description content (Page Builder / WYSIWYG). */
+    .description-ahy {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    .description-ahy img,
+    .description-ahy video,
+    .description-ahy iframe,
+    .description-ahy table {
+        max-width: 100% !important;
+        height: auto;
+    }
+    .description-ahy table {
+        display: block;
+        overflow-x: auto;
+    }
+    @media screen and (max-width: 767px) {
+        .description-ahy [style*="display:flex"],
+        .description-ahy [style*="display: flex"],
+        .description-ahy [style*="display:grid"],
+        .description-ahy [style*="display: grid"] {
+            flex-direction: column !important;
+            grid-template-columns: 1fr !important;
+            width: 100% !important;
+        }
+        .description-ahy [style*="display:flex"] > *,
+        .description-ahy [style*="display: flex"] > *,
+        .description-ahy [style*="display:grid"] > *,
+        .description-ahy [style*="display: grid"] > * {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex-basis: auto !important;
+        }
+    }
+</style>

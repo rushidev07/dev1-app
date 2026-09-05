@@ -1,0 +1,334 @@
+<?php
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\ProductPage;
+use Magento\Framework\Escaper;
+use Magento\Paypal\Block\Express\InContext\SmartButton;
+
+/** @var SmartButton $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+$widgetData = json_decode($block->getJsInitParams(), true);
+// JSON_HEX_TAG so a "</script>" can never appear in the JSON below; still valid JSON.
+$clientConfig = json_encode(
+    $widgetData['Magento_Paypal/js/in-context/product-express-checkout']['clientConfig'] ?? null,
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+$product = $productViewModel->getProduct();
+
+$restrictedProductsAttributeFfl = $product && $product->hasData('ffl_selection_required')
+    ? $product->getData('ffl_selection_required')
+    : null;
+$restrictedProductsAttributeAge = $product && $product->hasData('age_verification_required')
+    ? $product->getData('age_verification_required')
+    : null;
+
+$blockedCategoryIds = [3614, 921, 490, 521, 44];
+$blockedSkuPrefixes = ['KIN-'];
+
+$blockPaypalForSku = false;
+foreach ($blockedSkuPrefixes as $prefix) {
+    if ($product && str_starts_with((string) $product->getSku(), $prefix)) {
+        $blockPaypalForSku = true;
+        break;
+    }
+}
+
+$blockPaypalForCategory = $product
+    && (bool) array_intersect($blockedCategoryIds, $product->getCategoryIds());
+
+$countryCode = $_COOKIE['country'] ?? '';
+$hiddenClass = in_array($countryCode, ['FR', 'NL'], true) ? 'hidden' : '';
+?>
+
+<?php if (!$restrictedProductsAttributeFfl && !$restrictedProductsAttributeAge && !$blockPaypalForCategory && !$blockPaypalForSku): ?>
+    <?php /**
+     * Eager SDK loader - the single biggest remaining win, and deliberately NOT
+     * Alpine.
+     *
+     * A plain inline script tag executes during HTML parse, so the paypal.com
+     * request is already in flight before Alpine has booted. Alpine arrives as a
+     * deferred script and initialises on DOMContentLoaded, so anything that
+     * waits for x-init/x-data - as this button did - pays that entire delay
+     * before it even asks for the SDK, on top of the SDK's own download.
+     *
+     * The Alpine component below just awaits the same window.paypalScriptPromise
+     * this creates, so there is exactly one request either way.
+     */ ?>
+    <script>
+        window.ahyPdpPaypalConfig = <?= /* @noEscape */ $clientConfig ?>;
+
+        (function (config) {
+            if (!config || !config.sdkUrl || window.paypalScriptPromise) {
+                return;
+            }
+
+            window.paypalScriptPromise = new Promise(function (resolve, reject) {
+                var fail = function () {
+                    reject(new Error('<?= $escaper->escapeJs('PayPal SDK could not be loaded') ?>'));
+                };
+                var existing = document.getElementById('paypal-script');
+
+                if (existing) {
+                    // Already requested elsewhere (e.g. the mini-cart button):
+                    // attach to it rather than requesting the SDK a second time.
+                    if (window.paypal) {
+                        return resolve(window.paypal);
+                    }
+                    existing.addEventListener('load', function () { resolve(window.paypal); });
+                    existing.addEventListener('error', fail);
+                    return;
+                }
+
+                var script = document.createElement('script');
+                script.src = config.sdkUrl;
+                script.id = 'paypal-script';
+                script.async = true;
+                if (config.dataAttributes && config.dataAttributes['data-partner-attribution-id']) {
+                    script.setAttribute('data-partner-attribution-id', config.dataAttributes['data-partner-attribution-id']);
+                }
+                script.onload = function () { resolve(window.paypal); };
+                script.onerror = fail;
+                (document.head || document.documentElement).appendChild(script);
+            });
+        })(window.ahyPdpPaypalConfig);
+    </script>
+
+    <div x-data="initPayPalInContext('paypalInContextPDP', window.ahyPdpPaypalConfig)"
+        x-init="checkAndInitializeButtons()"
+        x-intersect="checkAndInitializeButtons()"
+        @private-content-loaded.window="getData($event.detail.data); checkAndInitializeButtons()"
+        class="min-h-a11y w-full paypalInContextPDP-ahy ahy-paypal-height-fix-pdp"
+    >
+        <div id="paypalInContextPDP" class="paypal checkout paypal-logo product-shortcuts-container isolate w-full h-full flex items-center justify-center <?= $hiddenClass ?>">
+        </div>
+    </div>
+    <script>
+        function initPayPalInContext(renderTargetId, config) {
+            return {
+                cart: false,
+                actions: {},
+                alreadyLoaded: false,
+                getData(data) {
+                    if (data.cart) {
+                        this.cart = data.cart;
+                        return true;
+                    }
+                },
+                /**
+                 * Read at call time, never snapshotted: onClick posts the
+                 * add-to-cart form before createOrder() runs, which can mint a
+                 * new quote. config.quoteId is preferred because it is the field
+                 * the minicart template uses and the only one actually populated
+                 * server-side; the cart-section reads are kept as a fallback in
+                 * case that section ever gains the key. Empty string is a valid
+                 * answer - the controller falls back to the session quote, which
+                 * is what has always happened here in practice.
+                 */
+                resolveQuoteId() {
+                    return config.quoteId
+                        || (this.cart && (this.cart.cartId || this.cart.quoteId))
+                        || '';
+                },
+                initializePayPalScript() {
+                    // Normally already resolved or in flight - the eager loader
+                    // above starts it during HTML parse. This branch is the
+                    // fallback for when that could not run (no sdkUrl at parse
+                    // time, script stripped by an optimiser, etc).
+                    if (!window.paypalScriptPromise) {
+                        window.paypalScriptPromise = new Promise((resolve, reject) => {
+                            const scriptId = 'paypal-script';
+                            const paypalScript = document.getElementById(scriptId);
+                            if (paypalScript) {
+                                if (window.paypal) {
+                                    return resolve(window.paypal);
+                                }
+                            }
+                            const script = document.createElement('script');
+                            script.src = config.sdkUrl;
+                            script.id = scriptId;
+                            script.setAttribute('data-partner-attribution-id', config.dataAttributes['data-partner-attribution-id']);
+                            script.onload = () => resolve(window.paypal);
+                            script.onerror = () => reject(new Error('<?= $escaper->escapeJs('PayPal SDK could not be loaded') ?>'));
+                            document.body.appendChild(script);
+                        });
+                    }
+
+                    return window.paypalScriptPromise;
+                },
+                async initializeButtons() {
+                    // paypal.Buttons() callbacks are invoked with PayPal's own
+                    // "this", so the component is captured here rather than
+                    // relied on inside them.
+                    const self = this;
+
+                    try {
+                        const paypal = await this.initializePayPalScript();
+
+                        paypal && paypal.Buttons({
+                            style: Object.assign({}, config.styles, {
+                                height: 55, // Sets the style.height option to a value from 25 to 55.
+                                disableMaxWidth: false, // The button has a default maximum width of 750px, but you can make the button larger with true and set container size
+                                tagline: false // Set the style.layout to horizontal for taglines.
+                            }),
+                            onInit: (data, actions) => {
+                                this.actions = actions || this.actions;
+                            },
+                            onClick(data, actions) {
+                                const form = document.forms.product_addtocart_form;
+                                if (!form || !form.reportValidity()) {
+                                    return;
+                                }
+                                const postUrl = form.action;
+                                const formData = new URLSearchParams(new FormData(form));
+                                formData.append('form_key', hyva.getFormKey());
+                                return window.fetch(postUrl, {
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                    body: formData,
+                                    method: 'POST',
+                                    mode: 'cors',
+                                    credentials: 'include'
+                                })
+                                    .catch(console.error)
+                                    .finally(() => {
+                                        window.dispatchEvent(new Event('reload-customer-section-data'));
+                                    });
+                            },
+                            createOrder() {
+                                const params = 'quote_id=' + self.resolveQuoteId() +
+                                    '&customer_id=' + (config.customerId || '') +
+                                    '&form_key=' + hyva.getFormKey() +
+                                    '&button=' + config.button;
+
+                                return window.fetch(config.getTokenUrl, {
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                    body: params,
+                                    method: 'POST',
+                                    mode: 'cors',
+                                    credentials: 'include'
+                                })
+                                    .then(result => result.json())
+                                    .then(data => data.token)
+                                    .catch(console.error);
+                            },
+                            onApprove(data, actions) {
+                                const params = 'paymentToken=' + (data.orderID || '') +
+                                    '&payerId=' + (data.payerID || '') +
+                                    '&quoteId=' + self.resolveQuoteId() +
+                                    '&customerId=' + (config.customerId || '') +
+                                    '&form_key=' + hyva.getFormKey();
+
+                                return window.fetch(config.onAuthorizeUrl, {
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                    body: params,
+                                    method: 'POST',
+                                    mode: 'cors',
+                                    credentials: 'include'
+                                })
+                                    .then(data => data.json())
+                                    .then(response => {
+                                        if (response.success) {
+                                            return actions.redirect(response.redirectUrl);
+                                        }
+
+                                        throw new Error(response['error_message']);
+                                    })
+                                    .catch(console.error)
+                                    .finally(() => {
+                                        window.dispatchEvent(new Event('reload-customer-section-data'));
+                                    });
+                            },
+
+                            onCancel(data, actions) {
+                                // reload data because of add to cart
+                                window.dispatchEvent(new Event('reload-customer-section-data'));
+
+                                return window.dispatchMessages([{
+                                    type: 'error',
+                                    text: '<?= $escaper->escapeJs(__('Paypal Express Checkout has been canceled.')) ?>'
+                                }]);
+                            },
+                            onError(err) {
+                                return window.dispatchMessages([{
+                                    type: 'error',
+                                    text: '<?= $escaper->escapeJs(__('We can\'t initialize Express Checkout.')) ?>'
+                                }]);
+                            }
+                        }).render(document.getElementById(renderTargetId));
+                    } catch (error) {
+                        const target = document.getElementById(renderTargetId);
+                        if (target) {
+                            target.innerHTML = '';
+                        }
+                        // Let a later trigger (intersect / section reload) retry
+                        // rather than leaving the button permanently dead after
+                        // one transient SDK failure.
+                        self.alreadyLoaded = false;
+                        console.error('Error loading PayPal SDK', error);
+                    }
+                },
+                checkAndInitializeButtons() {
+                    if (this.alreadyLoaded) {
+                        return;
+                    }
+                    // The button posts this form, so there is nothing to render
+                    // until it exists. On a bundle PDP this block is moved into
+                    // the bundle summary, so x-init can run before the form is
+                    // in the DOM - x-intersect covers that case.
+                    if (!document.forms.product_addtocart_form) {
+                        return;
+                    }
+                    this.alreadyLoaded = true;
+                    this.initializeButtons();
+                },
+                checkForRestrictedProductsInCart() {
+                    window.dispatchEvent(new Event('reload-customer-section-data'));
+                    var cartData = JSON.parse(localStorage.getItem('mage-cache-storage'));
+                    var cart = cartData.cart;
+
+                    var targetElement = document.querySelector('.paypalInContextPDP-ahy');
+                    if (!targetElement) return;
+
+                    if (cart.hasOwnProperty('extra_actions') && cart.extra_actions === "") {
+                        // Remove all child elements of targetElement
+                        while (targetElement.firstChild) {
+                            targetElement.removeChild(targetElement.firstChild);
+                        }
+                        this.alreadyLoaded = false;
+                        return false;
+                    } else {
+                        // If there are no restricted products in the cart
+                        this.checkAndInitializeButtons();
+                        return true;
+                    }
+                }
+            }
+        }
+    </script>
+
+    <?php /**
+     */ ?>
+    <style>
+        .ahy-paypal-height-fix-pdp {
+            height: 3rem !important;
+        }
+        @media (min-width: 320px) and (max-width: 639px) {
+            .ahy-paypal-height-fix-pdp {
+                height: 2.6rem !important;
+            }
+        }
+    </style>
+<?php endif; ?>

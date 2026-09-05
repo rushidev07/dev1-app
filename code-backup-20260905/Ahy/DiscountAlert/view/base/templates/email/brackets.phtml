@@ -1,0 +1,32 @@
+<?php
+/**
+ * Distribution cells for the discount alert email.
+ *
+ * Presentation only: band boundaries and counts come from BracketProvider.
+ *
+ * @var \Ahy\DiscountAlert\Block\Email\BracketSummary $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$brackets = $block->getBrackets();
+$width    = $block->getColumnWidth();
+$total    = count($brackets);
+
+// Deepest discount first, so the palette darkens towards the left-hand cell.
+$palette = ['#9b1c1c', '#c0392b', '#c8622a', '#b45309', '#92400e'];
+?>
+<?php foreach ($brackets as $index => $bracket): ?>
+    <?php
+    $paletteIndex = $total > 0
+        ? min(count($palette) - 1, (int) floor($index * count($palette) / $total))
+        : 0;
+    $borderRight = $index < $total - 1 ? 'border-right:1px solid #FFFFFF;' : '';
+    ?>
+    <td style="width:<?= $escaper->escapeHtmlAttr($width) ?>%;vertical-align:top;text-align:center;padding:22px 8px;<?= /* @noEscape */ $borderRight ?>">
+        <div style="font-size:10px;font-weight:700;color:<?= $escaper->escapeHtmlAttr($palette[$paletteIndex]) ?>;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">
+            <?= $escaper->escapeHtml($bracket['label']) ?>
+        </div>
+        <div style="font-size:28px;font-weight:800;color:#0D2E47;line-height:1;font-variant-numeric:tabular-nums;">
+            <?= $escaper->escapeHtml((string) $bracket['count']) ?>
+        </div>
+    </td>
+<?php endforeach; ?>

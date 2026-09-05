@@ -1,0 +1,138 @@
+<?php
+/**
+ * PDP-only: resolves a hex color for each Color swatch option of the
+ * current configurable product, in priority order:
+ *  1. Admin-set exact hex per simple-product variant (the "Colour" column
+ *     added to the Configurations grid by Ahy\PDPRevamp\Ui\DataProvider\
+ *     Product\Form\Modifier\VariantColorColumn, in ahy_pdprevamp_variant_color).
+ *  2. Magento's own native visual swatch per option (eav_attribute_option_swatch
+ *     - the "Swatch" color box in Stores > Attributes > Product > color),
+ *     set by an admin directly or backfilled by
+ *     Ahy\PDPRevamp\Service\AiColorHexResolver for options nobody set one for.
+ *  3. The option's own label treated as a CSS color name (e.g. "Red"),
+ *     when it matches a recognized CSS color keyword.
+ * Only if none of these match does swatch-item.phtml fall back to a plain
+ * text swatch for that option.
+ */
+declare(strict_types=1);
+
+use Ahy\PDPRevamp\Block\Product\View\ColorSwatchResolver;
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Magento\Catalog\Model\Product;
+use Magento\ConfigurableProduct\Model\Product\Type\Configurable;
+use Magento\Framework\Escaper;
+
+/** @var ColorSwatchResolver $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var CurrentProduct $currentProduct */
+$currentProduct = $viewModels->require(CurrentProduct::class);
+
+/** @var Product $product */
+$product = $currentProduct->get();
+
+$colorHexByOptionValue = [];
+$nativeSwatchHexByOptionValue = [];
+
+if ($product && $product->getId() && $product->getTypeId() === Configurable::TYPE_CODE) {
+    $children = $product->getTypeInstance()->getUsedProducts($product);
+
+    $childIds = [];
+    $colorValueByChildId = [];
+    foreach ($children as $child) {
+        $childId = (int) $child->getId();
+        $colorValue = $child->getData('color');
+        if ($colorValue === null || $colorValue === '') {
+            continue;
+        }
+        $childIds[] = $childId;
+        $colorValueByChildId[$childId] = (int) $colorValue;
+    }
+
+    if ($childIds) {
+        $variantColor = $block->getVariantColor();
+        $hexByChildId = $variantColor->getHexByProductIds($childIds);
+
+        foreach ($hexByChildId as $childId => $hex) {
+            $colorValue = $colorValueByChildId[$childId] ?? null;
+            if ($colorValue !== null && !isset($colorHexByOptionValue[$colorValue])) {
+                $colorHexByOptionValue[$colorValue] = $hex;
+            }
+        }
+
+        $distinctOptionIds = array_values(array_unique($colorValueByChildId));
+        $nativeSwatchHexByOptionValue = $block->getNativeColorSwatch()->getHexByOptionIds($distinctOptionIds);
+    }
+}
+?>
+<script>
+    window.AHY_ADMIN_COLOR_HEX = <?= /* @noEscape */ json_encode($colorHexByOptionValue) ?>;
+
+    window.AHY_CSS_COLOR_HEX_MAP = <?= /* @noEscape */ $block->getColorHexMapJson() ?>;
+
+    window.AHY_NATIVE_SWATCH_HEX = <?= /* @noEscape */ json_encode($nativeSwatchHexByOptionValue) ?>;
+
+    window.AHY_SWATCH_MEDIA_BASE_URL = <?= /* @noEscape */ json_encode($block->getSwatchMediaBaseUrl()) ?>;
+
+    // Native swatch values may be a single "#RRGGBB" (or an uploaded image's
+    // relative path, e.g. "/w/i/photo.jpg") or two comma-separated halves of
+    // either for a two-color option like "Black & Blue" - see
+    // AiColorHexResolver::splitDualColorLabel() and the admin "Two-Color
+    // Swatches" panel's own "Upload a file" option. A pair renders as a
+    // straight left/right split circle instead of a solid one (not
+    // diagonal - a diagonal line reads as crooked/broken on a small
+    // circle); when either half is an image, background-image layers
+    // (positioned left/right half each) give the same straight split,
+    // since a single CSS background property can't mix a gradient and an
+    // image in one gradient.
+    window.ahyIsSwatchImagePath = function (part) {
+        return part.charAt(0) === '/';
+    };
+
+    window.ahyBuildSwatchBackground = function (hexValue) {
+        var parts = String(hexValue).split(',').map(function (part) { return part.trim(); }).filter(Boolean);
+
+        if (parts.length < 2) {
+            return window.ahyIsSwatchImagePath(parts[0])
+                ? 'background-image:url(\'' + window.AHY_SWATCH_MEDIA_BASE_URL + parts[0] + '\');'
+                    + 'background-size:cover;background-position:center;'
+                : 'background-color:' + parts[0] + ';';
+        }
+
+        if (!window.ahyIsSwatchImagePath(parts[0]) && !window.ahyIsSwatchImagePath(parts[1])) {
+            return 'background: linear-gradient(90deg, ' + parts[0] + ' 50%, ' + parts[1] + ' 50%);';
+        }
+
+        var toLayer = function (part) {
+            return window.ahyIsSwatchImagePath(part)
+                ? 'url(\'' + window.AHY_SWATCH_MEDIA_BASE_URL + part + '\')'
+                : 'linear-gradient(' + part + ',' + part + ')';
+        };
+
+        return 'background-image:' + toLayer(parts[0]) + ',' + toLayer(parts[1]) + ';'
+            + 'background-position:left center,right center;'
+            + 'background-size:50% 100%,50% 100%;'
+            + 'background-repeat:no-repeat,no-repeat;';
+    };
+
+    window.ahyGetSwatchStyle = function (optionValueId, optionLabel) {
+        var hex = window.AHY_ADMIN_COLOR_HEX[optionValueId];
+        if (hex) {
+            return 'background-color:' + hex + ';';
+        }
+        var nativeHex = window.AHY_NATIVE_SWATCH_HEX[optionValueId];
+        if (nativeHex) {
+            return window.ahyBuildSwatchBackground(nativeHex);
+        }
+        if (optionLabel) {
+            var normalized = String(optionLabel).trim().toLowerCase().replace(/\s+/g, '');
+            var cssHex = window.AHY_CSS_COLOR_HEX_MAP[normalized];
+            if (cssHex) {
+                return 'background-color:' + cssHex + ';';
+            }
+        }
+        return null;
+    };
+</script>

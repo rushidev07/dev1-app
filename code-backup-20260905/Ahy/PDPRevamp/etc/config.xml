@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <pdprevamp_fbt>
+            <general>
+                <enabled>1</enabled>
+                <heading>Frequently Bought Together</heading>
+                <discount_percent>0</discount_percent>
+                <max_suggestions>2</max_suggestions>
+                <min_copurchase_orders>3</min_copurchase_orders>
+                <excluded_skus>FREE Everest Decal</excluded_skus>
+            </general>
+        </pdprevamp_fbt>
+        <pdprevamp_exit_popup>
+            <general>
+                <enabled>1</enabled>
+                <timer_hours>48</timer_hours>
+                <discount_percent>10</discount_percent>
+                <send_email>0</send_email>
+                <email_sender>general</email_sender><timer_hours>48</timer_hours>
+                <email_template>pdprevamp_exit_popup_discount_email</email_template>
+                <description_text>your first order. Enter your email below and we'll send your exclusive discount code.</description_text>
+            </general>
+        </pdprevamp_exit_popup>
+        <pdprevamp_pdp_badges>
+            <adventure_seekers>
+                <best_seller_enabled>1</best_seller_enabled>
+                <top_rated_enabled>1</top_rated_enabled>
+                <top_rated_threshold>90</top_rated_threshold>
+                <same_seller_enabled>1</same_seller_enabled>
+                <under_price_enabled>1</under_price_enabled>
+            </adventure_seekers>
+        </pdprevamp_pdp_badges>
+        <pdprevamp_ai_descriptors>
+            <general>
+                <gemini_model>gemini-2.5-flash</gemini_model>
+            </general>
+        </pdprevamp_ai_descriptors>
+        <pdprevamp_share_buttons>
+            <general>
+                <copy_link_enabled>1</copy_link_enabled>
+            </general>
+        </pdprevamp_share_buttons>
+        <pdprevamp_avantlink>
+            <general>
+                <enabled>0</enabled>
+            </general>
+        </pdprevamp_avantlink>
+    </default>
+</config>

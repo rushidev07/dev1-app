@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<listing xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Ui:etc/ui_configuration.xsd">
+    <argument name="data" xsi:type="array">
+        <item name="js_config" xsi:type="array">
+            <item name="provider" xsi:type="string">ahy_caliber_nation_refund_request_listing.ahy_caliber_nation_refund_request_listing_data_source</item>
+        </item>
+    </argument>
+    <settings>
+        <spinner>refund_request_columns</spinner>
+        <deps>
+            <dep>ahy_caliber_nation_refund_request_listing.ahy_caliber_nation_refund_request_listing_data_source</dep>
+        </deps>
+    </settings>
+
+    <dataSource name="ahy_caliber_nation_refund_request_listing_data_source"
+                component="Magento_Ui/js/grid/provider">
+        <settings>
+            <updateUrl path="mui/index/render"/>
+        </settings>
+        <aclResource>Ahy_CaliberNation::refund_requests</aclResource>
+        <dataProvider name="ahy_caliber_nation_refund_request_listing_data_source"
+                      class="Magento\Framework\View\Element\UiComponent\DataProvider\DataProvider">
+            <settings>
+                <requestFieldName>entity_id</requestFieldName>
+                <primaryFieldName>entity_id</primaryFieldName>
+            </settings>
+        </dataProvider>
+    </dataSource>
+
+    <listingToolbar name="listing_top">
+        <bookmark name="bookmarks"/>
+        <columnsControls name="columns_controls"/>
+        <filterSearch name="fulltext"/>
+        <filters name="listing_filters"/>
+        <paging name="listing_paging"/>
+    </listingToolbar>
+
+    <columns name="refund_request_columns">
+        <column name="entity_id">
+            <settings>
+                <filter>textRange</filter>
+                <label translate="true">ID</label>
+                <sorting>desc</sorting>
+            </settings>
+        </column>
+        <column name="customer_email">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Customer Email</label>
+            </settings>
+        </column>
+        <column name="customer_name">
+            <settings>
+                <filter>text</filter>
+                <label translate="true">Customer Name</label>
+            </settings>
+        </column>
+        <column name="start_date" class="Magento\Ui\Component\Listing\Columns\Date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Start Date</label>
+            </settings>
+        </column>
+        <column name="cancelled_at" class="Magento\Ui\Component\Listing\Columns\Date">
+            <settings>
+                <filter>dateRange</filter>
+                <dataType>date</dataType>
+                <label translate="true">Cancelled Date</label>
+            </settings>
+        </column>
+
+    </columns>
+</listing>

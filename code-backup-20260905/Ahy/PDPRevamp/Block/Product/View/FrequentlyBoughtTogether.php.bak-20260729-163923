@@ -1,0 +1,161 @@
+<?php
+declare(strict_types=1);
+
+namespace Ahy\PDPRevamp\Block\Product\View;
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\CurrentProduct;
+use Magento\Catalog\Helper\Image as ImageHelper;
+use Magento\Catalog\Model\Category;
+use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
+use Magento\Catalog\Model\Product\Visibility;
+use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
+use Magento\Catalog\Model\ResourceModel\Product\Collection;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
+use Magento\Framework\Pricing\Helper\Data as PricingHelper;
+use Magento\Framework\View\Element\Template;
+use Magento\Framework\View\Element\Template\Context;
+
+/**
+ * PDP "Frequently Bought Together" section. Suggestions are picked
+ * automatically from the current product's most specific (deepest) shared
+ * category - not merchant-curated like the existing Amasty bundle-pack
+ * widget elsewhere on the page - so every product gets suggestions without
+ * manual setup. Candidates with no real price or that aren't salable are
+ * skipped so we never show a $0.00 / out-of-stock suggestion.
+ */
+class FrequentlyBoughtTogether extends Template
+{
+    private const SUGGESTION_LIMIT = 2;
+    private const CANDIDATE_POOL_SIZE = 12;
+
+    private CollectionFactory $productCollectionFactory;
+    private CategoryCollectionFactory $categoryCollectionFactory;
+    private ViewModelRegistry $viewModelRegistry;
+    private ImageHelper $imageHelper;
+    private PricingHelper $priceHelper;
+
+    public function __construct(
+        Context $context,
+        CollectionFactory $productCollectionFactory,
+        CategoryCollectionFactory $categoryCollectionFactory,
+        ViewModelRegistry $viewModelRegistry,
+        ImageHelper $imageHelper,
+        PricingHelper $priceHelper,
+        array $data = []
+    ) {
+        parent::__construct($context, $data);
+        $this->productCollectionFactory = $productCollectionFactory;
+        $this->categoryCollectionFactory = $categoryCollectionFactory;
+        $this->viewModelRegistry = $viewModelRegistry;
+        $this->imageHelper = $imageHelper;
+        $this->priceHelper = $priceHelper;
+    }
+
+    public function getCurrentProduct(): Product
+    {
+        /** @var CurrentProduct $currentProduct */
+        $currentProduct = $this->viewModelRegistry->require(CurrentProduct::class);
+        return $currentProduct->get();
+    }
+
+    public function getImageHelper(): ImageHelper
+    {
+        return $this->imageHelper;
+    }
+
+    public function getPriceHelper(): PricingHelper
+    {
+        return $this->priceHelper;
+    }
+
+    /**
+     * The most specific (deepest) of the current product's categories -
+     * picking the first assigned category tends to land on a broad, generic
+     * bucket that pulls in unrelated products; the deepest one is the
+     * narrowest/most relevant grouping.
+     */
+    private function getMostSpecificCategoryId(Product $product): ?int
+    {
+        $categoryIds = $product->getCategoryIds();
+        if (empty($categoryIds)) {
+            return null;
+        }
+
+        $categories = $this->categoryCollectionFactory->create()
+            ->addAttributeToSelect('level')
+            ->addAttributeToFilter('entity_id', ['in' => $categoryIds])
+            ->setOrder('level', 'DESC');
+
+        $deepest = $categories->getFirstItem();
+        return $deepest && $deepest->getId() ? (int) $deepest->getId() : (int) $categoryIds[0];
+    }
+
+    /**
+     * @return Product[]
+     */
+    public function getSuggestedProducts(): array
+    {
+        $product = $this->getCurrentProduct();
+        $categoryId = $this->getMostSpecificCategoryId($product);
+
+        if ($categoryId === null) {
+            return [];
+        }
+
+        /** @var Collection $collection */
+        $collection = $this->productCollectionFactory->create();
+        $collection->addAttributeToSelect(['name', 'price', 'special_price', 'image', 'small_image'])
+            ->addAttributeToFilter('entity_id', ['neq' => $product->getId()])
+            ->addAttributeToFilter('status', Status::STATUS_ENABLED)
+            ->addAttributeToFilter('visibility', ['neq' => Visibility::VISIBILITY_NOT_VISIBLE])
+            ->addAttributeToFilter('price', ['gt' => 0])
+            ->addCategoriesFilter(['in' => [$categoryId]])
+            ->setPageSize(self::CANDIDATE_POOL_SIZE)
+            ->setCurPage(1);
+        $collection->addAttributeToSort('entity_id', 'DESC');
+
+        $suggestions = [];
+        foreach ($collection as $candidate) {
+            if (count($suggestions) >= self::SUGGESTION_LIMIT) {
+                break;
+            }
+            if (!$candidate->isSalable()) {
+                continue;
+            }
+            $finalPrice = (float) $candidate->getPriceInfo()->getPrice('final_price')->getAmount()->getValue();
+            if ($finalPrice <= 0) {
+                continue;
+            }
+            $suggestions[] = $candidate;
+        }
+
+        return $suggestions;
+    }
+
+    /**
+     * All bundle items: the current product first, then suggestions.
+     *
+     * @return Product[]
+     */
+    public function getBundleItems(): array
+    {
+        return array_merge([$this->getCurrentProduct()], $this->getSuggestedProducts());
+    }
+
+    public function getBundleDiscountPercent(): int
+    {
+        return 10;
+    }
+
+    public function getItemFinalPrice(Product $item): float
+    {
+        return (float) $item->getPriceInfo()->getPrice('final_price')->getAmount()->getValue();
+    }
+
+    public function getItemRegularPrice(Product $item): float
+    {
+        return (float) $item->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
+    }
+}

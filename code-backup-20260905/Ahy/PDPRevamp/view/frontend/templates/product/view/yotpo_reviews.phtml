@@ -1,0 +1,468 @@
+<?php
+/**
+ * PDP "Ratings & Reviews" section, sourced dynamically from Yotpo (same
+ * account/widget the star/count line above the product title uses - see
+ * product-detail-page.phtml and product-info.phtml). All data is fetched
+ * client-side via the yotpoReview() Alpine component defined in
+ * options/yotpo/yotpo_js.phtml, so this template only needs the product ID
+ * to build the fetch URL - no server-side review query here.
+ */
+
+declare(strict_types=1);
+
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HeroiconsSolid;
+use Hyva\Theme\ViewModel\ProductPage;
+use Magento\Catalog\Model\Product;
+use Magento\Framework\Escaper;
+use Magento\Framework\View\Element\Template;
+
+/** @var Template $block */
+/** @var Escaper $escaper */
+/** @var ViewModelRegistry $viewModels */
+
+/** @var HeroiconsSolid $heroiconsSolid */
+$heroiconsSolid = $viewModels->require(HeroiconsSolid::class);
+
+/** @var ProductPage $productViewModel */
+$productViewModel = $viewModels->require(ProductPage::class);
+/** @var Product $product */
+$product = $productViewModel->getProduct();
+?>
+<div x-data="yotpoReview()" x-init="initReview()" id="ahy-yotpo-product-reviews" x-show="isReviewAvailable">
+    <template x-if="isReviewAvailable">
+        <?php /**
+         * pdp-reviews-container replaces what used to be a `container` class
+         * here: product.yotpo.review.details already renders inside
+         * product.detail.page's ambient .columns wrapper (itself a
+         * Tailwind `container`), so a second `container` class stacked a
+         * second max-width+padding on top and made this section render
+         * narrower than its siblings (trust-row, faq, etc - see the matching
+         * fix/comment in details-tabs.phtml). This is now its own class,
+         * independent of .container/.columns, so it can be resized without
+         * affecting or being affected by any other PDP section.
+         */ ?>
+        <div class="pdp-reviews-container py-8 relative" x-data="{ showPhotos: true }">
+            <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+                <h2 class="text-xl font-bold text-ahy-blue"><?= __('Ratings & Reviews') ?></h2>
+                <button @click="window.dispatchEvent(new CustomEvent('open-yotpo-write-review'))"
+                    @mouseenter="$el.style.cssText='background:#e85d26!important;color:#fff!important;border-color:#e85d26!important;'"
+                    @mouseleave="$el.style.cssText='background:transparent!important;color:#e85d26!important;border-color:#e85d26!important;'"
+                    class="flex items-center gap-2 border-2 font-semibold rounded-xl px-3 py-2 text-sm transition duration-300 ease-in-out"
+                    style="border-color:#e85d26; color:#e85d26; background:transparent;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera mr-2" data-loc="client/src/components/ReviewsSection.tsx:99"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+                    <?= __('Write a Review') ?>
+                </button>
+            </div>
+
+            <!-- Customer photos strip, gathered from every review's images_data -->
+            <div class="mb-8" x-data="{ get allPhotos() { return (reviewData || []).flatMap(r => (r.images_data || []).map(img => ({ ...img, reviewer: r.user.display_name }))); } }" x-show="allPhotos.length > 0">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-ahy-blue">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M18 6h.008v.008H18V6Z" />
+                    </svg>
+                    <span class="text-sm font-semibold text-ahy-blue"><?= __('Customer Photos') ?></span>
+                    <span class="text-xs" style="color:oklch(0.5 0.015 240);">(<span x-text="allPhotos.length"></span> <?= __('photos') ?>)</span>
+                </div>
+                <div class="flex gap-2 overflow-x-auto pb-2">
+                    <template x-for="(photo, idx) in allPhotos" :key="photo.id">
+                        <button type="button" @click="currentImage = photo; modalOpen = true"
+                            class="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:border-ahy-blue transition-colors group">
+                            <img :src="photo.thumb_url" :alt="'Photo by ' + photo.reviewer" class="w-full h-full object-cover" loading="lazy" />
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Write a review - inline card, opens via window event from both the
+                 star/count line (when there are no reviews yet) and the button above -->
+            <div
+                x-data="{
+                    showReviewForm: false,
+                    init() {
+                        window.addEventListener('open-yotpo-write-review', () => {
+                            this.showReviewForm = true;
+                        });
+                    }
+                }"
+                @keyup.escape.window="showReviewForm = false"
+            >
+                <template x-if="showReviewForm">
+                    <div class="rounded-xl p-6 mb-8" style="background:#FEF7F5;border:1px solid #e85d264d;">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-semibold text-ahy-blue"><?= __('Share Your Experience') ?></h3>
+                            <button type="button" @click="showReviewForm = false" class="text-gray-400 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <?php /* canVote (despite the name) is really "is this visitor
+                               logged in" - see yotpo_js.phtml's initReview(), which the
+                               "Helpful" vote button below reads the exact same way. Passed
+                               in explicitly because submitReviews() runs inside this
+                               nested x-data - Alpine's scope inheritance resolves canVote
+                               fine here, in this template expression, but reading
+                               this.canVote from inside the method body would not, since
+                               that "this" is createReview()'s own data object only. */ ?>
+                        <form class="space-y-5" x-data="createReview()" x-init="createReview()" x-on:submit.prevent="submitReviews(canVote)">
+                            <div @private-content-loaded.window="getCustomerData($event.detail.data)" x-show="showForm" class="space-y-5">
+                                <div class="hidden">
+                                    <input type="text" x-model.trim="display_name = getCustomerName() ? getCustomerName() : 'Anonymous'" id="wr_display_name" name="display_name" />
+                                    <input type="email" x-model.trim="email = getCustomerEmail() ? getCustomerEmail() : 'guest@review.everest.com'" id="wr_email" name="email" />
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-ahy-blue mb-1"><?= __('Your Rating') ?></label>
+                                    <div x-data="{ hoverIndex: null, selectedIndex: null, updateSelected: null }">
+                                        <ul class="flex pl-0">
+                                            <template x-for="(item, index) in Array(5)" :key="index">
+                                                <li @mouseenter="hoverIndex = index" @mouseleave="hoverIndex = null"
+                                                    @click="selectedIndex = index; $refs.wrStarInput.value = selectedIndex + 1; updateSelected = index + 1"
+                                                    class="pr-1 cursor-pointer transition duration-300 ease-in-out">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                                        :fill="(hoverIndex !== null && index <= hoverIndex) || (selectedIndex !== null && index <= selectedIndex) ? '#fbbf24' : 'none'"
+                                                        :stroke="(hoverIndex !== null && index <= hoverIndex) || (selectedIndex !== null && index <= selectedIndex) ? '#fbbf24' : '#d1d5db'">
+                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                    </svg>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                        <input type="hidden" x-ref="wrStarInput" required id="wr_review_score" x-model.number="review_score = updateSelected" name="review_score" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="wr_review_title" class="block text-xs font-semibold text-ahy-blue mb-1"><?= __('Review Title') ?></label>
+                                    <input type="text" x-model.trim="review_title" id="wr_review_title" name="review_title"
+                                        placeholder="<?= $escaper->escapeHtmlAttr(__('Summarize your experience...')) ?>"
+                                        class="block w-full rounded-lg border-gray-300 shadow-sm text-sm" required />
+                                </div>
+
+                                <div>
+                                    <label for="wr_review_content" class="block text-xs font-semibold text-ahy-blue mb-1"><?= __('Your Review') ?></label>
+                                    <textarea x-model.trim="review_content" id="wr_review_content" name="review_content" rows="4"
+                                        placeholder="<?= $escaper->escapeHtmlAttr(__('Tell other adventurers about your experience with the %1...', $product->getName())) ?>"
+                                        class="block w-full rounded-lg border-gray-300 shadow-sm text-sm"
+                                        required></textarea>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-ahy-blue mb-1">
+                                        <?= __('Add Trail Photos') ?> <span class="font-normal text-gray-500"><?= __('(optional - share your adventure!)') ?></span>
+                                    </label>
+                                    <div class="flex flex-wrap gap-3">
+                                        <template x-for="(photo, index) in photos" :key="index">
+                                            <div class="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                                                <img :src="photo.dataUrl" :alt="photo.name" class="w-full h-full object-cover" />
+                                                <button type="button" @click="removePhoto(index)"
+                                                    class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs" style="background:rgba(0,0,0,0.6);">
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        </template>
+                                        <label x-show="photos.length < 5" class="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer text-gray-400 transition-colors"
+                                            @mouseenter="$el.style.borderColor='#e85d26'; $el.style.color='#e85d26'"
+                                            @mouseleave="$el.style.borderColor=''; $el.style.color=''">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload" data-loc="client/src/components/ReviewsSection.tsx:212"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>
+                                            <span class="text-[10px] mt-1"><?= __('Add Photo') ?></span>
+                                            <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden" @change="addPhotos($event)" />
+                                        </label>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2"><?= __('Up to 4 photos. JPG, PNG, or WebP.Max 10MB each.') ?></p>
+                                    <p class="text-xs font-semibold mt-1" style="color:#dc2626;" x-show="photoError" x-html="photoError"></p>
+                                </div>
+
+                                <div class="flex items-center gap-4 pt-2">
+                                    <button type="submit"
+                                        class="font-semibold text-sm rounded-xl px-6 py-2.5 transition duration-300 ease-in-out" style="background:#e85d26;color:#fff;">
+                                        <?= __('Submit Review') ?>
+                                    </button>
+                                    <button type="button" @click="showReviewForm = false" class="text-sm font-semibold wr-cancel-btn">
+                                        <?= __('Cancel') ?>
+                                    </button>
+                                    <div class="text-sm font-semibold" style="color:#dc2626;" x-html="errorMessage"></div>
+                                </div>
+                            </div>
+
+                            <div class="text-center py-6" x-show="showThankYouForm">
+                                <p class="text-lg font-bold text-ahy-blue"><?= __('Thank you for posting a review!') ?></p>
+                            </div>
+                        </form>
+                    </div>
+                </template>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Rating summary column -->
+                <div class="lg:col-span-4 space-y-5">
+                    <div class="text-center lg:text-left">
+                        <div class="flex items-baseline justify-center lg:justify-start">
+                            <span class="text-5xl font-extrabold text-ahy-blue" style="font-family:'DM Mono', monospace;" x-html="getAverageReviewScore()"></span>
+                            <span class="text-lg font-medium" style="color:oklch(0.5 0.015 240);">/5</span>
+                        </div>
+                        <div class="flex items-center justify-center lg:justify-start gap-0.5 mt-1">
+
+                            <template x-for="i in [1,2,3,4,5]" :key="i">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :fill="i <= Math.round(getAverageReviewScore()) ? '#fbbf24' : '#e5e7eb'" :stroke="i <= Math.round(getAverageReviewScore()) ? '#fbbf24' : '#e5e7eb'"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                            </template>
+                        </div>
+                        <p class="text-sm mt-1" style="color:oklch(0.5 0.015 240);"><?= __('Based on') ?> <span x-html="totalReviewCount"></span> <span x-html="totalReviewCountText"></span></p>
+                    </div>
+
+                    <div class="p-4 text-center" style="border-radius:0.75rem; border:1px solid oklch(0.527 0.154 150.069); background:#f0fdf4;" x-show="reviewData.length > 0">
+                        <p class="text-2xl font-extrabold" style="color:oklch(0.527 0.154 150.069);" x-text="Math.round(reviewData.filter(r => r.score >= 4).length / reviewData.length * 100) + '%'"></p>
+                        <p class="text-xs font-medium" style="color:oklch(0.527 0.154 150.069);"><?= __('of reviewers recommend this product') ?></p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <?php foreach ([5, 4, 3, 2, 1] as $star): ?>
+                            <?php $word = ['five', 'four', 'three', 'two', 'one'][5 - $star]; ?>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold w-3" style="color:oklch(0.2 0.03 240);"><?= $star ?></span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#fbbf24" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden bar-container">
+                                    <div class="h-full bg-amber-400 rounded-full transition-all bar <?= $star ?>-star" x-bind:style="'width:' + <?= $word ?>StartPercentage"></div>
+                                </div>
+                                <span class="text-xs text-gray-500 w-6 text-right" x-html="<?= $word ?>StartCount"></span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <?php /**
+                     * Both sponsored cards are admin-authored CMS blocks (Content > Blocks)
+                     * - no code-side default content. Create a block with each identifier
+                     * below (image, link, whatever markup you want) and it renders here;
+                     * leave one unwritten and it simply renders nothing.
+                     *
+                     * pdp-reviews-sponsor-card forces the rounded-corner clipping regardless
+                     * of what's inside (a plain <img>, Page Builder markup, etc. all have
+                     * square corners on their own) - same reason pdp-seller-promo-card exists
+                     * in details-tabs.phtml.
+                     */ ?>
+                    <div class="pdp-reviews-sponsor-card">
+                        <?= $this->getLayout()
+                            ->createBlock('Magento\Cms\Block\Block')
+                            ->setBlockId('pdp_reviews_calibernation_card')
+                            ->toHtml() ?>
+                    </div>
+
+                    <div class="pdp-reviews-sponsor-card">
+                        <?= $this->getLayout()
+                            ->createBlock('Magento\Cms\Block\Block')
+                            ->setBlockId('pdp_reviews_americanstandardgold_card')
+                            ->toHtml() ?>
+                    </div>
+                </div>
+
+                <!-- Review list column -->
+                <div class="lg:col-span-8 space-y-4">
+                    <div class="space-y-4">
+                        <template x-for="(review, reviewIndex) in searchReviews()" :key="review.id || reviewIndex">
+                            <div class="border border-gray-200 rounded-xl p-5 space-y-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold text-ahy-blue" x-html="review.user.display_name"></span>
+                                            <template x-if="review.verified_buyer">
+                                                <span class="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-2.5 h-2.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                                    </svg>
+                                                    <?= __('Verified Purchase') ?>
+                                                </span>
+                                            </template>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-0.5" x-html="formatReviewDate(review.created_at)"></p>
+                                    </div>
+                                    <div class="flex items-center gap-0.5 shrink-0">
+                                        <template x-for="i in [1,2,3,4,5]" :key="i">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :fill="i <= review.score ? '#fbbf24' : '#e5e7eb'" :stroke="i <= review.score ? '#fbbf24' : '#e5e7eb'"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 class="text-sm font-bold text-ahy-blue" x-html="review.title || ''"></h4>
+                                    <p class="text-xs text-gray-600" x-html="review.content"></p>
+                                </div>
+
+                                <div class="flex gap-2 pt-1 flex-wrap" x-show="review.images_data && review.images_data.length > 0">
+                                    <template x-for="(image, index) in (review.images_data || [])" :key="image.id">
+                                        <button type="button" @click="openDialog(index)"
+                                            class="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 hover:border-ahy-blue transition-colors">
+                                            <img :src="image.thumb_url" :alt="'Photo by ' + review.user.display_name" class="w-full h-full object-cover" loading="lazy" />
+                                        </button>
+                                    </template>
+                                </div>
+
+                                <div class="flex gap-1.5 flex-wrap" x-show="review.custom_fields && review.custom_fields.tags && review.custom_fields.tags.length > 0">
+                                    <template x-for="tag in (review.custom_fields ? review.custom_fields.tags : [])" :key="tag">
+                                        <span class="text-[10px] font-medium text-ahy-blue bg-gray-100 px-2.5 py-1 rounded-full" x-text="tag"></span>
+                                    </template>
+                                </div>
+
+                                <?php /* Vote row. The filled/unfilled state is bound to
+                                       review.my_vote ("up" or null), which the reviews
+                                       endpoint stamps per customer - it used to be held
+                                       only in a CSS class here, so a page reload lost it
+                                       and the same visitor could vote again on every
+                                       load. Voting requires being signed in; the count
+                                       stays readable either way.
+
+                                       Helpful only - there is deliberately no "not
+                                       helpful" counterpart. */ ?>
+                                <div class="flex items-center gap-4">
+                                    <button
+                                        type="button"
+                                        class="flex items-center gap-1.5 text-xs transition-colors hover:text-ahy-rating-green disabled:opacity-60"
+                                        :class="review.my_vote === 'up' ? 'text-ahy-rating-green font-semibold' : 'text-gray-500'"
+                                        :aria-pressed="review.my_vote === 'up'"
+                                        :disabled="votePending"
+                                        @click="reviewFeedback(1, review, $event)"
+                                    >
+                                        <svg class="w-4 h-4" :class="review.my_vote === 'up' ? 'fill-current' : ''" :id="'vote-up-' + review.id" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V3a.75.75 0 0 1 .75-.75A2.25 2.25 0 0 1 16.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 10.203 4.167 9.75 5 9.75h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                                        </svg>
+                                        <span><?= __('Helpful') ?> (<span x-text="review.votes_up ?? 0"></span>)</span>
+                                    </button>
+                                </div>
+                                <?php /* Inline prompt rather than a redirect to login:
+                                       the reviews section sits far down the PDP, so a
+                                       redirect would cost the reader their place. */ ?>
+                                <p
+                                    x-show="voteMessage && voteMessageReviewId === review.id"
+                                    x-cloak
+                                    class="text-xs mt-1"
+                                    style="color:#c0392b;"
+                                >
+                                    <span x-text="voteMessage"></span>
+                                    <a href="<?= $escaper->escapeUrl($block->getUrl('customer/account/login')) ?>" class="font-semibold underline">
+                                        <?= $escaper->escapeHtml(__('Sign in')) ?>
+                                    </a>
+                                </p>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Photo lightbox, shared by the customer-photos strip and each review's photo row -->
+                    <div class="fixed flex justify-center items-center text-left z-[500] inset-0" x-show="modalOpen" @keyup.escape.window.prevent.stop="modalOpen = false" role="dialog" aria-modal="true">
+                        <div x-show="modalOpen" x-transition:enter="transition-opacity" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition-opacity" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                            class="fixed inset-0 bg-black bg-opacity-50" @click="modalOpen = false"></div>
+                        <div x-show="modalOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-90"
+                            x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-300"
+                            x-transition:leave-start="opacity-100 transform scale-100" x-transition:leave-end="opacity-0 transform scale-90"
+                            class="relative inline-block bg-white shadow-xl max-h-[90vh] overflow-auto rounded-xl m-4 z-10">
+                            <button class="absolute top-3 right-3 h-8 w-8 bg-white shadow-lg border border-gray-200 flex items-center justify-center rounded-full" @click="modalOpen = false">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20" width="16" height="16">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 0 1 1.414 0L10 8.586l4.293-4.293a1 1 0 1 1 1.414 1.414L11.414 10l4.293 4.293a1 1 0 0 1-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 0 1-1.414-1.414L8.586 10 4.293 5.707a1 1 0 0 1 0-1.414Z" clip-rule="evenodd"></path>
+                                </svg>
+                            </button>
+                            <img :src="currentImage.original_url || currentImage.thumb_url" :alt="'Customer photo'" class="max-w-[90vw] max-h-[80vh] object-contain" loading="lazy" />
+                        </div>
+                    </div>
+
+                    <button type="button" x-show="!showPagination && pageSize < totalReviewCount"
+                        @click="pageSize = 6; showPagination = true"
+                        class="w-full py-3 text-sm font-semibold text-ahy-blue hover:bg-gray-50 rounded-xl transition duration-300 ease-in-out border border-gray-200">
+                        <?= __('View All') ?> <span x-html="totalReviewCount"></span> <?= __('Reviews') ?>
+                    </button>
+
+                    <div class="flex items-center justify-between pt-2" x-show="showPagination && totalPages > 0">
+                        <button type="button" @click="prevPage()" x-show="pageNumber > 0"
+                            class="flex items-center gap-1 text-sm font-semibold text-ahy-blue hover:bg-gray-50 rounded-lg px-3 py-2 transition duration-300 ease-in-out border border-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                            </svg>
+                            <?= __('Previous') ?>
+                        </button>
+                        <div class="text-xs text-gray-500 flex-1 text-center">
+                            <?= __('Showing') ?> <span x-text="startPageResults()"></span>&ndash;<span x-text="endResults()"></span> <?= __('of') ?> <span x-text="totalReviewCount"></span> <?= __('reviews') ?>
+                        </div>
+                        <button type="button" @click="nextPage()" x-show="pageNumber + 1 < pageCount()"
+                            class="flex items-center gap-1 text-sm font-semibold text-ahy-blue hover:bg-gray-50 rounded-lg px-3 py-2 transition duration-300 ease-in-out border border-gray-200">
+                            <?= __('Next') ?>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="text-center text-sm font-bold text-ahy-blue py-6" x-show="totalPages === 0">
+                        <?= __('No results') ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<style>
+    /* Adjust max-width/padding here to resize just this section - see the
+       matching .pdp-details-tabs-container comment in details-tabs.phtml.
+       No-op by default (full width of the ambient .columns container). */
+    .pdp-reviews-container {
+        width: 100%;
+    }
+        @media (max-width: 425px) {
+        .pdp-reviews-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+
+    /* Forces rounded-corner clipping on the two admin-authored sponsor
+       cards regardless of what markup is inside (plain <img>, Page Builder
+       content, etc. all have square corners on their own by default). */
+    .pdp-reviews-sponsor-card {
+        border-radius: 0.75rem;
+        overflow: hidden;
+        width: 100%;
+    }
+    .pdp-reviews-sponsor-card img {
+        display: block;
+        width: 100%;
+        height: auto;
+    }
+    :root {
+        --star-size: 20px;
+        --star-color: #d1d5db;
+        --star-background: #f59e0b;
+    }
+    .yotpo-review-stars {
+        --percent: calc(var(--rating) / 5 * 100%);
+        display: inline-block;
+        font-size: var(--star-size);
+        line-height: 1;
+    }
+    .yotpo-review-stars-font { font-size: 16px !important; }
+    .yotpo-review-stars::before {
+        content: "★★★★★";
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, var(--star-background) var(--percent), var(--star-color) var(--percent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        -webkit-text-stroke-width: 1px;
+        -webkit-text-stroke-color: var(--star-background);
+    }
+    .bar-container { background-color: #eee; }
+    #wr_review_title:focus,
+    #wr_review_content:focus {
+        outline: none !important;
+        border-color: #e85d26 !important;
+        box-shadow: 0 0 0 3px #e85d264d !important;
+    }
+    .wr-cancel-btn { color: #5c656b; }
+      .pdp-reviews-sponsor-card + .pdp-reviews-sponsor-card {
+        margin-top: 0.35rem !important;
+    }
+    @media (max-width: 767px) {
+        .pdp-reviews-sponsor-card * {
+            padding-top: 0 !important;
+            padding-bottom: 0.2rem !important;
+        }
+    }
+
+</style>
+

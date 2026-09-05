@@ -1,0 +1,502 @@
+<?php
+/** @var \Magewirephp\Magewire\Block\Component $block */
+/** @var \Ahy\CaliberNation\Magewire\MembershipSignup $magewire */
+/** @var \Magento\Framework\Escaper $escaper */
+
+$annualPrice  = $magewire->membershipPrice;
+$annualPeriod = '/yr';
+// form_only = render just the account form (used inside the registration-page modal),
+// dropping the marketing header + left brand panel.
+$formOnly     = (bool) $block->getData('form_only');
+
+// Logged-in shoppers already HAVE an account, so "Create Your Account" copy is wrong
+// for them. Distinguish a returning/lapsed member (renew) from a logged-in never-member.
+$loggedInLapsed = $magewire->isLoggedIn && ($magewire->isReturning || $magewire->isWinback);
+$loggedInNew    = $magewire->isLoggedIn && !$loggedInLapsed;
+?>
+
+<?php if (!$magewire->programEnabled): ?>
+    <section id="membership-signup" class="<?= $formOnly ? 'bg-white p-8' : 'py-16 md:py-24 bg-white' ?>">
+        <div class="<?= $formOnly ? '' : 'container mx-auto px-4' ?> text-center">
+            <h2 class="font-bold text-2xl md:text-3xl text-ahy-blue">Membership Currently Unavailable</h2>
+            <p class="mt-3 text-ahy-blue text-sm md:text-base max-w-md mx-auto">
+                Caliber Nation membership isn't accepting new signups right now. Please check back soon.
+            </p>
+        </div>
+    </section>
+    <?php return; ?>
+<?php endif; ?>
+
+<section id="membership-signup" class="<?= $formOnly ? 'bg-white' : 'py-16 md:py-24 bg-white' ?>">
+
+    <?php /* Keep the loader overlay up until checkout paints. Magewire stops the loader
+             inside its own message.processed hook and only THEN queues the redirect in a
+             setTimeout (see livewire.js), so the form would repaint for a beat before the
+             browser leaves. Re-raising it on any response carrying a redirect closes that
+             gap. detail must be an object: the loader's notification messenger reads
+             detail.loader, and a bare value throws when it filters the message list. */ ?>
+    <div x-data="{}"
+         x-init="(() => {
+                     const pin = () => window.Magewire.hook('message.processed', (message) => {
+                         if (message.response && message.response.effects && message.response.effects.redirect) {
+                             setTimeout(() => window.Magewire.dispatchEvent('loader:start', { detail: { loader: true } }));
+                         }
+                     });
+                     window.Magewire
+                         ? pin()
+                         : document.addEventListener('magewire:available', pin, { once: true });
+                 })()"></div>
+
+    <?php if (!$formOnly): ?>
+    <?php /* Join/Renew CTAs link here with ?scrollTo=signup rather than a #fragment:
+             browsers jump to a fragment instantly during navigation, so there is no
+             distance left to animate. Arriving at the top of the page instead lets us
+             own the whole scroll. Waits for window.load because the tall hero above
+             uses lazy background images — scrolling before that settles overshoots.
+             Kept off the <section>, which is the Magewire root (wire:id). */ ?>
+    <div x-data="{}"
+         x-init="(() => {
+                     const p = new URLSearchParams(window.location.search);
+                     if (p.get('<?= /* @noEscape */ \Ahy\CaliberNation\Model\Config::SIGNUP_SCROLL_PARAM ?>')
+                         !== '<?= /* @noEscape */ \Ahy\CaliberNation\Model\Config::SIGNUP_SCROLL_VALUE ?>') { return; }
+                     const go = () => setTimeout(() => {
+                         document.getElementById('membership-signup')
+                             .scrollIntoView({ behavior: 'smooth', block: 'start' });
+                         /* Drop the flag so a refresh or Back doesn't re-scroll. */
+                         p.delete('<?= /* @noEscape */ \Ahy\CaliberNation\Model\Config::SIGNUP_SCROLL_PARAM ?>');
+                         const q = p.toString();
+                         window.history.replaceState(null, '', window.location.pathname + (q ? '?' + q : ''));
+                     }, 150);
+                     document.readyState === 'complete'
+                         ? go()
+                         : window.addEventListener('load', go, { once: true });
+                 })()"></div>
+    <?php endif; ?>
+    <div class="<?= $formOnly ? '' : 'container mx-auto px-4' ?>">
+
+        <?php if (!$formOnly): ?>
+        <div class="text-center mb-12">
+            <?php if ($magewire->isAlreadyMember): ?>
+            <h2 class="font-bold text-2xl md:text-4xl text-ahy-blue">YOUR MEMBERSHIP IS ACTIVE</h2>
+            <p class="mt-3 text-ahy-blue text-sm md:text-base max-w-md mx-auto">
+                Your annual membership is active. Make the most of your savings and member-only perks.
+            </p>
+            <?php elseif ($loggedInLapsed): ?>
+            <h2 class="font-bold text-2xl md:text-4xl text-ahy-blue">WELCOME BACK</h2>
+            <p class="mt-3 text-ahy-blue text-sm md:text-base max-w-md mx-auto">
+                Your Caliber Nation membership has expired. Renew now to restore your member savings and perks.
+            </p>
+            <?php elseif ($loggedInNew): ?>
+            <h2 class="font-bold text-2xl md:text-4xl text-ahy-blue">JOIN CALIBER NATION</h2>
+            <p class="mt-3 text-ahy-blue text-sm md:text-base max-w-md mx-auto">
+                You're logged in — confirm your details below and complete payment securely at checkout.
+            </p>
+            <?php else: ?>
+            <h2 class="font-bold text-2xl md:text-4xl text-ahy-blue">START YOUR MEMBERSHIP</h2>
+            <p class="mt-3 text-ahy-blue text-sm md:text-base max-w-md mx-auto">
+                Create your account to join Caliber Nation. You'll complete payment securely at checkout.
+            </p>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <div class="<?= $formOnly ? 'w-full' : 'w-full overflow-hidden shadow-[0_0_45px_rgba(0,0,0,0.16)] flex flex-col lg:flex-row' ?>">
+
+            <?php if (!$formOnly): ?>
+            <!-- ── LEFT — brand banner ─────────────────────────────────────── -->
+            <div class="hidden lg:flex flex-col items-center justify-center bg-ahy-blue px-12 py-16 lg:w-2/5">
+                <img src="/media/wysiwyg/caliber-nation/caliber-nation-logo.png"
+                     alt="Caliber Nation" class="w-64 mb-8"/>
+                <h3 class="font-league-gothic text-white text-center leading-none mb-6 text-[5.25rem]">
+                    JOIN NOW<br/>AND SAVE
+                </h3>
+                <p class="text-white text-center opacity-80 leading-relaxed text-[1.375rem] max-w-[340px]">
+                    Exclusive discounts, early-bird deals and more.
+                </p>
+                <div class="w-20 h-[3px] bg-ahy-red mt-11 mb-9"></div>
+                <ul class="text-white w-full max-w-[340px] text-[1.3rem] flex flex-col gap-6 leading-[1.35]">
+                    <li class="flex items-start gap-3"><span class="text-ahy-red mt-1 shrink-0">&#10003;</span>10%–90% off member products</li>
+                    <li class="flex items-start gap-3"><span class="text-ahy-red mt-1 shrink-0">&#10003;</span>Track your total member savings</li>
+                    <li class="flex items-start gap-3"><span class="text-ahy-red mt-1 shrink-0">&#10003;</span>Early-bird access to sales &amp; new sellers</li>
+                    <li class="flex items-start gap-3"><span class="text-ahy-red mt-1 shrink-0">&#10003;</span>Cancel anytime — no long-term lock-in</li>
+                </ul>
+            </div>
+            <?php endif; ?>
+
+            <!-- ── RIGHT — form ────────────────────────────────────────────── -->
+            <div class="bg-white flex-1 flex flex-col px-8 py-10 lg:px-12 lg:py-12">
+
+                <?php if ($magewire->isAlreadyMember): ?>
+                <!-- Already an active member -->
+                <?php
+                $alreadyMemberName = strtoupper(trim($magewire->firstName . ' ' . $magewire->lastName));
+                $alreadyMemberCard = $block->getLayout()
+                    ->createBlock(\Magento\Framework\View\Element\Template::class)
+                    ->setTemplate('Ahy_CaliberNation::partials/membership-card.phtml')
+                    ->setData('member_name', $alreadyMemberName)
+                    ->setData('tier', 'ANNUAL');
+                ?>
+                <div class="flex flex-1 flex-col items-center justify-center text-center py-6">
+                    <div class="w-full mb-16 text-left" style="max-width:340px;"><?= $alreadyMemberCard->toHtml() ?></div>
+                    <h3 class="font-league-gothic text-5xl text-ahy-blue mb-4 uppercase">
+                        <?= $escaper->escapeHtml(__("You're Already a Member!")) ?>
+                    </h3>
+                    <p class="text-gray-500 text-base max-w-sm mb-10 leading-relaxed">
+                        <?= $escaper->escapeHtml(__('Manage your plan, auto-renew and savings from your account dashboard.')) ?>
+                    </p>
+                    <a href="<?= $escaper->escapeUrl($block->getUrl('caliber-nation/account')) ?>"
+                       class="inline-flex items-center justify-center gap-2 bg-ahy-red hover:bg-ahy-red-light
+                              text-white font-bold text-lg rounded-full px-12 h-16 transition-colors">
+                        <?= $escaper->escapeHtml(__('View My Membership')) ?>
+                    </a>
+                </div>
+
+                <?php else: ?>
+                <!-- Account creation form (no payment here) -->
+                <div wire:key="cn-signup"
+                     x-data="{
+                         showPassword: false,
+                         showPasswordConfirm: false,
+                         localPassword: '',
+                         localConfirmPassword: '',
+                         attemptedSubmit: false,
+                         fieldChangeCounter: 0,
+                         phoneInvalid() {
+                             void this.fieldChangeCounter;
+                             const el = document.getElementById('cn-telephone');
+                             if (!el || el.value.trim() === '') return false;
+                             return el.value.replace(/\D/g, '').length < 10;
+                         },
+                         allFieldsFilled() {
+                             void this.fieldChangeCounter;
+                             const ids = ['cn-first-name', 'cn-last-name', 'cn-email', 'cn-street', 'cn-city', 'cn-region', 'cn-postcode', 'cn-telephone'];
+                             const fieldsOk = ids.every(id => !this.isFieldEmpty(id));
+                             const namesOk = !this.nameStartsWithDigit('cn-first-name') && !this.nameStartsWithDigit('cn-last-name');
+                             <?php if (!$magewire->isLoggedIn): ?>
+                             const pwOk = this.localPassword.length >= <?= (int) $magewire->minPasswordLength ?>
+                                 && this.passwordSetsCount() >= <?= (int) $magewire->minCharacterSets ?>
+                                 && this.localPassword === this.localConfirmPassword
+                                 && this.localConfirmPassword.length > 0;
+                             return fieldsOk && namesOk && !this.phoneInvalid() && pwOk;
+                             <?php else: ?>
+                             return fieldsOk && namesOk && !this.phoneInvalid();
+                             <?php endif; ?>
+                         },
+                         passwordSetsCount() {
+                             const pw = this.localPassword;
+                             let sets = 0;
+                             if (/[a-z]/.test(pw)) sets++;
+                             if (/[A-Z]/.test(pw)) sets++;
+                             if (/[0-9]/.test(pw)) sets++;
+                             if (/[^a-zA-Z0-9]/.test(pw)) sets++;
+                             return sets;
+                         },
+                         passwordTooShort() {
+                             return this.localPassword.length > 0
+                                 && this.localPassword.length < <?= (int) $magewire->minPasswordLength ?>;
+                         },
+                         isFieldEmpty(id) {
+                             void this.fieldChangeCounter;
+                             const el = document.getElementById(id);
+                             return el ? el.value.trim() === '' : false;
+                         },
+                         nameStartsWithDigit(id) {
+                             void this.fieldChangeCounter;
+                             const el = document.getElementById(id);
+                             return el ? /^\d/.test(el.value.trim()) : false;
+                         },
+                         remainingSets() {
+                             return Math.max(0, <?= (int) $magewire->minCharacterSets ?> - this.passwordSetsCount());
+                         },
+                         passwordRequired() {
+                             return this.attemptedSubmit && this.localPassword.length === 0;
+                         },
+                         confirmRequired() {
+                             return this.attemptedSubmit && this.localConfirmPassword.length === 0;
+                         },
+                         passwordMissingSets() {
+                             return this.localPassword.length > 0
+                                 && this.remainingSets() > 0;
+                         },
+                         passwordMismatch() {
+                             return (this.localConfirmPassword.length > 0 || this.attemptedSubmit)
+                                 && this.localConfirmPassword !== this.localPassword;
+                         },
+                         submitJoin() {
+                             this.attemptedSubmit = true;
+                             const requiredIds = ['cn-first-name', 'cn-last-name', 'cn-email', 'cn-street', 'cn-city', 'cn-region', 'cn-postcode', 'cn-telephone'];
+                             const hasEmptyFields = requiredIds.some(id => this.isFieldEmpty(id));
+                             const hasNameError = this.nameStartsWithDigit('cn-first-name') || this.nameStartsWithDigit('cn-last-name');
+                             <?php if (!$magewire->isLoggedIn): ?>
+                             const hasPwError = this.localPassword.length === 0
+                                 || this.localConfirmPassword.length === 0
+                                 || this.passwordTooShort()
+                                 || this.passwordMissingSets()
+                                 || this.passwordMismatch();
+                             if (hasEmptyFields || hasNameError || this.phoneInvalid() || hasPwError) return;
+                             <?php else: ?>
+                             if (hasEmptyFields || hasNameError || this.phoneInvalid()) return;
+                             <?php endif; ?>
+                             $wire.join();
+                         },
+                         strengthScore() {
+                             const pw = this.localPassword;
+                             const minLen  = <?= (int) $magewire->minPasswordLength ?>;
+                             const minSets = <?= (int) $magewire->minCharacterSets ?>;
+                             if (!pw) return 0;
+                             let sets = 0;
+                             if (/[a-z]/.test(pw)) sets++;
+                             if (/[A-Z]/.test(pw)) sets++;
+                             if (/[0-9]/.test(pw)) sets++;
+                             if (/[^a-zA-Z0-9]/.test(pw)) sets++;
+                             if (pw.length < minLen || sets < minSets) return 1;
+                             const ls = pw.length >= 16 ? 2 : (pw.length >= 12 ? 1 : 0);
+                             const ss = sets >= 4 ? 2 : (sets >= 3 ? 1 : 0);
+                             const t  = ls + ss;
+                             return t >= 4 ? 4 : (t >= 2 ? 3 : 2);
+                         },
+                         strengthLabel() { return ['No Password','Weak','Fair','Strong','Very Strong'][this.strengthScore()]; },
+                         strengthLabelStyle() { return ['color:#9ca3af','color:#ef4444','color:#ca8a04','color:#2563eb','color:#16a34a'][this.strengthScore()]; },
+                         strengthBarStyle(i) { const s=this.strengthScore(); if(i>s) return 'background:#e5e7eb'; return ['','background:#ef4444','background:#eab308','background:#2563eb','background:#22c55e'][s]; }
+                     }">
+
+                    <?php if ($loggedInLapsed): ?>
+                    <h3 class="text-xl font-bold text-ahy-blue mb-1">Renew Your Membership</h3>
+                    <p class="text-gray-500 text-sm mb-7">Your membership has expired. Confirm your details and renew — payment is completed at checkout.</p>
+                    <?php elseif ($loggedInNew): ?>
+                    <h3 class="text-xl font-bold text-ahy-blue mb-1">Complete Your Membership</h3>
+                    <p class="text-gray-500 text-sm mb-7">You're logged in — just confirm your details and check out.</p>
+                    <?php else: ?>
+                    <h3 class="text-xl font-bold text-ahy-blue mb-1">Create Your Account</h3>
+                    <p class="text-gray-500 text-sm mb-7">Enter your details to join. Payment is completed at checkout.</p>
+                    <?php endif; ?>
+
+                    <!-- Plan display — Annual only -->
+                    <div class="mb-7">
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-3">Your Plan</label>
+                        <div class="flex items-center justify-between border-2 border-ahy-red bg-red-50 rounded-lg px-5 py-4">
+                            <div>
+                                <p class="text-sm font-bold text-ahy-blue uppercase tracking-wide">Annual Membership</p>
+                                <p class="text-xs text-gray-500 mt-0.5">
+                                    <?= $magewire->isWinback ? 'Special win-back renewal price for you' : 'Full access to all member benefits' ?>
+                                </p>
+                            </div>
+                            <div class="text-right shrink-0 ml-4">
+                                <span class="font-league-gothic text-2xl text-ahy-blue leading-none"><?= $escaper->escapeHtml($annualPrice) ?></span>
+                                <span class="text-xs text-gray-400 ml-0.5"><?= $annualPeriod ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Name row -->
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="cn-first-name" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">First Name <span class="text-ahy-red">*</span></label>
+                            <input id="cn-first-name" type="text" wire:model.defer="firstName" placeholder="John" required
+                                   <?= $magewire->isLoggedIn ? 'readonly' : '' ?>
+                                   @input="fieldChangeCounter++"
+                                   class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors<?= $magewire->isLoggedIn ? ' bg-gray-100 cursor-not-allowed' : '' ?>"/>
+                            <p x-show="attemptedSubmit && isFieldEmpty('cn-first-name')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                            <p x-show="nameStartsWithDigit('cn-first-name')" x-cloak class="text-xs text-red-600 mt-1.5">First name cannot start with a number.</p>
+                        </div>
+                        <div>
+                            <label for="cn-last-name" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">Last Name <span class="text-ahy-red">*</span></label>
+                            <input id="cn-last-name" type="text" wire:model.defer="lastName" placeholder="Doe" required
+                                   <?= $magewire->isLoggedIn ? 'readonly' : '' ?>
+                                   @input="fieldChangeCounter++"
+                                   class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors<?= $magewire->isLoggedIn ? ' bg-gray-100 cursor-not-allowed' : '' ?>"/>
+                            <p x-show="attemptedSubmit && isFieldEmpty('cn-last-name')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                            <p x-show="nameStartsWithDigit('cn-last-name')" x-cloak class="text-xs text-red-600 mt-1.5">Last name cannot start with a number.</p>
+                        </div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-4">
+                        <label for="cn-email" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">Email Address <span class="text-ahy-red">*</span></label>
+                        <input id="cn-email" type="text" inputmode="email" autocomplete="email" wire:model.defer="email" placeholder="john@example.com" required
+                               <?= $magewire->isLoggedIn ? 'readonly' : '' ?>
+                               @input="fieldChangeCounter++"
+                               class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors<?= $magewire->isLoggedIn ? ' bg-gray-100 cursor-not-allowed' : '' ?>"/>
+                        <?php if (!$magewire->isLoggedIn): ?>
+                        <p x-show="attemptedSubmit && isFieldEmpty('cn-email')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($magewire->needsAddress): ?>
+                    <!-- Billing address (required to place the order at checkout) -->
+                    <div class="mb-4">
+                        <label for="cn-street" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">
+                            Street Address <span class="text-ahy-red">*</span>
+                        </label>
+                        <input id="cn-street" type="text" wire:model.defer="street" placeholder="123 Main St" required
+                               @input="fieldChangeCounter++"
+                               class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors"/>
+                        <p x-show="attemptedSubmit && isFieldEmpty('cn-street')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="cn-city" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">City <span class="text-ahy-red">*</span></label>
+                            <input id="cn-city" type="text" wire:model.defer="city" placeholder="Austin" required
+                                   @input="fieldChangeCounter++"
+                                   class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors"/>
+                            <p x-show="attemptedSubmit && isFieldEmpty('cn-city')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                        </div>
+                        <div>
+                            <label for="cn-region" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">State <span class="text-ahy-red">*</span></label>
+                            <div style="position:relative;">
+                                <select id="cn-region" wire:model.defer="regionId" required
+                                        @change="fieldChangeCounter++"
+                                        style="-webkit-appearance:none;appearance:none;padding-top:0.625rem;padding-bottom:0.625rem;padding-right:2rem;"
+                                        class="w-full border border-gray-300 rounded px-3 h-[42px] text-sm text-ahy-blue bg-white focus:outline-none focus:border-ahy-blue transition-colors">
+                                    <option value="">Select state</option>
+                                    <?php foreach ($magewire->getUsRegions() as $regionId => $regionName): ?>
+                                    <option value="<?= (int) $regionId ?>"><?= $escaper->escapeHtml($regionName) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div style="pointer-events:none;position:absolute;top:0;bottom:0;right:0;display:flex;align-items:center;padding-right:0.75rem;color:#9ca3af;">
+                                    <svg style="height:1rem;width:1rem;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <p x-show="attemptedSubmit && isFieldEmpty('cn-region')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="cn-postcode" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">ZIP Code <span class="text-ahy-red">*</span></label>
+                            <input id="cn-postcode" type="text" wire:model.defer="postcode" placeholder="78701" required
+                                   inputmode="numeric" maxlength="10"
+                                   @input="$el.value = $el.value.replace(/\D/g, ''); fieldChangeCounter++"
+                                   class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors"/>
+                            <p x-show="attemptedSubmit && isFieldEmpty('cn-postcode')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                        </div>
+                        <div>
+                            <label for="cn-telephone" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">Phone <span class="text-ahy-red">*</span></label>
+                            <input id="cn-telephone" type="text" inputmode="tel" autocomplete="tel" wire:model.defer="telephone" placeholder="(555) 555-5555" required maxlength="15"
+                                   @keydown="if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes($event.key) || $event.metaKey || $event.ctrlKey) return; if (!/^[0-9()+\-\s]$/.test($event.key)) $event.preventDefault()"
+                                   @paste="$event.preventDefault(); const t=($event.clipboardData || window.clipboardData).getData('text').replace(/[^0-9()+\-\s]/g, '').slice(0,15); document.execCommand('insertText', false, t)"
+                                   @input="fieldChangeCounter++"
+                                   class="w-full border border-gray-300 rounded px-4 py-2.5 h-[42px] text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors"/>
+                            <p x-show="attemptedSubmit && isFieldEmpty('cn-telephone')" x-cloak class="text-xs text-red-600 mt-1.5">This is a required field.</p>
+                            <p x-show="phoneInvalid()" x-cloak class="text-xs text-red-600 mt-1.5">Please enter a valid phone number (at least 10 digits).</p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!$magewire->isLoggedIn): ?>
+                    <!-- Password -->
+                    <div class="mb-2">
+                        <label for="cn-password" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">Password <span class="text-ahy-red">*</span></label>
+                        <div class="relative">
+                            <input id="cn-password" :type="showPassword ? 'text' : 'password'" wire:model.defer="password"
+                                   @input="localPassword = $event.target.value" minlength="<?= (int) $magewire->minPasswordLength ?>"
+                                   placeholder="Min. <?= (int) $magewire->minPasswordLength ?> characters" required autocomplete="new-password"
+                                   style="height:42px;padding-top:0;padding-bottom:0;line-height:42px;font-size:0.875rem;border-radius:0.25rem;border-color:#d1d5db;"
+                                   class="w-full border border-gray-300 rounded px-4 pr-11 text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors"/>
+                            <button type="button" @click="showPassword = !showPassword"
+                                    class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-ahy-blue transition-colors border-0 bg-transparent outline-none">
+                                <span x-text="showPassword ? 'Hide' : 'Show'" class="text-xs font-semibold"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Strength meter -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs text-gray-400">Password Strength:</span>
+                            <span class="text-xs font-semibold" :style="strengthLabelStyle()" x-text="strengthLabel()"></span>
+                        </div>
+                        <div class="flex gap-1">
+                            <template x-for="i in [1,2,3,4]" :key="i">
+                                <div class="h-1 flex-1 rounded-full transition-all duration-300" :style="strengthBarStyle(i)"></div>
+                            </template>
+                        </div>
+                        <p x-show="passwordRequired()" x-cloak class="text-xs text-red-600 mt-1.5">
+                            This is a required field.
+                        </p>
+                        <p x-show="passwordTooShort()" x-cloak class="text-xs text-red-600 mt-1.5">
+                            Please enter at least <?= (int) $magewire->minPasswordLength ?> characters.
+                        </p>
+                        <p x-show="passwordMissingSets()" x-cloak class="text-xs text-red-600 mt-1.5">
+                            The password must include at least <span x-text="remainingSets()"></span> or more of: uppercase (A-Z), lowercase (a-z), number and symbol.
+                        </p>
+                    </div>
+                    <!-- Confirm password -->
+                    <div class="mb-6">
+                        <label for="cn-confirm-password" class="block text-xs font-semibold uppercase tracking-wide text-ahy-blue mb-1">Confirm Password <span class="text-ahy-red">*</span></label>
+                        <div class="relative">
+                            <input id="cn-confirm-password" :type="showPasswordConfirm ? 'text' : 'password'" wire:model.defer="confirmPassword"
+                                   @input="localConfirmPassword = $event.target.value"
+                                   placeholder="Re-enter password" required autocomplete="new-password"
+                                   style="height:42px;padding-top:0;padding-bottom:0;line-height:42px;font-size:0.875rem;border-radius:0.25rem;border-color:#d1d5db;"
+                                   class="w-full border border-gray-300 rounded px-4 pr-11 text-sm text-ahy-blue focus:outline-none focus:border-ahy-blue transition-colors"/>
+                            <button type="button" @click="showPasswordConfirm = !showPasswordConfirm"
+                                    class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-ahy-blue transition-colors border-0 bg-transparent outline-none">
+                                <span x-text="showPasswordConfirm ? 'Hide' : 'Show'" class="text-xs font-semibold"></span>
+                            </button>
+                        </div>
+                        <p x-show="confirmRequired()" x-cloak class="text-xs text-red-600 mt-1.5">
+                            This is a required field.
+                        </p>
+                        <p x-show="passwordMismatch()" x-cloak class="text-xs text-red-600 mt-1.5">
+                            Passwords do not match.
+                        </p>
+                    </div>
+                    <?php else: ?>
+                    <div class="mb-6"></div>
+                    <?php endif; ?>
+
+                    <!-- Error / login redirect -->
+                    <?php if ($magewire->errorMessage): ?>
+                    <div class="mb-5 p-4 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                        <?= $escaper->escapeHtml($magewire->errorMessage) ?>
+                        <?php if ($magewire->loginUrl): ?>
+                        <a href="<?= $escaper->escapeUrl($magewire->loginUrl) ?>" class="ml-1 font-semibold underline text-ahy-blue hover:text-ahy-red">Log in here &rarr;</a>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Continue button → account (+login) → cart → checkout -->
+                    <button type="button" @click="submitJoin()"
+                            wire:loading.attr="disabled" wire:target="join"
+                            :class="allFieldsFilled() ? 'bg-ahy-red hover:bg-ahy-red-light cursor-pointer' : 'bg-ahy-red opacity-50'"
+                            class="w-full flex items-center justify-center gap-2 text-white font-bold rounded-full h-14 transition-all">
+                        <span wire:loading.remove wire:target="join">
+                            <?= $loggedInLapsed
+                                ? 'Renew &amp; Continue to Checkout &rarr;'
+                                : ($magewire->isLoggedIn ? 'Join &amp; Continue to Checkout &rarr;' : 'Create Account &amp; Continue &rarr;') ?>
+                        </span>
+                        <svg wire:loading wire:target="join" class="animate-spin h-4 w-4 text-white shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                        <span wire:loading wire:target="join">Processing...</span>
+                    </button>
+
+                    <?php if (!$magewire->isLoggedIn): ?>
+                    <?php
+                    $cnLoginUrl = $block->getUrl('customer/account/login', [
+                        '_query' => ['referer' => base64_encode($block->getUrl('caliber-nation') . '#membership-signup')],
+                    ]);
+                    ?>
+                    <p class="text-center text-ahy-blue text-sm mt-4">
+                        <?= $escaper->escapeHtml(__('Already a member?')) ?>
+                        <a href="<?= $escaper->escapeUrl($cnLoginUrl) ?>"
+                           class="font-semibold underline underline-offset-2 hover:text-ahy-red">
+                            <?= $escaper->escapeHtml(__('Log In')) ?>
+                        </a>
+                    </p>
+                    <p class="text-center text-ahy-blue text-xs mt-4 leading-relaxed">
+                        By creating an account you agree to Everest's
+                        <a href="/terms-and-conditions" class="underline underline-offset-2 hover:text-ahy-red">Terms of Use</a>
+                        and <a href="/privacy-policy" class="underline underline-offset-2 hover:text-ahy-red">Privacy Policy.</a>
+                    </p>
+                    <?php endif; ?>
+
+                </div>
+                <?php endif; ?>
+
+            </div><!-- /right -->
+        </div><!-- /card -->
+    </div><!-- /container -->
+</section>
