@@ -101,7 +101,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
     class="w-full">
 
    <div class="md:hidden bg-ahy-bg border-b border-gray-300"
-        x-show="!loading && results.length > 0 && !mobileNavOpen"
+        x-show="results.length > 0 && !mobileNavOpen"
         x-data="{ showMobileFilter: false, mobileNavOpen: false }"
         @toggle-mobile-menu.window="mobileNavOpen = !mobileNavOpen"
         x-effect="document.body.style.overflow = showMobileFilter ? 'hidden' : ''">
@@ -232,9 +232,18 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         </template>
     </div>
 
- <div id="search-results-layout" class="flex px-4 md:pr-0 lg:pl-6 pt-0 pb-12 ahy-filter-layout">
+ <!-- Filters + grid stay mounted (not hidden) while a filter/sort/search fetch is in
+     flight — _scrollToResults() below targets this same element's position and
+     depends on it never collapsing while loading, which is what used to blank the
+     page (its children hid via their own !loading conditions, shrinking this
+     element's height out from under the already-computed scroll target). The
+     loader is now scoped to just this row instead of the old fixed/viewport
+     overlay. Only the very first-ever fetch (nothing rendered yet) has no content
+     to sit on top of, so it gets a min-height placeholder instead. -->
+ <div id="search-results-layout" class="flex px-4 md:pr-0 lg:pl-6 pt-0 pb-12 ahy-filter-layout relative"
+      :style="(loading && !results.length) ? 'min-height:1200px' : ''">
 
-        <div x-show="loading || paginationLoading" x-cloak class="ahy-modal-loader-overlay">
+        <div x-show="loading || paginationLoading" x-cloak class="ahy-products-loader-overlay">
             <div class="ahy-page-loader" style="margin:0;"></div>
         </div>
 
@@ -260,7 +269,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                     <div class="cat-skel h-3.5 rounded-full w-3/5"></div>
                 </div>
 
-                <div x-show="!loading && results.length > 0">
+                <div x-show="results.length > 0">
 
                     <div class="pb-3 mb-6 border-b-4 border-ahy-blue">
                         <span class="text-sm font-semibold text-ahy-blue">
@@ -375,7 +384,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
 
         <div class="flex-1 min-w-0">
 
-            <div class="hidden md:flex items-center justify-end mb-5" x-show="!loading && results.length > 0">
+            <div class="hidden md:flex items-center justify-end mb-5" x-show="results.length > 0">
                 <div x-data="{ open: false }" class="relative flex items-center gap-1 text-sm text-ahy-blue">
                     <span>Sort by:</span>
                     <button @click="open = !open" class="font-bold flex items-center gap-1 ml-1">
@@ -393,7 +402,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                 </div>
             </div>
 
-            <div class="hidden text-sm font-semibold text-ahy-blue px-1 mb-3" x-show="!loading && results.length > 0">
+            <div class="hidden text-sm font-semibold text-ahy-blue px-1 mb-3" x-show="results.length > 0">
                 (<span x-text="total"></span> Items)
             </div>
 
@@ -402,7 +411,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
             </div>
 
             <!-- ==================== DESKTOP GRID ==================== -->
-            <div x-show="!loading && results.length > 0"
+            <div x-show="results.length > 0"
                  class="hidden md:grid grid-cols-2 xl:grid-cols-3 gap-0.5">
                 <template x-for="(product, index) in sortedResults()" :key="product.sku || product.product_id">
                     <div class="plp-card"
@@ -562,7 +571,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
             </div>
 
             <!-- ==================== MOBILE LIST ==================== -->
-            <div x-show="!loading && results.length > 0" class="md:hidden flex flex-col gap-0.5">
+            <div x-show="results.length > 0" class="md:hidden flex flex-col gap-0.5">
                 <template x-for="(product, index) in sortedResults()" :key="'m-' + (product.sku || product.product_id)">
                     <div class="relative flex bg-white ahy-mobile-card"
                          x-data="{
@@ -1096,7 +1105,7 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
                 window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
             },
 
-            goToPage(p) { this.page = p; this._writeUrl(); this.paginationLoading = true; this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollToResults()); }); },
+            goToPage(p) { this.page = p; this._writeUrl(); this.paginationLoading = true; this._scrollToResults(); this.fetch().then(() => { this.paginationLoading = false; }); },
             setSort(val) { this.sort = val; this._writeUrl(); },
             sortLabel() {
                 return { relevance: 'Relevance', price_asc: 'Low to High', price_desc: 'High to Low' }[this.sort] || 'Relevance';
@@ -1258,11 +1267,13 @@ window.addEventListener('pageshow', function(e) { if (e.persisted) { window.loca
         margin: 80px auto;
         position: relative;
     }
-    .ahy-modal-loader-overlay {
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        width: 100vw; height: 100vh;
-        z-index: 999998;
+    /* Filters+grid loader — scoped to #search-results-layout (both columns
+       together) instead of the fixed/viewport overlay above, so a filter/sort
+       fetch dims just that row rather than the whole page. */
+    .ahy-products-loader-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
         display: flex;
         align-items: center;
         justify-content: center;

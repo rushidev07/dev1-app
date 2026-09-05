@@ -554,7 +554,19 @@ function ahyModalSearch(productsApiUrl, searchToken, addToCartUrl) {
 
         isFilterActive(key, value) { return this.activeFilters.some(f => f.key === key && f.value === value); },
 
-       goToPage(p) { this.page = p; this.paginationLoading = true; this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollModalToTop()); }); },
+       // Patches `p` onto whatever URL ahySetSearchUrl() already pushed for the
+       // current query, via replaceState — never pushState, so pagination clicks
+       // don't add to _ahySearchPushCount (see closeModal(): that count must only
+       // reflect actual searches, or closing the modal would pop too many/few
+       // history entries and land somewhere wrong).
+       goToPage(p) {
+           this.page = p;
+           const url = new URL(window.location.href);
+           if (p > 1) { url.searchParams.set('p', p); } else { url.searchParams.delete('p'); }
+           history.replaceState(history.state, '', url);
+           this.paginationLoading = true;
+           this.fetch().then(() => { this.paginationLoading = false; this.$nextTick(() => this._scrollModalToTop()); });
+       },
         setSort(val) { this.sort = val; this.page = 1; this.fetch(); },
         sortLabel() {
             return { relevance: 'Relevance', price_asc: 'Price: Low to high', price_desc: 'Price: High to low' }[this.sort] || 'Relevance';
